@@ -71,6 +71,7 @@ index_generator:
 # Category & Tag
 default_category: uncategorized
 category_map:
+    - AI
     - C/C++
     - Python
     - 随笔
