@@ -54,8 +54,12 @@ card:
     description: |
         人生天地间，忽如远行客。
     iconLinks:
+        github:
+            name: github
+            theme: brands
+            link: https://github.com/ShadowUnderMoon/ShadowUnderMoon.github.io
     friendLinks:
-    #    friend Argvchs: https://argvchs.github.io
+        Argvchs: https://argvchs.github.io
 
 # Footer info
 footer:
