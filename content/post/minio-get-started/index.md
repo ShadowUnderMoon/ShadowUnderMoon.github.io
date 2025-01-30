@@ -981,3 +981,59 @@ const (
 
 ## s3 API: PutObject
 
+```go
+// PutObject
+// http处理函数
+router.Methods(http.MethodPut).Path("/{object:.+}").
+  HandlerFunc(s3APIMiddleware(api.PutObjectHandler, traceHdrsS3HFlag))
+// objectLayer层接口
+putObject = objectAPI.PutObject
+```
+
+```go
+// Validate storage class metadata if present
+// x-amz-storage-class minio 只支持 REDUCED_REDUNDANCY 和 Standard
+if sc := r.Header.Get(xhttp.AmzStorageClass); sc != "" {
+    if !storageclass.IsValid(sc) {
+       writeErrorResponse(ctx, w, errorCodes.ToAPIErr(ErrInvalidStorageClass), r.URL)
+       return
+    }
+}
+```
+
+```go
+// maximum Upload size for objects in a single operation
+// 5TiB
+if isMaxObjectSize(size) {
+    writeErrorResponse(ctx, w, errorCodes.ToAPIErr(ErrEntityTooLarge), r.URL)
+    return
+}
+```
+
+```go
+	objInfo, err := putObject(ctx, bucket, object, pReader, opts)
+```
+
+同一个对象对应到的`erasure set`总是同一个，这是通过确定性的hash算法得到的，所以server pool不能被修改，否则hash映射关系可能发生变化。
+
+```go
+// Returns always a same erasure coded set for a given input.
+func (s *erasureSets) getHashedSetIndex(input string) int {
+	// 通过hash得到对应erasure set，以下要素可能影响hash结果
+	return hashKey(s.distributionAlgo, input, len(s.sets), s.deploymentID)
+}
+```
+
+
+
+```go
+
+// PutObject - creates an object upon reading from the input stream
+// until EOF, erasure codes the data across all disk and additionally
+// writes `xl.meta` which carries the necessary metadata for future
+// object operations.
+func (er erasureObjects) PutObject(ctx context.Context, bucket string, object string, data *PutObjReader, opts ObjectOptions) (objInfo ObjectInfo, err error) {
+	return er.putObject(ctx, bucket, object, data, opts)
+}
+```
+
