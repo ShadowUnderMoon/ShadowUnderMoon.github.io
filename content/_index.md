@@ -1,8 +1,3 @@
 ---
-menu:
-    main:
-        name: Home
-        weight: 1
-        params:
-            icon: home
+title: "人生天地间，忽如远行客"
 ---
