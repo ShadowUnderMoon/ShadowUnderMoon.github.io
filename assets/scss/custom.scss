@@ -1,3 +1,88 @@
 /*
     You can add your own custom styles here.
 */
+
+// 把正文的占比改到了 70%, 原来的只有 50% 左右
+.left-sidebar {
+  order: -3;
+  // max-width: var(--left-sidebar-max-width);
+  max-width: 10%;
+}
+
+.right-sidebar {
+  order: -1;
+  // max-width: var(--right-sidebar-max-width);
+  max-width: 20%;
+
+  /// Display right sidebar when min-width: lg
+  @include respond(lg) {
+    display: flex;
+  }
+}
+
+/*-----------归档页面----------*/
+//归档页面卡片缩放
+.article-list--tile article {
+  transition: 0.6s ease;
+}
+
+.article-list--tile article:hover {
+  transform: scale(1.03, 1.03);
+}
+
+// macOS 风格代码块
+.article-content {
+  .highlight:before {
+    content: "";
+    display: block;
+    background: url(/code-header.svg);
+    height: 32px;
+    width: 100%;
+    background-size: 57px;
+    background-repeat: no-repeat;
+    margin-bottom: 5px;
+    background-position: -1px 2px;
+  }
+}
+
+.article-content {
+  // line 205
+  .highlight {
+    // line 331
+    background-color: var(--pre-background-color);
+    position: relative;
+    pre {
+      // line 345
+      margin: initial;
+      padding: 0;
+      margin: 0;
+      width: auto;
+      max-height: 20em;
+      scrollbar-width: none; /* Firefox */
+      &::-webkit-scrollbar {
+        display: none; /* Chrome Safari */
+      }
+    }
+  }
+}
+
+// 头像旋转动画
+.sidebar header .site-avatar .site-logo {
+  transition: transform 1.65s ease-in-out; // 旋转时间
+}
+
+.sidebar header .site-avatar .site-logo:hover {
+  transform: rotate(360deg); // 旋转角度为360度
+}
+
+@import url("/css/highlight-dark.css");
+
+
+@font-face {
+    font-family: "Fira Code";
+    src: url("/fonts/FiraCode-Regular.woff2") format("woff2"),
+         url("/fonts/FiraCode-Regular.ttf") format("truetype");
+}
+code, pre {
+    font-family: "Fira Code", monospace;
+}

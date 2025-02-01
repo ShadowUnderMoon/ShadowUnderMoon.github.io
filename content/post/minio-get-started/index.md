@@ -16,11 +16,11 @@ categories = [
 
 +++
 
-## xl.meta数据结构
+## xl.meta 数据结构
 
-当对象大小超过128KiB后，比如`a.txt`，数据和元数据分开存储
+当对象大小超过 128KiB 后，比如`a.txt`，数据和元数据分开存储
 
-MinIO提供了命令行工具`xl-meta`用来查看`xl.meta`文件
+MinIO 提供了命令行工具`xl-meta`用来查看`xl.meta`文件
 
 ```json
 {
@@ -77,11 +77,11 @@ MinIO提供了命令行工具`xl-meta`用来查看`xl.meta`文件
     └── xl.meta
 ```
 
-## minio的启动流程
+## minio 的启动流程
 
-minio启动核心的核心命令为 `minio server https://minio{1...4}.example.net:9000/mnt/disk{1...4}/minio`，表示minio服务分布部署在4台服务器上总共16块磁盘上，`...这种写法称之为拓展表达式，比如 `http://minio{1...4}.example.net:9000`实际上表示`http://minio1.example.net:9000`到`http://minio4.example.net:9000`的4台主机。
+minio 启动核心的核心命令为 `minio server https://minio{1...4}.example.net:9000/mnt/disk{1...4}/minio`，表示 minio 服务分布部署在 4 台服务器上总共 16 块磁盘上，`...这种写法称之为拓展表达式，比如 `http://minio{1...4}.example.net:9000`实际上表示`http://minio1.example.net:9000`到`http://minio4.example.net:9000`的4台主机。
 
-go程序的入口为`main#main()`函数，直接调用了`cmd#Main`,其中做了一些命令行程序的相关操作，包括注册命令，其中`registerCommand(serverCmd)`注册服务相关命令，`cmd#ServerMain`是主要启动流程函数。
+go 程序的入口为`main#main()`函数，直接调用了`cmd#Main`,其中做了一些命令行程序的相关操作，包括注册命令，其中`registerCommand(serverCmd)`注册服务相关命令，`cmd#ServerMain`是主要启动流程函数。
 
 ```go
 // Run the app - exit on error.
@@ -113,7 +113,7 @@ signal.Notify(globalOSSignalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 go handleSignals()
 ```
 
-`buildServerCtxt`决定磁盘布局以及是否使用legacy方式，调用函数`cmd#mergeDisksLayoutFromArgs`判断是否使用了拓展表达式，如果没有，`legacy = true`，否则`legacy =false`, `legacy`参数的作用我们在后面就能看到了。
+`buildServerCtxt`决定磁盘布局以及是否使用 legacy 方式，调用函数`cmd#mergeDisksLayoutFromArgs`判断是否使用了拓展表达式，如果没有，`legacy = true`，否则`legacy =false`, `legacy`参数的作用我们在后面就能看到了。
 
 `serverHandleCmdArgs`函数中调用 `createServerEndpoints`，
 
@@ -128,9 +128,9 @@ go handleSignals()
 	})
 ```
 
-## MinIO的DNS缓存
+## MinIO 的 DNS 缓存
 
-MinIO为了避免向外发送过多的DNS查询，所以实现了DNS缓存，默认使用`net.DefaultResolver`实际执行DNS查询，设置的DNS查询超时时间为`5s`，缓存的刷新时间在容器环境下默认为`30s`，在其他环境下为`10min`，可以通过`dns-cache-ttl`指定。
+MinIO 为了避免向外发送过多的 DNS 查询，所以实现了 DNS 缓存，默认使用`net.DefaultResolver`实际执行 DNS 查询，设置的 DNS 查询超时时间为`5s`，缓存的刷新时间在容器环境下默认为`30s`，在其他环境下为`10min`，可以通过`dns-cache-ttl`指定。
 
 ```go
 type Resolver struct {
@@ -200,7 +200,7 @@ type poolDisksLayout struct {
 }
 ```
 
-构造拓扑关系的主要函数实现是`mergeDisksLayoutFromArgs`，判断环境变量`MINIO_ERASURE_SET_DRIVE_COUNT`是否存在，环境变量`MINIO_ERASURE_SET_DRIVE_COUNT`表示erasure set中指定的磁盘数量，否则默认为0，表示自动设置最优结果。根据是否使用拓展表达式会走不同的逻辑。这里我们主要关心使用拓展表达式的场景`GetAllSets(setDriveCount, arg)`。（顺带一提，legacy style会走`GetAllSets(setDriveCount, args...)`，可以看到legacy style只能指定一个`server pool`）
+构造拓扑关系的主要函数实现是`mergeDisksLayoutFromArgs`，判断环境变量`MINIO_ERASURE_SET_DRIVE_COUNT`是否存在，环境变量`MINIO_ERASURE_SET_DRIVE_COUNT`表示 erasure set 中指定的磁盘数量，否则默认为 0，表示自动设置最优结果。根据是否使用拓展表达式会走不同的逻辑。这里我们主要关心使用拓展表达式的场景`GetAllSets(setDriveCount, arg)`。（顺带一提，legacy style 会走`GetAllSets(setDriveCount, args...)`，可以看到 legacy style 只能指定一个`server pool`）
 
 ```go
 // mergeDisksLayoutFromArgs supports with and without ellipses transparently.
@@ -255,7 +255,7 @@ func mergeDisksLayoutFromArgs(args []string, ctxt *serverCtxt) (err error) {
 }
 ```
 
-`GetAllSets`主要调用了`parseEndpointSet`，通过正则表达式解析带有拓展表达式的输入参数，并返回一个`[][]string`，表示不同erasure set中的磁盘路径。这里主要对应的数据结构是`endpointSet`，主要实现两件事情，第一确定setSize，第二确定如何将endpoints分布到不同的erasure set中。
+`GetAllSets`主要调用了`parseEndpointSet`，通过正则表达式解析带有拓展表达式的输入参数，并返回一个`[][]string`，表示不同 erasure set 中的磁盘路径。这里主要对应的数据结构是`endpointSet`，主要实现两件事情，第一确定 setSize，第二确定如何将 endpoints 分布到不同的 erasure set 中。
 
 ```go
 // Endpoint set represents parsed ellipses values, also provides
@@ -278,7 +278,7 @@ type Pattern struct {
 }
 ```
 
-函数`getSetIndexes`的目的是找到合适的`setSize`，MinIO规定分布式部署setSize的取值必须属于`var setSizes = []uint64{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}`，首先从`SetSizes`中找到能够被`server pool size`整除的`setCounts`集合，如果自定义了`setSize`则判断自定义的`setSize`是否属于`setCounts`集合，如果属于则`setSize`设置成功，否则返回错误。如果没有设置自定义的`setSize`，函数`possibleSetCountsWithSymmetry`从`setCounts`集合中找到具有`symmetry`属性的值，MinIO中输入带拓展表达式的参数对应的pattern列表和参数中的顺序是相反的，`symmetry`过滤出能够被pattern中最后一个pattern对应的数量整除或者被整除的`setCounts`中的值，这里举一个例子`http://127.0.0.{1...4}:9000/Users/hanjing/mnt/minio{1...32}`，显然`symmetry`函数会判断4和`setCounts`中值的关系，而不是32和`setCounts`中值的关系，这可能与MinIO希望尽可能将erasure set的中不同磁盘分布到不同的节点上有关。最后取出剩余候选值中最大的值作为最终的`setSize`。
+函数`getSetIndexes`的目的是找到合适的`setSize`，MinIO 规定分布式部署 setSize 的取值必须属于`var setSizes = []uint64{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}`，首先从`SetSizes`中找到能够被`server pool size`整除的`setCounts`集合，如果自定义了`setSize`则判断自定义的`setSize`是否属于`setCounts`集合，如果属于则`setSize`设置成功，否则返回错误。如果没有设置自定义的`setSize`，函数`possibleSetCountsWithSymmetry`从`setCounts`集合中找到具有`symmetry`属性的值，MinIO 中输入带拓展表达式的参数对应的 pattern 列表和参数中的顺序是相反的，`symmetry`过滤出能够被 pattern 中最后一个 pattern 对应的数量整除或者被整除的`setCounts`中的值，这里举一个例子`http://127.0.0.{1...4}:9000/Users/hanjing/mnt/minio{1...32}`，显然`symmetry`函数会判断 4 和`setCounts`中值的关系，而不是 32 和`setCounts`中值的关系，这可能与 MinIO 希望尽可能将 erasure set 的中不同磁盘分布到不同的节点上有关。最后取出剩余候选值中最大的值作为最终的`setSize`。
 
 ```go
 func (s endpointSet) Get() (sets [][]string) {
@@ -295,9 +295,9 @@ func (s endpointSet) Get() (sets [][]string) {
 }
 ```
 
-`endpointSet#Get`方法返回一个二维数据，第一维表示 不同的 erasure set，第二位表示erasure set中的不同磁盘。这里`getEndpoints`多重循环迭代ellipses-style对应的pattern，如果还记得的话，pattern的顺序和实际在参数中出现的顺序相反，这样得到的`endpoints`列表将不同节点上的磁盘均匀分布，后面连续取列表中的一段组成`erasure set`时，得到的`erasure set`中的磁盘也分布在不同的节点上。
+`endpointSet#Get`方法返回一个二维数据，第一维表示 不同的 erasure set，第二位表示 erasure set 中的不同磁盘。这里`getEndpoints`多重循环迭代 ellipses-style 对应的 pattern，如果还记得的话，pattern 的顺序和实际在参数中出现的顺序相反，这样得到的`endpoints`列表将不同节点上的磁盘均匀分布，后面连续取列表中的一段组成`erasure set`时，得到的`erasure set`中的磁盘也分布在不同的节点上。
 
-### serverHandleCmdArgs函数
+### serverHandleCmdArgs 函数
 
 ```go
 	globalEndpoints, setupType, err = createServerEndpoints(globalMinioAddr, ctxt.Layout.pools, ctxt.Layout.legacy)
@@ -322,11 +322,11 @@ func (s endpointSet) Get() (sets [][]string) {
 	setGlobalInternodeInterface(ctxt.Interface)
 ```
 
-里面有一个比较重要的工具函数`isLocalHost`，通过DNS查询host对应的ip，和所有网卡对应的所有本地ip取交集,如果交集为空，说明不是本地服务器，否则是本地服务器。
+里面有一个比较重要的工具函数`isLocalHost`，通过 DNS 查询 host 对应的 ip，和所有网卡对应的所有本地 ip 取交集,如果交集为空，说明不是本地服务器，否则是本地服务器。
 
 函数`createServerEndpoints`将数据结构`[]poolDisksLayout`转换成`EndpointServerPools`，并指定对应的`SetupType`
 
-对于单磁盘部署，要求使用目录路径指定输入参数，`IsLocal`一定为`true`，`SetupType`为`ErasureSDSetupType`。其他情况下根据，根据本地ip和给定的host，判断`IsLocal`，如果 host为空（MinIO称为`PathEndpointType`)，则`setupType = ErasureSetupType`，否则为`URLEndpointType`情况，如果不同`host:port`的数量等于1，则是`ErasureSetupType`，否则对应`DistErasureSetupType`，根据得到的`SetType`设置全局参数。
+对于单磁盘部署，要求使用目录路径指定输入参数，`IsLocal`一定为`true`，`SetupType`为`ErasureSDSetupType`。其他情况下根据，根据本地 ip 和给定的 host，判断`IsLocal`，如果 host 为空（MinIO 称为`PathEndpointType`)，则`setupType = ErasureSetupType`，否则为`URLEndpointType`情况，如果不同`host:port`的数量等于 1，则是`ErasureSetupType`，否则对应`DistErasureSetupType`，根据得到的`SetType`设置全局参数。
 
 `EndpointServerPools`实际上是`[][]EndPoint`，第一位
 
@@ -386,7 +386,7 @@ const (
 )
 ```
 
-以下函数列出了Minio支持的不同模式，和上面的`SetType`之间存在对应关系。
+以下函数列出了 Minio 支持的不同模式，和上面的`SetType`之间存在对应关系。
 
 ```go
 // Returns the mode in which MinIO is running
@@ -404,10 +404,10 @@ func getMinioMode() string {
 }
 ```
 
-## HTTP服务器注册API
+## HTTP 服务器注册 API
 
 - 注册分布式命名空间锁
-- `registerAPIRouter`注册 s3相关的主要api
+- `registerAPIRouter`注册 s3 相关的主要 api
 
 ```go
 	// Configure server.
@@ -483,9 +483,9 @@ func configureServerHandler(endpointServerPools EndpointServerPools) (http.Handl
 }
 ```
 
-`registerAPIRouter`会注册主要的s3 API，这里举`GetObject`操作为例进行说明，当http method为`GET`时，如果没有命中其他的路由，则认为是`GetObject`操作，从Path中获取`object`名字，并使用`api.GetObjectHandler`进行处理和响应，`s3APIMiddleware`作为中间件，可以做一些额外的操作，比如监控和记录日志。
+`registerAPIRouter`会注册主要的 s3 API，这里举`GetObject`操作为例进行说明，当 http method 为`GET`时，如果没有命中其他的路由，则认为是`GetObject`操作，从 Path 中获取`object`名字，并使用`api.GetObjectHandler`进行处理和响应，`s3APIMiddleware`作为中间件，可以做一些额外的操作，比如监控和记录日志。
 
-`api`对象中保存了一个函数引用，通过这个函数引用，能够得到全局的`ObjectLayer`对象，`ObjectLayer`实现了对象API层的基本操作。
+`api`对象中保存了一个函数引用，通过这个函数引用，能够得到全局的`ObjectLayer`对象，`ObjectLayer`实现了对象 API 层的基本操作。
 
 ```go
 // GetObject
@@ -507,7 +507,7 @@ func newObjectLayerFn() ObjectLayer {
 }
 ```
 
-## ObjectLayer的初始化流程
+## ObjectLayer 的初始化流程
 
 ```go
 	var newObject ObjectLayer
@@ -542,13 +542,13 @@ func DefaultParityBlocks(drive int) int {
 }
 ```
 
-`Reduced Redundancy Storage Class`: 通过环境变量`MINIO_STORAGE_CLASS_RRS`指定，否则默认为1
+`Reduced Redundancy Storage Class`: 通过环境变量`MINIO_STORAGE_CLASS_RRS`指定，否则默认为 1
 
 `Optimized Storage Class`：通过环境变量`MINIO_STORAGE_CLASS_OPTIMIZE`指定，默认为`""`
 
-`inline block size`: 通过环境变量`MINIO_STORAGE_CLASS_INLINE_BLOCK`指定，默认为`128KiB`,如果shard数据的大小小于`inline block size`，则会直接将数据和元数据写到同一个文件，即`xl.meta`
+`inline block size`: 通过环境变量`MINIO_STORAGE_CLASS_INLINE_BLOCK`指定，默认为`128KiB`,如果 shard 数据的大小小于`inline block size`，则会直接将数据和元数据写到同一个文件，即`xl.meta`
 
-### MinIO的存储分层
+### MinIO 的存储分层
 
 #### erasureServerPools
 
@@ -810,7 +810,7 @@ type StorageAPI interface {
 
 唯一一个实现就是`erasureServerPools`
 
-ObjectLayer就是Minio提供的面向Object的接口，而`StorageAPI`则是具体的本地或者远程存储磁盘。
+ObjectLayer 就是 Minio 提供的面向 Object 的接口，而`StorageAPI`则是具体的本地或者远程存储磁盘。
 
 ```go
 // ObjectLayer implements primitives for object API layer.
@@ -956,7 +956,7 @@ if isMaxObjectSize(size) {
 	objInfo, err := putObject(ctx, bucket, object, pReader, opts)
 ```
 
-同一个对象对应到的`erasure set`总是同一个，这是通过确定性的hash算法得到的，所以server pool不能被修改，否则hash映射关系可能发生变化。
+同一个对象对应到的`erasure set`总是同一个，这是通过确定性的 hash 算法得到的，所以 server pool 不能被修改，否则 hash 映射关系可能发生变化。
 
 ```go
 // Returns always a same erasure coded set for a given input.
@@ -1004,13 +1004,13 @@ Shard (分片)
   - **计算出 2 个额外的 `parity block`（用于恢复数据）**。
   - **最终存储 6 个 `shard`**，每个 `shard` 分别存放在不同的磁盘上。
 
-假设数据为300MiB，blocksize为10MiB, 遵循EC: 4 + 2, shardsize = ceil(10MiB / 4) =2.5MiB，最终每个blocksize存储在磁盘上为6个shard，4个 data shard，6个 parity shard
+假设数据为 300MiB，blocksize 为 10MiB, 遵循 EC: 4 + 2, shardsize = ceil(10MiB / 4) =2.5MiB，最终每个 blocksize 存储在磁盘上为 6 个 shard，4 个 data shard，6 个 parity shard
 
-### putObject的主要流程
+### putObject 的主要流程
 
 1. 创建临时目录，写入分片数据
 2. 如果没有加锁，获取名字空间锁，实现原子操作，避免数据竞争
-3. rename操作，包含将分片移动到目标目录以及写入 `xl.meta`元数据
+3. rename 操作，包含将分片移动到目标目录以及写入 `xl.meta`元数据
 4. 最后好像有提交操作，没有看懂
 
 ## 名字空间锁的实现原理 （TODO)
@@ -1159,7 +1159,7 @@ func newNSLock(isDistErasure bool) *nsLockMap {
 - 提供 **读/写锁、强制解锁、锁续约等功能**，适用于高并发场景。
 - **MinIO 通过 `dsync` 确保多个服务器不会并发写入相同对象**，保证数据一致性。
 
-## O_DIRECT的实际用途
+## O_DIRECT 的实际用途
 
 ## s3 API: GetObject
 
@@ -1171,32 +1171,32 @@ router.Methods(http.MethodGet).Path("/{object:.+}").
 
 - 首先加分布式读锁
 - 通过读取`xl.meta`获取对象的元数据信息，`xl.meta`保存了`part`和`verison`的全部信息，注意可能存在某些磁盘上的`xl.meta`由于故障而修改落后，所以依然需要读取法定人数的磁盘，从而确定实际的元数据
-- 如果http请求通过`part`或者`range`要求读取部分数据，最终都会转换成对多个part的读取，每个part都会划分成不同的`block`进行操作。
+- 如果 http 请求通过`part`或者`range`要求读取部分数据，最终都会转换成对多个 part 的读取，每个 part 都会划分成不同的`block`进行操作。
 
 ## 纠删码的基本原理
 
 https://p0kt65jtu2p.feishu.cn/docx/LZ36dMN3LoZCuUxFadccNOXGnKb
 
-假设将数据分成4块，采用EC:2冗余比例，可以将原来的数据组合成一个输入矩阵 `P = [][]byte`， 第一维表示不同的数据块，第二维表示数据块的数据，所以这里的 P 的大小为 `4 * n`，n为每个数据块的大小
+假设将数据分成 4 块，采用 EC:2 冗余比例，可以将原来的数据组合成一个输入矩阵 `P = [][]byte`， 第一维表示不同的数据块，第二维表示数据块的数据，所以这里的 P 的大小为 `4 * n`，n 为每个数据块的大小
 
-编码矩阵E的大小为 `6 * 4`，要求 编码矩阵的前4行组成的矩阵为单位矩阵，保持原来数据块数据不变，后两行用来生成冗余数据。
+编码矩阵 E 的大小为 `6 * 4`，要求 编码矩阵的前 4 行组成的矩阵为单位矩阵，保持原来数据块数据不变，后两行用来生成冗余数据。
 
-E \* P = C （C表示生成的数据块和冗余块）
+E \* P = C （C 表示生成的数据块和冗余块）
 
 假设有两行数据不慎丢失，此时去掉那两行对应的数据后依然有关系 $E' * P = C'$ 成立，此时通过求逆可以得到原先的 P，也就从数据丢失中恢复了原来的数据。
 
 ## 分片上传和断点续传
 
-分片下载可以通过前面说过的http请求中的`range`或者`partnumber`实现。
+分片下载可以通过前面说过的 http 请求中的`range`或者`partnumber`实现。
 
-主要涉及的s3 API（客户端）:
+主要涉及的 s3 API（客户端）:
 
 - InitiateMultipartUpload
 - UploadPart
 - AbortMultipartUpload
 - CompleteMultipartUpload
 
-在minio的客户端代码中实现了分片上传，并且支持并发上传
+在 minio 的客户端代码中实现了分片上传，并且支持并发上传
 
 ```go
 
@@ -1256,13 +1256,13 @@ func (c *Client) putObjectMultipartStreamParallel(ctx context.Context, bucketNam
 
 **NewMultipartUpload**
 
-- 生成uuid作为uploadId
-- 将元数据写入 `.minio.sys/multipart` uploadId路径下
+- 生成 uuid 作为 uploadId
+- 将元数据写入 `.minio.sys/multipart` uploadId 路径下
 
 **PutObjectPart**
 
-- 类似于PutObejct
+- 类似于 PutObejct
 
 **CompleteMultipartUpload**
 
-- 并没有合并part，仍然保留每个part
+- 并没有合并 part，仍然保留每个 part

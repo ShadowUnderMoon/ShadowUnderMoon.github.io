@@ -2,7 +2,7 @@
 mainSections = ["post"]
 # Output page's full content in RSS.
 rssFullContent = true
-favicon = "/favicon.png"
+favicon = "/favicon.jpg"
 
 [footer]
 since = 2020
@@ -19,7 +19,7 @@ subtitle = "人生天地间，忽如远行客"
 [sidebar.avatar]
 enabled = true
 local = true
-src = "img/winter_dusk.jpg"
+src = "img/avatar.jpg"
 
 [article]
 headingAnchor = false
