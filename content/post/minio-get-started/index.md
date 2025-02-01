@@ -1,7 +1,10 @@
 +++
 date = '2025-01-22T19:03:56+08:00'
 draft = false
-title = 'Minio Get Started'
+title = 'MinIO大杂烩'
+
+math = true
+
 tags = [
 
 "minio"
@@ -13,13 +16,11 @@ categories = [
 
 +++
 
-https://blog.min.io/minio-versioning-metadata-deep-dive/
-
-http://127.0.0.{1...4}:9000/Users/hanjing/mnt/minio{1...32}
-
 ## xl.meta数据结构
 
 当对象大小超过128KiB后，比如`a.txt`，数据和元数据分开存储
+
+MinIO提供了命令行工具`xl-meta`用来查看`xl.meta`文件
 
 ```json
 {
@@ -42,9 +43,7 @@ http://127.0.0.{1...4}:9000/Users/hanjing/mnt/minio{1...32}
           "DDir": "74hQxU7FTrq56ShK8pjqAA==",
           "EcAlgo": 1,
           "EcBSize": 1048576,
-          "EcDist": [
-            1
-          ],
+          "EcDist": [1],
           "EcIndex": 1,
           "EcM": 1,
           "EcN": 0,
@@ -55,16 +54,10 @@ http://127.0.0.{1...4}:9000/Users/hanjing/mnt/minio{1...32}
             "content-type": "text/plain",
             "etag": "90a1a2b65a4e40d55d758f2a59fe33b4"
           },
-          "PartASizes": [
-            2097152
-          ],
+          "PartASizes": [2097152],
           "PartETags": null,
-          "PartNums": [
-            1
-          ],
-          "PartSizes": [
-            2097152
-          ],
+          "PartNums": [1],
+          "PartSizes": [2097152],
           "Size": 2097152
         },
         "v": 1734527744
@@ -84,19 +77,17 @@ http://127.0.0.{1...4}:9000/Users/hanjing/mnt/minio{1...32}
     └── xl.meta
 ```
 
-
-
 ## minio的启动流程
 
-minio启动核心的核心命令为 `minio server https://minio{1...4}.example.net:9000/mnt/disk{1...4}/minio`，表示minio服务分布部署在4台服务器上总共16块磁盘上，`...`用来简写，比如 `http://minio{1...4}.example.net:9000`实际上表示`http://minio1.example.net:9000`到`http://minio4.example.net:9000`的4台主机。
+minio启动核心的核心命令为 `minio server https://minio{1...4}.example.net:9000/mnt/disk{1...4}/minio`，表示minio服务分布部署在4台服务器上总共16块磁盘上，`...这种写法称之为拓展表达式，比如 `http://minio{1...4}.example.net:9000`实际上表示`http://minio1.example.net:9000`到`http://minio4.example.net:9000`的4台主机。
 
 go程序的入口为`main#main()`函数，直接调用了`cmd#Main`,其中做了一些命令行程序的相关操作，包括注册命令，其中`registerCommand(serverCmd)`注册服务相关命令，`cmd#ServerMain`是主要启动流程函数。
 
 ```go
-	// Run the app - exit on error.
-	if err := newApp(appName).Run(args); err != nil {
-		os.Exit(1) //nolint:gocritic
-	}
+// Run the app - exit on error.
+if err := newApp(appName).Run(args); err != nil {
+  os.Exit(1) //nolint:gocritic
+}
 ```
 
 ```go
@@ -107,8 +98,6 @@ var serverCmd = cli.Command{
 	Action: serverMain,
 ```
 
-
-
 ### ServerMain
 
 ```go
@@ -117,16 +106,14 @@ http://127.0.0.1:/Users/hanjing/mnt/minio0{1...3}
 http://127.0.0.1:/Users/hanjing/mnt/minio0{4...6}
 ```
 
-
-
 处理系统终止或者重启相关的信号等
 
 ```go
-	signal.Notify(globalOSSignalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
-	go handleSignals()
+signal.Notify(globalOSSignalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+go handleSignals()
 ```
 
-`buildServerCtxt`决定磁盘布局以及是否使用legacy方式，调用函数`cmd#mergeDisksLayoutFromArgs`判断是否使用拓展表达式，如果没有，`legacy = true`，否则`legacy =false`, `legacy`参数的作用我们在后面就能看到了。
+`buildServerCtxt`决定磁盘布局以及是否使用legacy方式，调用函数`cmd#mergeDisksLayoutFromArgs`判断是否使用了拓展表达式，如果没有，`legacy = true`，否则`legacy =false`, `legacy`参数的作用我们在后面就能看到了。
 
 `serverHandleCmdArgs`函数中调用 `createServerEndpoints`，
 
@@ -164,8 +151,6 @@ globalDNSCache = &dnscache.Resolver{
 }
 ```
 
-
-
 ```go
 
 func runDNSCache(ctx *cli.Context) {
@@ -196,8 +181,6 @@ func runDNSCache(ctx *cli.Context) {
 	}()
 }
 ```
-
-
 
 ## 构造拓扑关系 (`buildServerCtxt`)
 
@@ -381,8 +364,6 @@ type Endpoint struct {
 }
 ```
 
-
-
 ```go
 // SetupType - enum for setup type.
 type SetupType int
@@ -423,40 +404,7 @@ func getMinioMode() string {
 }
 ```
 
-## 分布式锁
-
-```go
-	// Initialize grid
-	bootstrapTrace("initGrid", func() {
-		logger.FatalIf(initGlobalGrid(GlobalContext, globalEndpoints), "Unable to configure server grid RPC services")
-	})
-
-	// Initialize lock grid
-	bootstrapTrace("initLockGrid", func() {
-		logger.FatalIf(initGlobalLockGrid(GlobalContext, globalEndpoints), "Unable to configure server lock grid RPC services")
-	})
-```
-
-```go
-	// Initialize distributed NS lock.
-	if globalIsDistErasure {
-		registerDistErasureRouters(router, endpointServerPools)
-	}
-```
-
-
-
-```go
-// Node holds information about a node in this cluster
-type Node struct {
-	*url.URL
-	Pools    []int
-	IsLocal  bool
-	GridHost string
-}
-```
-
-## HTTP服务器注册API 
+## HTTP服务器注册API
 
 - 注册分布式命名空间锁
 - `registerAPIRouter`注册 s3相关的主要api
@@ -599,10 +547,6 @@ func DefaultParityBlocks(drive int) int {
 `Optimized Storage Class`：通过环境变量`MINIO_STORAGE_CLASS_OPTIMIZE`指定，默认为`""`
 
 `inline block size`: 通过环境变量`MINIO_STORAGE_CLASS_INLINE_BLOCK`指定，默认为`128KiB`,如果shard数据的大小小于`inline block size`，则会直接将数据和元数据写到同一个文件，即`xl.meta`
-
-
-
-
 
 ### MinIO的存储分层
 
@@ -751,8 +695,6 @@ func newStorageAPI(endpoint Endpoint, opts storageOpts) (storage StorageAPI, err
 		return s, err
 	}
 ```
-
-
 
 ```go
 // getDiskInfo returns given disk information.
@@ -1024,8 +966,6 @@ func (s *erasureSets) getHashedSetIndex(input string) int {
 }
 ```
 
-
-
 ```go
 
 // PutObject - creates an object upon reading from the input stream
@@ -1037,3 +977,292 @@ func (er erasureObjects) PutObject(ctx context.Context, bucket string, object st
 }
 ```
 
+### block 和 shard
+
+block （块）
+
+`blockSize` 代表原始数据在存储时被切分的最小单位。
+
+- 在 MinIO 中，数据在存储前被分割成多个 `block`。
+- 这些 `block` 经过 **纠删码（Erasure Coding）** 计算后，生成 **数据块（data blocks）** 和 **校验块（parity blocks）**。
+
+Shard (分片)
+
+`shard` 是 MinIO **存储在磁盘上的物理单位**，包含 **数据块** 和 **校验块**。
+
+- 在 **N+M 纠删码**（N 个数据块 + M 个校验块）中，每个 `shard` 对应 **一个数据块或一个校验块**。
+
+- 例如，
+
+  ```
+  EC: 4+2
+  ```
+
+  （4 个数据块 + 2 个校验块）表示：
+
+  - **数据被分成 4 个 `block`**。
+  - **计算出 2 个额外的 `parity block`（用于恢复数据）**。
+  - **最终存储 6 个 `shard`**，每个 `shard` 分别存放在不同的磁盘上。
+
+假设数据为300MiB，blocksize为10MiB, 遵循EC: 4 + 2, shardsize = ceil(10MiB / 4) =2.5MiB，最终每个blocksize存储在磁盘上为6个shard，4个 data shard，6个 parity shard
+
+### putObject的主要流程
+
+1. 创建临时目录，写入分片数据
+2. 如果没有加锁，获取名字空间锁，实现原子操作，避免数据竞争
+3. rename操作，包含将分片移动到目标目录以及写入 `xl.meta`元数据
+4. 最后好像有提交操作，没有看懂
+
+## 名字空间锁的实现原理 （TODO)
+
+```go
+// func (er erasureObjects) putObject
+if !opts.NoLock {
+		lk := er.NewNSLock(bucket, object)
+		lkctx, err := lk.GetLock(ctx, globalOperationTimeout)
+		if err != nil {
+			return ObjectInfo{}, err
+		}
+		ctx = lkctx.Context()
+		defer lk.Unlock(lkctx)
+	}
+```
+
+`erasureObjects`中有两个关键的字段`getLockers`和`nsMutex`用于名字空间加锁。
+
+```go
+type erasureObjects struct {
+	// getLockers returns list of remote and local lockers.
+	getLockers func() ([]dsync.NetLocker, string)
+
+	// Locker mutex map.
+	nsMutex *nsLockMap
+}
+```
+
+```go
+type erasureSets struct {
+	sets []*erasureObjects
+
+	// Distributed locker clients.
+	erasureLockers setsDsyncLockers
+
+  // Distributed lock owner (constant per running instance).
+	erasureLockOwner string
+  // setsDsyncLockers is encapsulated type for Close()
+	type setsDsyncLockers [][]dsync.NetLocker
+```
+
+```go
+func (s *erasureSets) GetLockers(setIndex int) func() ([]dsync.NetLocker, string) {
+	return func() ([]dsync.NetLocker, string) {
+		lockers := make([]dsync.NetLocker, len(s.erasureLockers[setIndex]))
+		copy(lockers, s.erasureLockers[setIndex])
+    // erasureLockerOwner实际上是globalLocalNodeName
+    // The name of this local node, fetched from arguments
+	  // globalLocalNodeName    string
+		return lockers, s.erasureLockOwner
+	}
+}
+```
+
+```go
+// nsLockMap - namespace lock map, provides primitives to Lock,
+// Unlock, RLock and RUnlock.
+type nsLockMap struct {
+	// Indicates if namespace is part of a distributed setup.
+	isDistErasure bool
+	lockMap       map[string]*nsLock
+	lockMapMutex  sync.Mutex
+}
+// newNSLock - return a new name space lock map.
+func newNSLock(isDistErasure bool) *nsLockMap {
+	nsMutex := nsLockMap{
+		isDistErasure: isDistErasure,
+	}
+	if isDistErasure {
+		return &nsMutex
+	}
+	nsMutex.lockMap = make(map[string]*nsLock)
+	return &nsMutex
+}
+```
+
+### **什么是 dsync？**
+
+`dsync` 是 **MinIO** 实现的**分布式锁（distributed locking）库**，用于在多节点环境下进行同步锁定，确保数据一致性。
+
+**主要作用：**
+
+- 在 **MinIO 集群** 中，确保多个 MinIO 服务器节点在 **并发访问同一资源** 时，正确管理**读/写锁**。
+- 提供 **类似 `sync.Mutex` 和 `sync.RWMutex` 的分布式版本**，但适用于**分布式系统**，而不是单机环境。
+- **避免数据竞争和不一致性**，保证多个 MinIO 服务器不会发生并发冲突。
+
+#### **`NetLocker` 接口**
+
+你提供的 `NetLocker` 接口定义了一种**分布式锁管理机制**，与 `dsync` 兼容，核心方法包括：
+
+- `Lock()` / `Unlock()` —— **写锁**
+- `RLock()` / `RUnlock()` —— **读锁**
+- `Refresh()` —— **续约锁，防止锁过期**
+- `ForceUnlock()` —— **强制解锁**
+- `IsOnline()` / `IsLocal()` —— **检查锁服务是否在线，本地还是远程**
+- `String()` / `Close()` —— **返回锁的标识 & 关闭连接**
+
+这套机制允许 MinIO 在**多个服务器节点**间进行**分布式锁管理**，确保一致性。
+
+### **dsync 是如何工作的？**
+
+`dsync` **采用基于 `n/2+1` 多数决机制的分布式锁**，适用于 MinIO **分布式对象存储集群**。
+
+**核心特点：**
+
+1. **分布式锁（类似 `sync.Mutex`）**
+
+   - `Lock()` / `Unlock()` 实现互斥锁，确保**多个 MinIO 节点不会同时写入相同数据**。
+   - `RLock()` / `RUnlock()` 允许**多个读取者并发访问**，但不能同时有写入者。
+
+2. **基于 Raft 的一致性算法**
+
+   不存储锁的持久化状态，而是采用 n/2+1 机制
+
+   - **如果大多数（n/2+1）MinIO 节点同意加锁，则锁成功。**
+   - 如果未达到多数决（如部分节点宕机），加锁失败，防止数据不一致。
+
+   - 这类似于 **Paxos/Raft** 选举机制，保证**数据一致性**。
+
+3. **超时 & 续约（避免死锁）**
+
+   - **锁会自动超时**，防止死锁问题。
+   - `Refresh()` 允许持有锁的进程 **续约**，防止锁过期被其他进程获取。
+
+4. **支持本地 & 远程锁**
+
+   - **单机模式**：类似 `sync.Mutex`，锁是**本地的**。
+   - **分布式模式**（`dsync`）：锁请求会被发送到**多个 MinIO 服务器**，确保整个集群同步加锁。
+
+**MinIO 为什么需要 `dsync`？**
+
+在 MinIO **分布式对象存储** 中，多个节点可能同时操作同一个对象（如 PUT/DELETE 操作）。
+如果没有锁，可能会出现 **数据覆盖、损坏或不一致** 的问题。
+
+**使用 `dsync` 进行分布式锁管理，MinIO 解决了这些问题**：
+
+- **确保多个节点不会同时写入同一对象**，防止数据损坏。
+- **允许多个节点同时读取数据**，提高并发性能。
+- **防止死锁 & 允许锁续约**，确保锁不会永久占用资源。
+
+### **总结**
+
+- **`dsync` 是 MinIO 的分布式锁库**，用于**多节点同步**，确保一致性。
+- 采用 **n/2+1 多数决机制**，防止数据竞争 & 保证锁安全。
+- 提供 **读/写锁、强制解锁、锁续约等功能**，适用于高并发场景。
+- **MinIO 通过 `dsync` 确保多个服务器不会并发写入相同对象**，保证数据一致性。
+
+## O_DIRECT的实际用途
+
+## s3 API: GetObject
+
+```go
+// GetObject
+router.Methods(http.MethodGet).Path("/{object:.+}").
+  HandlerFunc(s3APIMiddleware(api.GetObjectHandler, traceHdrsS3HFlag))
+```
+
+- 首先加分布式读锁
+- 通过读取`xl.meta`获取对象的元数据信息，`xl.meta`保存了`part`和`verison`的全部信息，注意可能存在某些磁盘上的`xl.meta`由于故障而修改落后，所以依然需要读取法定人数的磁盘，从而确定实际的元数据
+- 如果http请求通过`part`或者`range`要求读取部分数据，最终都会转换成对多个part的读取，每个part都会划分成不同的`block`进行操作。
+
+## 纠删码的基本原理
+
+https://p0kt65jtu2p.feishu.cn/docx/LZ36dMN3LoZCuUxFadccNOXGnKb
+
+假设将数据分成4块，采用EC:2冗余比例，可以将原来的数据组合成一个输入矩阵 `P = [][]byte`， 第一维表示不同的数据块，第二维表示数据块的数据，所以这里的 P 的大小为 `4 * n`，n为每个数据块的大小
+
+编码矩阵E的大小为 `6 * 4`，要求 编码矩阵的前4行组成的矩阵为单位矩阵，保持原来数据块数据不变，后两行用来生成冗余数据。
+
+E \* P = C （C表示生成的数据块和冗余块）
+
+假设有两行数据不慎丢失，此时去掉那两行对应的数据后依然有关系 $E' * P = C'$ 成立，此时通过求逆可以得到原先的 P，也就从数据丢失中恢复了原来的数据。
+
+## 分片上传和断点续传
+
+分片下载可以通过前面说过的http请求中的`range`或者`partnumber`实现。
+
+主要涉及的s3 API（客户端）:
+
+- InitiateMultipartUpload
+- UploadPart
+- AbortMultipartUpload
+- CompleteMultipartUpload
+
+在minio的客户端代码中实现了分片上传，并且支持并发上传
+
+```go
+
+// PutObject creates an object in a bucket.
+//
+// You must have WRITE permissions on a bucket to create an object.
+//
+//   - For size smaller than 16MiB PutObject automatically does a
+//     single atomic PUT operation.
+//
+//   - For size larger than 16MiB PutObject automatically does a
+//     multipart upload operation.
+//
+//   - For size input as -1 PutObject does a multipart Put operation
+//     until input stream reaches EOF. Maximum object size that can
+//     be uploaded through this operation will be 5TiB.
+//
+//     WARNING: Passing down '-1' will use memory and these cannot
+//     be reused for best outcomes for PutObject(), pass the size always.
+//
+// NOTE: Upon errors during upload multipart operation is entirely aborted.
+func (c *Client) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader, objectSize int64,
+	opts PutObjectOptions,
+)
+```
+
+```go
+// putObjectMultipartStreamParallel uploads opts.NumThreads parts in parallel.
+// This is expected to take opts.PartSize * opts.NumThreads * (GOGC / 100) bytes of buffer.
+func (c *Client) putObjectMultipartStreamParallel(ctx context.Context, bucketName, objectName string,
+	reader io.Reader, opts PutObjectOptions,
+) (info UploadInfo, err error) {
+```
+
+```go
+  // PutObjectPart
+  router.Methods(http.MethodPut).Path("/{object:.+}").
+    HandlerFunc(s3APIMiddleware(api.PutObjectPartHandler, traceHdrsS3HFlag)).
+    Queries("partNumber", "{partNumber:.*}", "uploadId", "{uploadId:.*}")
+  // ListObjectParts
+  router.Methods(http.MethodGet).Path("/{object:.+}").
+    HandlerFunc(s3APIMiddleware(api.ListObjectPartsHandler)).
+    Queries("uploadId", "{uploadId:.*}")
+  // CompleteMultipartUpload
+  router.Methods(http.MethodPost).Path("/{object:.+}").
+    HandlerFunc(s3APIMiddleware(api.CompleteMultipartUploadHandler)).
+    Queries("uploadId", "{uploadId:.*}")
+  // NewMultipartUpload
+  router.Methods(http.MethodPost).Path("/{object:.+}").
+    HandlerFunc(s3APIMiddleware(api.NewMultipartUploadHandler)).
+    Queries("uploads", "")
+  // AbortMultipartUpload
+  router.Methods(http.MethodDelete).Path("/{object:.+}").
+    HandlerFunc(s3APIMiddleware(api.AbortMultipartUploadHandler)).
+    Queries("uploadId", "{uploadId:.*}")
+```
+
+**NewMultipartUpload**
+
+- 生成uuid作为uploadId
+- 将元数据写入 `.minio.sys/multipart` uploadId路径下
+
+**PutObjectPart**
+
+- 类似于PutObejct
+
+**CompleteMultipartUpload**
+
+- 并没有合并part，仍然保留每个part
