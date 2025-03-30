@@ -136,17 +136,61 @@ todo: MemoryBlock offset
 public long acquireExecutionMemory(long required, MemoryConsumer requestingConsumer) {
 ```
 
+- 首先调用`MemoryManager.acquireExecutionMemory`尝试获取计算内存
+- 如果获取到足够的内存，则跳过吐磁盘逻辑
+- 如果没有获取到足够的内存，尝试吐磁盘释放内存，并尝试获取计算内存
+  - 吐磁盘有两个优化的目标：
+    1. 最小化吐磁盘调用的次数，减少吐磁盘文件的数量并且避免小的吐磁盘文件
+    2. 避免吐磁盘释放内存超过所需，如果我们只是想要一丁点内存，不希望尽可能多的吐磁盘，很多内存消费者吐磁盘时会释放比请求多的内存
+  - 所以这里采用一种启发式的算法，选择内存占用超过所需内存的MemoryConsumer中最小的MemoryConsumer来平衡这些因素，当只有少量大内存请求时，这种方法效率很好，但如果场景中有大量小内存请求，这种方法会导致产生大量小的spill文件
+  - 具体实现，将所有的MemoryConsumer放入一个`TreeMap`中，根据内存占用排序，如果是当前MemoryConsumer，则认为内存占用为0，这样当前MemoryConsumer被spill的优先级最低。
+    然后选择内存占用超过所需内存的MemoryConsumer中最小的MemoryConsumer进行吐磁盘操作并且尝试获取计算内存，如果没有符合这一条件的MemoryConsumer，则直接选择内存占用最大的MemoryCosumer进行吐磁盘并尝试获取计算内存`trySpillAndAcquire`。
+    如果获取到的内存依然不满足需求，则继续吐磁盘流程，选择下一个MemoryConsumer，重复上述流程。
 
+- 最终不管是否获取到了所需的内存，都将`MemoryConsumer`加入consumers中，并更新当前和最高的任务内存占用
 
+**trySpillAndAcquire**对选中的MemoryConsumer执行吐磁盘操作释放内存，并尝试获取所需的计算内存
 
+```java
+ * @return number of bytes acquired (<= requested)
+ * @throws RuntimeException if task is interrupted
+ * @throws SparkOutOfMemoryError if an IOException occurs during spilling
+ */
+private long trySpillAndAcquire(MemoryConsumer requestingConsumer, long requested, List<MemoryConsumer> cList, int idx)
 
+```
 
+- 首先调用`MemoryConsumer#spill`方法尝试释放内存，如果释放内存为0，则直接返回0
+- 如果释放内存大于0，调用`MemoryManager#acquireExecutionMemory`尝试获取计算内存，这里需要注意，吐磁盘释放的内存会被所有任务公平竞争，所以可能无法获取到这次吐磁盘释放的所有内存，需要在下一次循环中继续尝试吐磁盘
+- 两种异常场景，当任务被中断时，抛出`RuntimeException`，吐磁盘遇到`IOException`时，抛出`SparkOutOfMemoryError`
 
-所以将
+**releaseExecutionMemory** 为一个MemoryConsumer释放N字节的计算内存，实际调用了`MemoryManager#releaseExecutionMemory`，并更新当前内存占用
 
-acquireExecutionMemory 是从内存管理框架中获取内存
+**showMemoryUsage** dump所有Consumer的内存占用
 
-MemoryAllocator.allocate 是实际获取内存，如果内存超限，说明内存管理框架任务有内存，但实际上没有内存，将这部分内存固定住，这里好奇怪，如果taskmananger关闭，这部分内存又会回到吗
+**allocatePage** 分配内存，并更新页表，该操作旨在为多个算子之间共享的大块内存分配空间
+
+```java
+public MemoryBlock allocatePage(long size, MemoryConsumer consumer) 
+```
+
+- 首先调用`TaskMemoryManager#acquiredExectionMemory`获取计算内存，如果没有获取到内存，则返回null
+- 然后通过`MemoryManager#tungstenMemoryAllocator#allocate`实际申请内存，如果遇到`OutOfMemoryError`，则认为实际上没有足够多的内存，实际的空闲内存要比MemoryManager认为的少一些，所以将从内存管理框架中获得的内存配额添加到`acquiredButNotUsed`字段中，并再次调用当前函数，这次将触发吐磁盘操作释放内存（p.s. 感觉处理OutOfMemoryError的意义不大，OutOfMeomryError发生时应该直接结束程序，因为程序已经进入了异常状态，无法预料OutOfMemoryError对程序的影响）
+- 如果成功获取到内存，则需要更新页表，并返回对应的页，其实就是MemoryBlock
+
+**freePage**释放页占用的内存，更新pageNumber为FREED_IN_TMM_PAGE_NUMBER，清理页表，调用`MemoryManager.tunstenMemoryAllocator#free`实际释放内存，调用`releaseExecutionMemory`释放内存管理框架对应的内存配额。
+
+似乎用逻辑内存指代内存管理框架中的内存配额，而用物理内存指代实际的内存更加好一些 todo
+
+```java
+public void freePage(MemoryBlock page, MemoryConsumer consumer) {
+```
+
+**cleanUpAllAllocatedMemory**清理所有申请的内存和页
+
+- 调用`MemoryManager#tungstenMemoryAllocator#free`释放每个页的内存
+- 调用`MemoryManager#releaseExectionMemory`释放`acquiredButNotUsed`内存
+- 调用`MemoryManager#ReleaseAllExecutionMemoryForTask`释放任务的所有计算内存，并返回释放的内存大小，非0值可以用来检测内存泄露
 
 
 
