@@ -8,6 +8,12 @@ license:
 hidden: false
 comments: true
 draft: false
+tags:
+  - "Spark"
+  - "内存管理"
+categories:
+  - "Spark"
+  - "内存管理"
 ---
 
 ## 关键问题
@@ -193,6 +199,10 @@ public void freePage(MemoryBlock page, MemoryConsumer consumer) {
 - 调用`MemoryManager#ReleaseAllExecutionMemoryForTask`释放任务的所有计算内存，并返回释放的内存大小，非0值可以用来检测内存泄露
 
 
+
+todo: 暂时不看spill，主要关心内存管理问题吧
+
+todo: MemoryManager是怎么管理内存的，记账
 
 ## 参考资料
 
