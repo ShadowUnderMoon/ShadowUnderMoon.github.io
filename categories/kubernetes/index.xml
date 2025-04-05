@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Kubernetes on 爱吃芒果</title><link>https://demo.stack.jimmycai.com/categories/kubernetes/</link><description>Recent content in Kubernetes on 爱吃芒果</description><generator>Hugo -- gohugo.io</generator><language>zh-cn</language><lastBuildDate>Fri, 07 Feb 2025 10:49:01 +0800</lastBuildDate><atom:link href="https://demo.stack.jimmycai.com/categories/kubernetes/index.xml" rel="self" type="application/rss+xml"/><item><title>k8s 存储</title><link>https://demo.stack.jimmycai.com/p/k8s-%E5%AD%98%E5%82%A8/</link><pubDate>Fri, 07 Feb 2025 10:49:01 +0800</pubDate><guid>https://demo.stack.jimmycai.com/p/k8s-%E5%AD%98%E5%82%A8/</guid><description>&lt;h2 id="pods">Pods
+&lt;/h2>&lt;p>Pod 是 Kubernetes 中最小的可部署计算单元，你可以创建和管理它们。&lt;/p>
+&lt;p>&lt;strong>Pod（类似于一群鲸鱼的“pod”或豌豆荚“pea pod”）&lt;/strong> 是一组一个或多个容器，这些容器共享存储和网络资源，并且有一个规范来定义如何运行它们。Pod 内部的内容始终是 &lt;strong>共同调度（co-scheduled）并在相同的上下文中运行&lt;/strong> 的。Pod 充当一个特定应用的“&lt;strong>逻辑主机&lt;/strong>”（logical host）：它包含一个或多个 &lt;strong>相对紧密耦合的应用容器&lt;/strong>。在非云环境下，运行在同一台物理机或虚拟机上的应用程序，可以类比于在 Kubernetes 中运行在同一逻辑主机上的应用。&lt;/p>
+&lt;p>除了应用容器之外，Pod 还可以包含 &lt;strong>Init 容器&lt;/strong>（init containers），这些容器在 Pod 启动时运行。此外，你还可以 &lt;strong>注入临时容器（ephemeral containers）&lt;/strong> 来调试正在运行的 Pod。&lt;/p>
+&lt;h2 id="volumes">Volumes
+&lt;/h2>&lt;p>k8s Volumes 为pod中的容器提供了通过文件系统访问和共享数据的方式，数据共享可以在一个容器中的不同进程或者容器间甚至不同的pod。&lt;/p>
+&lt;p>volume能够解决数据的持久化以及共享存储的问题。&lt;/p>
+&lt;p>k8s支持多种volumes，pod可以同时使用任意数量的不同类型volume，&lt;strong>Ephemeral volume&lt;/strong> 的生命周期和pod相同，&lt;strong>persistent volumes&lt;/strong> 可以超出一个pod的生命周期。当pod挂掉时，K8s会摧毁 &lt;strong>ephemeral volume&lt;/strong> 但不会摧毁 &lt;strong>persistent volume&lt;/strong> 。对于在给定pod中的任意类型的volume，数据在容器重启时都会被保留。&lt;/p>
+&lt;p>本质上，卷（Volume）是一个目录，其中可能包含一些数据，并且可供 Pod 内的容器访问。该目录如何创建、由何种存储介质支持以及其内容，取决于所使用的特定卷类型。&lt;/p>
+&lt;p>为了使用一个卷，声明要被提供给pod的卷在&lt;code>.spec.volumes&lt;/code>下，声明在容器的哪里挂载这些卷在&lt;code>spec.containers[*].volumeMounts&lt;/code>中。&lt;/p>
+&lt;p>当一个pod被启动时，容器中的进程看到的文件系统视图有两部分组成，一部分是容器镜像的初始内容，另一部分是挂载到容器中的卷。对于pod中的每个容器，需要独立的声明不同容器的挂载点。&lt;/p>
+&lt;h2 id="storage-classes">Storage Classes
+&lt;/h2>&lt;p>StorageClass 为管理员提供了一种描述其提供的存储类别的方法。不同的存储类别可能对应不同的 &lt;strong>服务质量（QoS）级别&lt;/strong>、&lt;strong>备份策略&lt;/strong>，或者由集群管理员自定义的其他策略。Kubernetes 本身并不对这些存储类别的具体含义做任何规定。&lt;/p>
+&lt;p>每个StorageClass 包含字段 &lt;code>provisioner&lt;/code>, &lt;code>parameters&lt;/code>和&lt;code>raclaimPolicy&lt;/code>，当一个属于某个storage class 的persistent volume需要被动态提供给 persistent volume claim时被使用。&lt;/p>
+&lt;p>Storage Class的名字非常重要，用户通过名字请求某类存储，管理员在创建storage class对象是设置名字以及类别的其他参数。&lt;/p>
+&lt;p>作为管理员，你可以声明一个默认的storage class用于没有指定类别的任何PVC。&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-yaml" data-lang="yaml">&lt;span class="line">&lt;span class="cl">&lt;span class="nt">apiVersion&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">storage.k8s.io/v1&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">kind&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">StorageClass&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">metadata&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">name&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">low-latency&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">annotations&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">storageclass.kubernetes.io/is-default-class&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="s2">&amp;#34;false&amp;#34;&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">provisioner&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">csi-driver.example-vendor.example&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">reclaimPolicy&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">Retain&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="c"># default value is Delete&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">allowVolumeExpansion&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="kc">true&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">mountOptions&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>- &lt;span class="l">discard&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="c"># this might enable UNMAP / TRIM at the block storage layer&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">volumeBindingMode&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">WaitForFirstConsumer&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">parameters&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">guaranteedReadWriteLatency&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="s2">&amp;#34;true&amp;#34;&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="c"># provider-specific&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h2 id="persistent-volumes">Persistent Volumes
+&lt;/h2>&lt;p>&lt;strong>PersistentVolume (PV)&lt;/strong> 是集群中的一块存储，可以由管理员提供或者通过 &lt;strong>Storage Classes&lt;/strong>动态提供。&lt;/p>
+&lt;p>**PersistentVolumeClaim (PVC)**是用户对存储的青秀区，类似于pod，pod消费节点资源而PVCs消费PV资源&lt;/p>
+&lt;p>有两种方式提供PVs：&lt;/p>
+&lt;ul>
+&lt;li>静态：管理员直接创建PV&lt;/li>
+&lt;li>动态：当没有静态PV满足PVC，集群可能尝试动态的提供卷，PVC必须要求Storage Class，管理员必须创建并且配置storage class，Storage Class &lt;code>&amp;quot;&amp;quot;&lt;/code>关闭动态获取卷&lt;/li>
+&lt;/ul>
+&lt;p>Pod使用PVC作为卷，集群检查PVC得到对应的卷并将卷绑定到pod。&lt;/p>
+&lt;h3 id="回收策略">回收策略
+&lt;/h3>&lt;p>当用户使用完卷后，可以将PVC对象删除从而允许资源的回收，PV的回收策略告诉集群当卷被释放后应该怎么样处理卷，目前有三种策略：&lt;code>Retained&lt;/code>, &lt;code>Recycled&lt;/code>和 &lt;code>Deleted&lt;/code>。&lt;/p>
+&lt;p>这里只介绍&lt;code>Retain&lt;/code>策略：&lt;/p>
+&lt;p>&lt;code>Retain&lt;/code>回收策略允许手动的资源回收，当PVC被删除时， PV依然存在，卷被认为是释放状态，但它并不能够被另一个PVC请求直接使用因为前任的数据还在上面。管理员可以通过以下方式手动回收卷：&lt;/p>
+&lt;ol>
+&lt;li>删除PV&lt;/li>
+&lt;li>手动清理数据&lt;/li>
+&lt;li>手动删除对应的storage asset&lt;/li>
+&lt;/ol>
+&lt;p>如果想要重用相同的storage asset，使用相同的storage asset definition 创建一个新的PV&lt;/p>
+&lt;h3 id="pv的类型">PV的类型
+&lt;/h3>&lt;p>PV类型作为插件实现，这里给出k8s支持的一些插件：&lt;/p>
+&lt;ul>
+&lt;li>csi : Container Storage Interface&lt;/li>
+&lt;li>local: 挂载在节点上的本地存储设备&lt;/li>
+&lt;/ul>
+&lt;hr>
+&lt;p>每个PV包含一个规范(spec) 和状态 (status)，PV对象的名字必须是一个有效的 DNS subdomain name，这意味着&lt;/p>
+&lt;ul>
+&lt;li>包含不超过253个字符&lt;/li>
+&lt;li>只包含小写字符、数字、&lt;code>-&lt;/code>或者&lt;code>.&lt;/code>&lt;/li>
+&lt;li>字符或者数字开头&lt;/li>
+&lt;li>字符或者数字结尾&lt;/li>
+&lt;/ul>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-yaml" data-lang="yaml">&lt;span class="line">&lt;span class="cl">&lt;span class="nt">apiVersion&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">v1&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">kind&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">PersistentVolume&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">metadata&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">name&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">pv0003&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">spec&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">capacity&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">storage&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">5Gi&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">volumeMode&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">Filesystem&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">accessModes&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>- &lt;span class="l">ReadWriteOnce&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">persistentVolumeReclaimPolicy&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">Recycle&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">storageClassName&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">slow&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">mountOptions&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>- &lt;span class="l">hard&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>- &lt;span class="l">nfsvers=4.1&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">nfs&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">path&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">/tmp&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">server&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="m">172.17.0.2&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>访问模式 &lt;strong>ReadWriteOnce&lt;/strong>，卷可以被挂载为单个节点可读写，ReadWriteOnce仍然允许多个pod访问，只要这些pod在相同的节点上。对于单pod访问，可以使用&lt;strong>ReadWriteOncePod&lt;/strong>。&lt;/p>
+&lt;p>节点亲和度 &lt;strong>Node Affinity&lt;/strong>，对于大多数卷类型，不需要设置这个字段，对于&lt;code>local&lt;/code>卷需要显示设置这个字段。&lt;/p>
+&lt;p>一个PV可以声明节点亲和度来限制在那个节点上这个卷可以被访问，使用某个PV的Pod将只会被调度到满足节点亲和度的节点上。&lt;/p>
+&lt;h3 id="persistentvolumeclaims">PersistentVolumeClaims
+&lt;/h3>&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-yaml" data-lang="yaml">&lt;span class="line">&lt;span class="cl">&lt;span class="nt">apiVersion&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">v1&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">kind&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">PersistentVolumeClaim&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">metadata&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">name&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">myclaim&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">spec&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">accessModes&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>- &lt;span class="l">ReadWriteOnce&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">volumeMode&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">Filesystem&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">resources&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">requests&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">storage&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">8Gi&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">storageClassName&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">slow&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">selector&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">matchLabels&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">release&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="s2">&amp;#34;stable&amp;#34;&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">matchExpressions&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>- {&lt;span class="nt">key: environment, operator: In, values&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="l">dev]}&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h2 id="参考文献">参考文献
+&lt;/h2>&lt;ol>
+&lt;li>&lt;a class="link" href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/" target="_blank" rel="noopener"
+>https://kubernetes.io/docs/concepts/storage/persistent-volumes/&lt;/a>&lt;/li>
+&lt;/ol></description></item></channel></rss>

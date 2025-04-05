@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Grafana on 爱吃芒果</title><link>https://demo.stack.jimmycai.com/tags/grafana/</link><description>Recent content in Grafana on 爱吃芒果</description><generator>Hugo -- gohugo.io</generator><language>zh-cn</language><lastBuildDate>Sat, 01 Feb 2025 19:42:56 +0800</lastBuildDate><atom:link href="https://demo.stack.jimmycai.com/tags/grafana/index.xml" rel="self" type="application/rss+xml"/><item><title>Prometheus_and_grafana</title><link>https://demo.stack.jimmycai.com/p/prometheus_and_grafana/</link><pubDate>Sat, 01 Feb 2025 19:42:56 +0800</pubDate><guid>https://demo.stack.jimmycai.com/p/prometheus_and_grafana/</guid><description>&lt;h2 id="prometheus">Prometheus
+&lt;/h2>&lt;p>&lt;a class="link" href="https://www.youtube.com/watch?v=h4Sl21AKiDg" target="_blank" rel="noopener"
+>https://www.youtube.com/watch?v=h4Sl21AKiDg&lt;/a>&lt;/p>
+&lt;p>&lt;img src="https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_arch.png"
+width="3024"
+height="1702"
+srcset="https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_arch_hu_7b3c3fab9e8bfbef.png 480w, https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_arch_hu_88ada26c643d61b1.png 1024w"
+loading="lazy"
+alt="image-20250201195125453"
+class="gallery-image"
+data-flex-grow="177"
+data-flex-basis="426px"
+>&lt;/p>
+&lt;p>&lt;img src="https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_metrics.png"
+width="3024"
+height="1702"
+srcset="https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_metrics_hu_2f1382908d0f94d8.png 480w, https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_metrics_hu_5a5bb5fb699eed81.png 1024w"
+loading="lazy"
+alt="image-20250201195720822"
+class="gallery-image"
+data-flex-grow="177"
+data-flex-basis="426px"
+>&lt;/p>
+&lt;p>&lt;img src="https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_collect.png"
+width="2978"
+height="1342"
+srcset="https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_collect_hu_b0864de2e1e66852.png 480w, https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_collect_hu_e386e82310e53bf8.png 1024w"
+loading="lazy"
+alt="image-20250201195956124"
+class="gallery-image"
+data-flex-grow="221"
+data-flex-basis="532px"
+>&lt;/p>
+&lt;p>&lt;img src="https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_exporter.png"
+width="3024"
+height="1394"
+srcset="https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_exporter_hu_94fd0e79c9a7914e.png 480w, https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_exporter_hu_532c9e751ea448e8.png 1024w"
+loading="lazy"
+alt="image-20250201200134497"
+class="gallery-image"
+data-flex-grow="216"
+data-flex-basis="520px"
+>&lt;/p>
+&lt;p>&lt;img src="https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_config.png"
+width="3024"
+height="1702"
+srcset="https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_config_hu_eeadf91c0bed92a8.png 480w, https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_config_hu_4132d3dd01a5b11e.png 1024w"
+loading="lazy"
+alt="image-20250201201116934"
+class="gallery-image"
+data-flex-grow="177"
+data-flex-basis="426px"
+>&lt;/p>
+&lt;p>&lt;img src="https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_alert.png"
+width="3024"
+height="1702"
+srcset="https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_alert_hu_927587d578231439.png 480w, https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_alert_hu_5d10bb74aac51ad3.png 1024w"
+loading="lazy"
+alt="image-20250201201412269"
+class="gallery-image"
+data-flex-grow="177"
+data-flex-basis="426px"
+>&lt;/p>
+&lt;p>Prometheus Server, Pushgateway, Alertmanager&lt;/p>
+&lt;p>&lt;a class="link" href="https://prometheus.io/docs/concepts/metric_types/" target="_blank" rel="noopener"
+>https://prometheus.io/docs/concepts/metric_types/&lt;/a>&lt;/p>
+&lt;p>&lt;a class="link" href="https://itnext.io/prometheus-for-beginners-5f20c2e89b6c" target="_blank" rel="noopener"
+>https://itnext.io/prometheus-for-beginners-5f20c2e89b6c&lt;/a>&lt;/p>
+&lt;p>&lt;strong>Prometheus is essentially just another metrics collection and analysis tool,&lt;/strong> and at its core it is made up of 3 components:&lt;/p>
+&lt;ul>
+&lt;li>A &lt;a class="link" href="https://en.wikipedia.org/wiki/Time_series" target="_blank" rel="noopener"
+>&lt;strong>time series database&lt;/strong>&lt;/a> that will store all our metrics data&lt;/li>
+&lt;li>A &lt;strong>data retrieval worker&lt;/strong> that is responsible for &lt;strong>pulling/scraping&lt;/strong> metrics from external sources and &lt;strong>pushing&lt;/strong> them into the database&lt;/li>
+&lt;li>A web server that provides a &lt;strong>simple web interface&lt;/strong> for configuration and querying of the data stored.&lt;/li>
+&lt;/ul>
+&lt;p>&lt;img src="https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_arch_all.png"
+width="1360"
+height="818"
+srcset="https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_arch_all_hu_43a7d5974c28da1e.png 480w, https://demo.stack.jimmycai.com/p/prometheus_and_grafana/prometheus_arch_all_hu_fdbe27354d59862d.png 1024w"
+loading="lazy"
+alt="image-20250201214518713"
+class="gallery-image"
+data-flex-grow="166"
+data-flex-basis="399px"
+>&lt;/p>
+&lt;p>&lt;a class="link" href="https://prometheus.io/docs/practices/naming/#metric-names" target="_blank" rel="noopener"
+>https://prometheus.io/docs/practices/naming/#metric-names&lt;/a>&lt;/p>
+&lt;p>&lt;a class="link" href="https://prometheus.io/docs/practices/naming/#base-units" target="_blank" rel="noopener"
+>https://prometheus.io/docs/practices/naming/#base-units&lt;/a>&lt;/p></description></item></channel></rss>
