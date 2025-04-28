@@ -199,7 +199,7 @@ hasCJKLanguage = true
   [params.page.comment.utterances]
     enable = true
     # owner/repo
-    repo = "ShadowUnderMoon/blog"
+    repo = "ShadowUnderMoon/ShadowUnderMoon.github.io"
     issueTerm = "pathname"
     label = ""
     lightTheme = "github-light"
