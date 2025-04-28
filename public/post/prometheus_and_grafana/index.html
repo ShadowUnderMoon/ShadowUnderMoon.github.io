@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noodp" />
+        <title>Prometheus_and_grafana - 我的全新 Hugo 网站</title><meta name="Description" content="This is my cool site"><meta property="og:url" content="http://localhost:1313/post/prometheus_and_grafana/">
+  <meta property="og:site_name" content="我的全新 Hugo 网站">
+  <meta property="og:title" content="Prometheus_and_grafana">
+  <meta property="og:description" content="Prometheus https://www.youtube.com/watch?v=h4Sl21AKiDg
+Prometheus Server, Pushgateway, Alertmanager
+https://prometheus.io/docs/concepts/metric_types/
+https://itnext.io/prometheus-for-beginners-5f20c2e89b6c
+Prometheus is essentially just another metrics collection and analysis tool, and at its core it is made up of 3 components:">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="post">
+    <meta property="article:published_time" content="2025-02-01T19:42:56+08:00">
+    <meta property="article:modified_time" content="2025-02-01T19:42:56+08:00">
+    <meta property="article:tag" content="Prometheus">
+    <meta property="article:tag" content="Grafana">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Prometheus_and_grafana">
+  <meta name="twitter:description" content="Prometheus https://www.youtube.com/watch?v=h4Sl21AKiDg
+Prometheus Server, Pushgateway, Alertmanager
+https://prometheus.io/docs/concepts/metric_types/
+https://itnext.io/prometheus-for-beginners-5f20c2e89b6c
+Prometheus is essentially just another metrics collection and analysis tool, and at its core it is made up of 3 components:">
+<meta name="application-name" content="My cool site">
+<meta name="apple-mobile-web-app-title" content="My cool site">
+<meta name="referrer" content="no-referrer" /><meta name="theme-color" content="#ffffff"><meta name="msapplication-TileColor" content="#da532c"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://localhost:1313/post/prometheus_and_grafana/" /><link rel="prev" href="http://localhost:1313/post/minio-get-started/" /><link rel="next" href="http://localhost:1313/post/k8s_storage/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="/lib/fontawesome-free/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="/lib/fontawesome-free/css/all.min.css"></noscript><link rel="preload" href="/lib/animate/animate.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="/lib/animate/animate.min.css"></noscript><script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "headline": "Prometheus_and_grafana",
+        "inLanguage": "zh-CN",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "http:\/\/localhost:1313\/post\/prometheus_and_grafana\/"
+        },"genre": "post","keywords": "prometheus, grafana","wordcount":  78 ,
+        "url": "http:\/\/localhost:1313\/post\/prometheus_and_grafana\/","datePublished": "2025-02-01T19:42:56+08:00","dateModified": "2025-02-01T19:42:56+08:00","publisher": {
+            "@type": "Organization",
+            "name": ""},"author": {
+                "@type": "Person",
+                "name": "xxxx"
+            },"description": ""
+    }
+    </script></head>
+    <body data-header-desktop="fixed" data-header-mobile="auto"><script>(window.localStorage && localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : ('auto' === 'auto' ? window.matchMedia('(prefers-color-scheme: dark)').matches : 'auto' === 'dark')) && document.body.setAttribute('theme', 'dark');</script>
+
+        <div id="mask"></div><div class="wrapper"><header class="desktop" id="header-desktop">
+    <div class="header-wrapper">
+        <div class="header-title">
+            <a href="/" title="我的全新 Hugo 网站">My cool site</a>
+        </div>
+        <div class="menu">
+            <div class="menu-inner"><a class="menu-item" href="/posts/"> 文章 </a><a class="menu-item" href="/page/archives/" title="Archives"> Archives </a><a class="menu-item" href="/tags/"> 标签 </a><a class="menu-item" href="/page/search/" title="Search"> Search </a><a class="menu-item" href="/categories/"> 分类 </a><span class="menu-item delimiter"></span><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                    <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+                </a></div>
+        </div>
+    </div>
+</header><header class="mobile" id="header-mobile">
+    <div class="header-container">
+        <div class="header-wrapper">
+            <div class="header-title">
+                <a href="/" title="我的全新 Hugo 网站">My cool site</a>
+            </div>
+            <div class="menu-toggle" id="menu-toggle-mobile">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div class="menu" id="menu-mobile"><a class="menu-item" href="/posts/" title="">文章</a><a class="menu-item" href="/page/archives/" title="Archives">Archives</a><a class="menu-item" href="/tags/" title="">标签</a><a class="menu-item" href="/page/search/" title="Search">Search</a><a class="menu-item" href="/categories/" title="">分类</a><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+            </a></div>
+    </div>
+</header><main class="main">
+                <div class="container"><div class="page single special"><h1 class="single-title animate__animated animate__pulse animate__faster">Prometheus_and_grafana</h1><div class="content" id="content"><h2 id="prometheus">Prometheus</h2>
+<p><a href="https://www.youtube.com/watch?v=h4Sl21AKiDg" target="_blank" rel="noopener noreffer ">https://www.youtube.com/watch?v=h4Sl21AKiDg</a></p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/post/prometheus_and_grafana/prometheus_arch.png"
+        data-srcset="/post/prometheus_and_grafana/prometheus_arch.png, /post/prometheus_and_grafana/prometheus_arch.png 1.5x, /post/prometheus_and_grafana/prometheus_arch.png 2x"
+        data-sizes="auto"
+        alt="/post/prometheus_and_grafana/prometheus_arch.png"
+        title="image-20250201195125453" width="3024" height="1702" /></p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/post/prometheus_and_grafana/prometheus_metrics.png"
+        data-srcset="/post/prometheus_and_grafana/prometheus_metrics.png, /post/prometheus_and_grafana/prometheus_metrics.png 1.5x, /post/prometheus_and_grafana/prometheus_metrics.png 2x"
+        data-sizes="auto"
+        alt="/post/prometheus_and_grafana/prometheus_metrics.png"
+        title="image-20250201195720822" width="3024" height="1702" /></p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/post/prometheus_and_grafana/prometheus_collect.png"
+        data-srcset="/post/prometheus_and_grafana/prometheus_collect.png, /post/prometheus_and_grafana/prometheus_collect.png 1.5x, /post/prometheus_and_grafana/prometheus_collect.png 2x"
+        data-sizes="auto"
+        alt="/post/prometheus_and_grafana/prometheus_collect.png"
+        title="image-20250201195956124" width="2978" height="1342" /></p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/post/prometheus_and_grafana/prometheus_exporter.png"
+        data-srcset="/post/prometheus_and_grafana/prometheus_exporter.png, /post/prometheus_and_grafana/prometheus_exporter.png 1.5x, /post/prometheus_and_grafana/prometheus_exporter.png 2x"
+        data-sizes="auto"
+        alt="/post/prometheus_and_grafana/prometheus_exporter.png"
+        title="image-20250201200134497" width="3024" height="1394" /></p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/post/prometheus_and_grafana/prometheus_config.png"
+        data-srcset="/post/prometheus_and_grafana/prometheus_config.png, /post/prometheus_and_grafana/prometheus_config.png 1.5x, /post/prometheus_and_grafana/prometheus_config.png 2x"
+        data-sizes="auto"
+        alt="/post/prometheus_and_grafana/prometheus_config.png"
+        title="image-20250201201116934" width="3024" height="1702" /></p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/post/prometheus_and_grafana/prometheus_alert.png"
+        data-srcset="/post/prometheus_and_grafana/prometheus_alert.png, /post/prometheus_and_grafana/prometheus_alert.png 1.5x, /post/prometheus_and_grafana/prometheus_alert.png 2x"
+        data-sizes="auto"
+        alt="/post/prometheus_and_grafana/prometheus_alert.png"
+        title="image-20250201201412269" width="3024" height="1702" /></p>
+<p>Prometheus Server, Pushgateway, Alertmanager</p>
+<p><a href="https://prometheus.io/docs/concepts/metric_types/" target="_blank" rel="noopener noreffer ">https://prometheus.io/docs/concepts/metric_types/</a></p>
+<p><a href="https://itnext.io/prometheus-for-beginners-5f20c2e89b6c" target="_blank" rel="noopener noreffer ">https://itnext.io/prometheus-for-beginners-5f20c2e89b6c</a></p>
+<p><strong>Prometheus is essentially just another metrics collection and analysis tool,</strong> and at its core it is made up of 3 components:</p>
+<ul>
+<li>A <a href="https://en.wikipedia.org/wiki/Time_series" target="_blank" rel="noopener noreffer "><strong>time series database</strong></a> that will store all our metrics data</li>
+<li>A <strong>data retrieval worker</strong> that is responsible for <strong>pulling/scraping</strong> metrics from external sources and <strong>pushing</strong> them into the database</li>
+<li>A web server that provides a <strong>simple web interface</strong> for configuration and querying of the data stored.</li>
+</ul>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/post/prometheus_and_grafana/prometheus_arch_all.png"
+        data-srcset="/post/prometheus_and_grafana/prometheus_arch_all.png, /post/prometheus_and_grafana/prometheus_arch_all.png 1.5x, /post/prometheus_and_grafana/prometheus_arch_all.png 2x"
+        data-sizes="auto"
+        alt="/post/prometheus_and_grafana/prometheus_arch_all.png"
+        title="image-20250201214518713" width="1360" height="818" /></p>
+<p><a href="https://prometheus.io/docs/practices/naming/#metric-names" target="_blank" rel="noopener noreffer ">https://prometheus.io/docs/practices/naming/#metric-names</a></p>
+<p><a href="https://prometheus.io/docs/practices/naming/#base-units" target="_blank" rel="noopener noreffer ">https://prometheus.io/docs/practices/naming/#base-units</a></p>
+</div></div></div>
+            </main><footer class="footer">
+        <div class="footer-container"><div class="footer-line">Powered by <a href="https://gohugo.io/" target="_blank" rel="noopener noreffer" title="Hugo 0.140.2">Hugo</a> | Theme - <a href="https://github.com/dillonzq/LoveIt" target="_blank" rel="noopener noreffer" title="LoveIt 0.3.1-DEV"><i class="far fa-kiss-wink-heart fa-fw" aria-hidden="true"></i> LoveIt</a>
+                </div><div class="footer-line" itemscope itemtype="http://schema.org/CreativeWork"><i class="far fa-copyright fa-fw" aria-hidden="true"></i><span itemprop="copyrightYear">2022 - 2025</span><span class="author" itemprop="copyrightHolder">&nbsp;<a href="/" target="_blank">xxxx</a></span></div>
+        </div>
+    </footer></div>
+
+        <div id="fixed-buttons"><a href="#" id="back-to-top" class="fixed-button" title="Back to Top">
+                <i class="fas fa-arrow-up fa-fw" aria-hidden="true"></i>
+            </a>
+        </div>
+
+        <div id="fixed-buttons-hidden"><a href="#" id="view-comments" class="fixed-button" title="View Comments">
+                <i class="fas fa-comment fa-fw" aria-hidden="true"></i>
+            </a>
+        </div><script src="/lib/lazysizes/lazysizes.min.js"></script><script src="/lib/clipboard/clipboard.min.js"></script><script src="/lib/sharer/sharer.min.js"></script><script>window.config={"comment":{}};</script><script src="/js/theme.min.js"></script></body>
+</html>

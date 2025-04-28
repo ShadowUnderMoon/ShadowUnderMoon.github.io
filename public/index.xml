@@ -1,0 +1,187 @@
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+    <channel>
+        <title>爱吃芒果</title>
+        <link>http://localhost:1313/</link>
+        <description>This is my cool site</description>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</lastBuildDate>
+            <atom:link href="http://localhost:1313/index.xml" rel="self" type="application/rss+xml" />
+        <item>
+    <title>Java线程池源码分析</title>
+    <link>http://localhost:1313/posts/java_thread_pool/</link>
+    <pubDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://localhost:1313/posts/java_thread_pool/</guid>
+    <description><![CDATA[<h2 id="阅前提示">阅前提示</h2>
+<p>参考文献中的文章非常的好，基本看完了就能理解很多东西，推荐阅读</p>
+<p>源码中也提供了很多注释文本，推荐对照源码学习。</p>
+<h2 id="重要概念和接口">重要概念和接口</h2>
+<h3 id="runnable-接口">Runnable 接口</h3>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="nd">@FunctionalInterface</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="kd">public</span><span class="w"> </span><span class="kd">interface</span> <span class="nc">Runnable</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kd">abstract</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">run</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
+<p>线程可以接受一个实现 Runnable 接口的对象，并执行对应的逻辑。</p>]]></description>
+</item>
+<item>
+    <title>Spark_optimizer</title>
+    <link>http://localhost:1313/posts/spark_optimizer/</link>
+    <pubDate>Sat, 05 Apr 2025 22:05:09 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://localhost:1313/posts/spark_optimizer/</guid>
+    <description><![CDATA[<h2 id="遇到的问题">遇到的问题</h2>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="n">Exception</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="n">thread</span><span class="w"> </span><span class="s">&#34;main&#34;</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="na">lang</span><span class="p">.</span><span class="na">NoClassDefFoundError</span><span class="p">:</span><span class="w"> </span><span class="n">org</span><span class="o">/</span><span class="n">apache</span><span class="o">/</span><span class="n">logging</span><span class="o">/</span><span class="n">log4j</span><span class="o">/</span><span class="n">core</span><span class="o">/</span><span class="n">Filter</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="na">base</span><span class="o">/</span><span class="n">java</span><span class="p">.</span><span class="na">lang</span><span class="p">.</span><span class="na">Class</span><span class="p">.</span><span class="na">forName0</span><span class="p">(</span><span class="n">Native</span><span class="w"> </span><span class="n">Method</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="na">base</span><span class="o">/</span><span class="n">java</span><span class="p">.</span><span class="na">lang</span><span class="p">.</span><span class="na">Class</span><span class="p">.</span><span class="na">forName</span><span class="p">(</span><span class="n">Class</span><span class="p">.</span><span class="na">java</span><span class="p">:</span><span class="n">578</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="na">base</span><span class="o">/</span><span class="n">java</span><span class="p">.</span><span class="na">lang</span><span class="p">.</span><span class="na">Class</span><span class="p">.</span><span class="na">forName</span><span class="p">(</span><span class="n">Class</span><span class="p">.</span><span class="na">java</span><span class="p">:</span><span class="n">557</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">org</span><span class="p">.</span><span class="na">apache</span><span class="p">.</span><span class="na">spark</span><span class="p">.</span><span class="na">util</span><span class="p">.</span><span class="na">SparkClassUtils</span><span class="p">.</span><span class="na">classForName</span><span class="p">(</span><span class="n">SparkClassUtils</span><span class="p">.</span><span class="na">scala</span><span class="p">:</span><span class="n">41</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">org</span><span class="p">.</span><span class="na">apache</span><span class="p">.</span><span class="na">spark</span><span class="p">.</span><span class="na">util</span><span class="p">.</span><span class="na">SparkClassUtils</span><span class="p">.</span><span class="na">classForName$</span><span class="p">(</span><span class="n">SparkClassUtils</span><span class="p">.</span><span class="na">scala</span><span class="p">:</span><span class="n">36</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">org</span><span class="p">.</span><span class="na">apache</span><span class="p">.</span><span class="na">spark</span><span class="p">.</span><span class="na">util</span><span class="p">.</span><span class="na">SparkClassUtils$</span><span class="p">.</span><span class="na">classForName</span><span class="p">(</span><span class="n">SparkClassUtils</span><span class="p">.</span><span class="na">scala</span><span class="p">:</span><span class="n">141</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">org</span><span class="p">.</span><span class="na">apache</span><span class="p">.</span><span class="na">spark</span><span class="p">.</span><span class="na">sql</span><span class="p">.</span><span class="na">SparkSession$</span><span class="p">.</span><span class="na">lookupCompanion</span><span class="p">(</span><span class="n">SparkSession</span><span class="p">.</span><span class="na">scala</span><span class="p">:</span><span class="n">826</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">org</span><span class="p">.</span><span class="na">apache</span><span class="p">.</span><span class="na">spark</span><span class="p">.</span><span class="na">sql</span><span class="p">.</span><span class="na">SparkSession$</span><span class="p">.</span><span class="na">CLASSIC_COMPANION$lzycompute</span><span class="p">(</span><span class="n">SparkSession</span><span class="p">.</span><span class="na">scala</span><span class="p">:</span><span class="n">816</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">org</span><span class="p">.</span><span class="na">apache</span><span class="p">.</span><span class="na">spark</span><span class="p">.</span><span class="na">sql</span><span class="p">.</span><span class="na">SparkSession$</span><span class="p">.</span><span class="na">org$apache$spark$sql$SparkSession$$CLASSIC_COMPANION</span><span class="p">(</span><span class="n">SparkSession</span><span class="p">.</span><span class="na">scala</span><span class="p">:</span><span class="n">815</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">org</span><span class="p">.</span><span class="na">apache</span><span class="p">.</span><span class="na">spark</span><span class="p">.</span><span class="na">sql</span><span class="p">.</span><span class="na">SparkSession$</span><span class="p">.</span><span class="na">$anonfun$DEFAULT_COMPANION$1</span><span class="p">(</span><span class="n">SparkSession</span><span class="p">.</span><span class="na">scala</span><span class="p">:</span><span class="n">820</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">scala</span><span class="p">.</span><span class="na">util</span><span class="p">.</span><span class="na">Try$</span><span class="p">.</span><span class="na">apply</span><span class="p">(</span><span class="n">Try</span><span class="p">.</span><span class="na">scala</span><span class="p">:</span><span class="n">217</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">org</span><span class="p">.</span><span class="na">apache</span><span class="p">.</span><span class="na">spark</span><span class="p">.</span><span class="na">sql</span><span class="p">.</span><span class="na">SparkSession$</span><span class="p">.</span><span class="na">org$apache$spark$sql$SparkSession$$DEFAULT_COMPANION</span><span class="p">(</span><span class="n">SparkSession</span><span class="p">.</span><span class="na">scala</span><span class="p">:</span><span class="n">820</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">org</span><span class="p">.</span><span class="na">apache</span><span class="p">.</span><span class="na">spark</span><span class="p">.</span><span class="na">sql</span><span class="p">.</span><span class="na">SparkSession$Builder</span><span class="p">.</span><span class="o">&lt;</span><span class="n">init</span><span class="o">&gt;</span><span class="p">(</span><span class="n">SparkSession</span><span class="p">.</span><span class="na">scala</span><span class="p">:</span><span class="n">854</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">org</span><span class="p">.</span><span class="na">apache</span><span class="p">.</span><span class="na">spark</span><span class="p">.</span><span class="na">sql</span><span class="p">.</span><span class="na">SparkSession$</span><span class="p">.</span><span class="na">builder</span><span class="p">(</span><span class="n">SparkSession</span><span class="p">.</span><span class="na">scala</span><span class="p">:</span><span class="n">833</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">org</span><span class="p">.</span><span class="na">apache</span><span class="p">.</span><span class="na">spark</span><span class="p">.</span><span class="na">examples</span><span class="p">.</span><span class="na">SparkPi$</span><span class="p">.</span><span class="na">main</span><span class="p">(</span><span class="n">SparkPi</span><span class="p">.</span><span class="na">scala</span><span class="p">:</span><span class="n">28</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">org</span><span class="p">.</span><span class="na">apache</span><span class="p">.</span><span class="na">spark</span><span class="p">.</span><span class="na">examples</span><span class="p">.</span><span class="na">SparkPi</span><span class="p">.</span><span class="na">main</span><span class="p">(</span><span class="n">SparkPi</span><span class="p">.</span><span class="na">scala</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">Caused</span><span class="w"> </span><span class="n">by</span><span class="p">:</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="na">lang</span><span class="p">.</span><span class="na">ClassNotFoundException</span><span class="p">:</span><span class="w"> </span><span class="n">org</span><span class="p">.</span><span class="na">apache</span><span class="p">.</span><span class="na">logging</span><span class="p">.</span><span class="na">log4j</span><span class="p">.</span><span class="na">core</span><span class="p">.</span><span class="na">Filter</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="na">base</span><span class="o">/</span><span class="n">jdk</span><span class="p">.</span><span class="na">internal</span><span class="p">.</span><span class="na">loader</span><span class="p">.</span><span class="na">BuiltinClassLoader</span><span class="p">.</span><span class="na">loadClass</span><span class="p">(</span><span class="n">BuiltinClassLoader</span><span class="p">.</span><span class="na">java</span><span class="p">:</span><span class="n">641</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="na">base</span><span class="o">/</span><span class="n">jdk</span><span class="p">.</span><span class="na">internal</span><span class="p">.</span><span class="na">loader</span><span class="p">.</span><span class="na">ClassLoaders$AppClassLoader</span><span class="p">.</span><span class="na">loadClass</span><span class="p">(</span><span class="n">ClassLoaders</span><span class="p">.</span><span class="na">java</span><span class="p">:</span><span class="n">188</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">at</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="na">base</span><span class="o">/</span><span class="n">java</span><span class="p">.</span><span class="na">lang</span><span class="p">.</span><span class="na">ClassLoader</span><span class="p">.</span><span class="na">loadClass</span><span class="p">(</span><span class="n">ClassLoader</span><span class="p">.</span><span class="na">java</span><span class="p">:</span><span class="n">528</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">...</span><span class="w"> </span><span class="n">16</span><span class="w"> </span><span class="n">more</span></span></span></code></pre></div></div>
+<p>在idea <code>Run/Debug Configuration</code>中添加<code>Add dependencies with provided scope to classpath</code></p>]]></description>
+</item>
+<item>
+    <title>Spark内存管理</title>
+    <link>http://localhost:1313/posts/spark_memory_manager/</link>
+    <pubDate>Sun, 09 Mar 2025 22:32:09 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://localhost:1313/posts/spark_memory_manager/</guid>
+    <description><![CDATA[<h2 id="关键问题">关键问题</h2>
+<ol>
+<li>
+<p>内存被分成哪些区域，各分区之间的关系是什么，通过什么参数控制</p>
+</li>
+<li>
+<p>内存上报和释放的单位是什么，上报和释放是如何实现的</p>
+</li>
+<li>
+<p>如何避免内存没有释放导致资源泄露</p>
+</li>
+<li>
+<p>如何避免重复上报和漏上报问题</p>]]></description>
+</item>
+<item>
+    <title>k8s 存储</title>
+    <link>http://localhost:1313/posts/k8s_storage/</link>
+    <pubDate>Fri, 07 Feb 2025 10:49:01 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://localhost:1313/posts/k8s_storage/</guid>
+    <description><![CDATA[<h2 id="pods">Pods</h2>
+<p>Pod 是 Kubernetes 中最小的可部署计算单元，你可以创建和管理它们。</p>
+<p><strong>Pod（类似于一群鲸鱼的“pod”或豌豆荚“pea pod”）</strong> 是一组一个或多个容器，这些容器共享存储和网络资源，并且有一个规范来定义如何运行它们。Pod 内部的内容始终是 <strong>共同调度（co-scheduled）并在相同的上下文中运行</strong> 的。Pod 充当一个特定应用的“<strong>逻辑主机</strong>”（logical host）：它包含一个或多个 <strong>相对紧密耦合的应用容器</strong>。在非云环境下，运行在同一台物理机或虚拟机上的应用程序，可以类比于在 Kubernetes 中运行在同一逻辑主机上的应用。</p>]]></description>
+</item>
+<item>
+    <title>Prometheus_and_grafana</title>
+    <link>http://localhost:1313/posts/prometheus_and_grafana/</link>
+    <pubDate>Sat, 01 Feb 2025 19:42:56 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://localhost:1313/posts/prometheus_and_grafana/</guid>
+    <description><![CDATA[<h2 id="prometheus">Prometheus</h2>
+<p><a href="https://www.youtube.com/watch?v=h4Sl21AKiDg" target="_blank" rel="noopener noreffer ">https://www.youtube.com/watch?v=h4Sl21AKiDg</a></p>
+<p></p>
+<p></p>
+<p></p>
+<p></p>
+<p></p>
+<p></p>
+<p>Prometheus Server, Pushgateway, Alertmanager</p>
+<p><a href="https://prometheus.io/docs/concepts/metric_types/" target="_blank" rel="noopener noreffer ">https://prometheus.io/docs/concepts/metric_types/</a></p>
+<p><a href="https://itnext.io/prometheus-for-beginners-5f20c2e89b6c" target="_blank" rel="noopener noreffer ">https://itnext.io/prometheus-for-beginners-5f20c2e89b6c</a></p>
+<p><strong>Prometheus is essentially just another metrics collection and analysis tool,</strong> and at its core it is made up of 3 components:</p>]]></description>
+</item>
+<item>
+    <title>MinIO大杂烩</title>
+    <link>http://localhost:1313/posts/minio-get-started/</link>
+    <pubDate>Wed, 22 Jan 2025 19:03:56 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://localhost:1313/posts/minio-get-started/</guid>
+    <description><![CDATA[<h2 id="xlmeta-数据结构">xl.meta 数据结构</h2>
+<p>当对象大小超过 128KiB 后，比如<code>a.txt</code>，数据和元数据分开存储</p>
+<p>MinIO 提供了命令行工具<code>xl-meta</code>用来查看<code>xl.meta</code>文件</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-json">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;Versions&#34;</span><span class="p">:</span> <span class="p">[</span>
+</span></span><span class="line"><span class="cl">    <span class="p">{</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;Header&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;EcM&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;EcN&#34;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;Flags&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;ModTime&#34;</span><span class="p">:</span> <span class="s2">&#34;2025-01-23T15:27:45.311572+08:00&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;Signature&#34;</span><span class="p">:</span> <span class="s2">&#34;d0c2b58b&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;Type&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;VersionID&#34;</span><span class="p">:</span> <span class="s2">&#34;00000000000000000000000000000000&#34;</span>
+</span></span><span class="line"><span class="cl">      <span class="p">},</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;Idx&#34;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;Metadata&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;Type&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;V2Obj&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;CSumAlgo&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;DDir&#34;</span><span class="p">:</span> <span class="s2">&#34;74hQxU7FTrq56ShK8pjqAA==&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;EcAlgo&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;EcBSize&#34;</span><span class="p">:</span> <span class="mi">1048576</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;EcDist&#34;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;EcIndex&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;EcM&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;EcN&#34;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;ID&#34;</span><span class="p">:</span> <span class="s2">&#34;AAAAAAAAAAAAAAAAAAAAAA==&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;MTime&#34;</span><span class="p">:</span> <span class="mi">1737617265311572000</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;MetaSys&#34;</span><span class="p">:</span> <span class="p">{},</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;MetaUsr&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;content-type&#34;</span><span class="p">:</span> <span class="s2">&#34;text/plain&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;etag&#34;</span><span class="p">:</span> <span class="s2">&#34;90a1a2b65a4e40d55d758f2a59fe33b4&#34;</span>
+</span></span><span class="line"><span class="cl">          <span class="p">},</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;PartASizes&#34;</span><span class="p">:</span> <span class="p">[</span><span class="mi">2097152</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;PartETags&#34;</span><span class="p">:</span> <span class="kc">null</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;PartNums&#34;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;PartSizes&#34;</span><span class="p">:</span> <span class="p">[</span><span class="mi">2097152</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;Size&#34;</span><span class="p">:</span> <span class="mi">2097152</span>
+</span></span><span class="line"><span class="cl">        <span class="p">},</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;v&#34;</span><span class="p">:</span> <span class="mi">1734527744</span>
+</span></span><span class="line"><span class="cl">      <span class="p">}</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="p">]</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-bash">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">.
+</span></span><span class="line"><span class="cl">├── a.txt
+</span></span><span class="line"><span class="cl">│   ├── ef8850c5-4ec5-4eba-b9e9-284af298ea00
+</span></span><span class="line"><span class="cl">│   │   └── part.1
+</span></span><span class="line"><span class="cl">│   └── xl.meta
+</span></span><span class="line"><span class="cl">└── b.txt
+</span></span><span class="line"><span class="cl">    └── xl.meta</span></span></code></pre></div></div>
+<h2 id="minio-的启动流程">minio 的启动流程</h2>
+<p>minio 启动核心的核心命令为 <code>minio server https://minio{1...4}.example.net:9000/mnt/disk{1...4}/minio</code>，表示 minio 服务分布部署在 4 台服务器上总共 16 块磁盘上，<code>...这种写法称之为拓展表达式，比如 </code>http://minio{1&hellip;4}.example.net:9000<code>实际上表示</code><a href="http://minio1.example.net:9000" target="_blank" rel="noopener noreffer ">http://minio1.example.net:9000</a><code>到</code><a href="http://minio4.example.net:9000" target="_blank" rel="noopener noreffer ">http://minio4.example.net:9000</a>`的4台主机。</p>]]></description>
+</item>
+</channel>
+</rss>

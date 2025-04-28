@@ -1,0 +1,27 @@
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+    <channel>
+        <title>内存管理 - Category - 爱吃芒果</title>
+        <link>http://localhost:1313/categories/%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/</link>
+        <description>内存管理 - Category - 爱吃芒果</description>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 09 Mar 2025 22:32:09 &#43;0800</lastBuildDate><atom:link href="http://localhost:1313/categories/%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/" rel="self" type="application/rss+xml" /><item>
+    <title>Spark内存管理</title>
+    <link>http://localhost:1313/posts/spark_memory_manager/</link>
+    <pubDate>Sun, 09 Mar 2025 22:32:09 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://localhost:1313/posts/spark_memory_manager/</guid>
+    <description><![CDATA[<h2 id="关键问题">关键问题</h2>
+<ol>
+<li>
+<p>内存被分成哪些区域，各分区之间的关系是什么，通过什么参数控制</p>
+</li>
+<li>
+<p>内存上报和释放的单位是什么，上报和释放是如何实现的</p>
+</li>
+<li>
+<p>如何避免内存没有释放导致资源泄露</p>
+</li>
+<li>
+<p>如何避免重复上报和漏上报问题</p>]]></description>
+</item>
+</channel>
+</rss>
