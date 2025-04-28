@@ -3,9 +3,17 @@
         <title>爱吃芒果</title>
         <link>http://example.org/</link>
         <description>This is my cool site</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 27 Apr 2025 23:23:47 &#43;0800</lastBuildDate>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Mon, 28 Apr 2025 22:02:31 &#43;0800</lastBuildDate>
             <atom:link href="http://example.org/index.xml" rel="self" type="application/rss+xml" />
         <item>
+    <title>Java内存模型</title>
+    <link>http://example.org/posts/java-concurrency-jmm/</link>
+    <pubDate>Mon, 28 Apr 2025 22:02:31 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://example.org/posts/java-concurrency-jmm/</guid>
+    <description><![CDATA[<h2 id="阅前须知">阅前须知</h2>]]></description>
+</item>
+<item>
     <title>Java线程池源码分析</title>
     <link>http://example.org/posts/java_thread_pool/</link>
     <pubDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</pubDate>
