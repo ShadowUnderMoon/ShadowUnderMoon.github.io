@@ -1,14 +1,14 @@
 <rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
     <channel>
         <title>Grafana - Tag - 爱吃芒果</title>
-        <link>http://localhost:1313/tags/grafana/</link>
+        <link>http://example.org/tags/grafana/</link>
         <description>Grafana - Tag - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 01 Feb 2025 19:42:56 &#43;0800</lastBuildDate><atom:link href="http://localhost:1313/tags/grafana/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 01 Feb 2025 19:42:56 &#43;0800</lastBuildDate><atom:link href="http://example.org/tags/grafana/" rel="self" type="application/rss+xml" /><item>
     <title>Prometheus_and_grafana</title>
-    <link>http://localhost:1313/posts/prometheus_and_grafana/</link>
+    <link>http://example.org/posts/prometheus_and_grafana/</link>
     <pubDate>Sat, 01 Feb 2025 19:42:56 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/prometheus_and_grafana/</guid>
+    <guid>http://example.org/posts/prometheus_and_grafana/</guid>
     <description><![CDATA[<h2 id="prometheus">Prometheus</h2>
 <p><a href="https://www.youtube.com/watch?v=h4Sl21AKiDg" target="_blank" rel="noopener noreffer ">https://www.youtube.com/watch?v=h4Sl21AKiDg</a></p>
 <p></p>

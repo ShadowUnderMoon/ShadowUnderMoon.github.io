@@ -1,16 +1,16 @@
 <rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
     <channel>
         <title>爱吃芒果</title>
-        <link>http://localhost:1313/</link>
+        <link>http://example.org/</link>
         <description>This is my cool site</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</lastBuildDate>
-            <atom:link href="http://localhost:1313/index.xml" rel="self" type="application/rss+xml" />
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 27 Apr 2025 23:23:47 &#43;0800</lastBuildDate>
+            <atom:link href="http://example.org/index.xml" rel="self" type="application/rss+xml" />
         <item>
     <title>Java线程池源码分析</title>
-    <link>http://localhost:1313/posts/java_thread_pool/</link>
+    <link>http://example.org/posts/java_thread_pool/</link>
     <pubDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/java_thread_pool/</guid>
+    <guid>http://example.org/posts/java_thread_pool/</guid>
     <description><![CDATA[<h2 id="阅前提示">阅前提示</h2>
 <p>参考文献中的文章非常的好，基本看完了就能理解很多东西，推荐阅读</p>
 <p>源码中也提供了很多注释文本，推荐对照源码学习。</p>
@@ -29,10 +29,10 @@
 </item>
 <item>
     <title>Spark_optimizer</title>
-    <link>http://localhost:1313/posts/spark_optimizer/</link>
+    <link>http://example.org/posts/spark_optimizer/</link>
     <pubDate>Sat, 05 Apr 2025 22:05:09 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/spark_optimizer/</guid>
+    <guid>http://example.org/posts/spark_optimizer/</guid>
     <description><![CDATA[<h2 id="遇到的问题">遇到的问题</h2>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-java">
@@ -65,10 +65,10 @@
 </item>
 <item>
     <title>Spark内存管理</title>
-    <link>http://localhost:1313/posts/spark_memory_manager/</link>
+    <link>http://example.org/posts/spark_memory_manager/</link>
     <pubDate>Sun, 09 Mar 2025 22:32:09 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/spark_memory_manager/</guid>
+    <guid>http://example.org/posts/spark_memory_manager/</guid>
     <description><![CDATA[<h2 id="关键问题">关键问题</h2>
 <ol>
 <li>
@@ -85,20 +85,20 @@
 </item>
 <item>
     <title>k8s 存储</title>
-    <link>http://localhost:1313/posts/k8s_storage/</link>
+    <link>http://example.org/posts/k8s_storage/</link>
     <pubDate>Fri, 07 Feb 2025 10:49:01 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/k8s_storage/</guid>
+    <guid>http://example.org/posts/k8s_storage/</guid>
     <description><![CDATA[<h2 id="pods">Pods</h2>
 <p>Pod 是 Kubernetes 中最小的可部署计算单元，你可以创建和管理它们。</p>
 <p><strong>Pod（类似于一群鲸鱼的“pod”或豌豆荚“pea pod”）</strong> 是一组一个或多个容器，这些容器共享存储和网络资源，并且有一个规范来定义如何运行它们。Pod 内部的内容始终是 <strong>共同调度（co-scheduled）并在相同的上下文中运行</strong> 的。Pod 充当一个特定应用的“<strong>逻辑主机</strong>”（logical host）：它包含一个或多个 <strong>相对紧密耦合的应用容器</strong>。在非云环境下，运行在同一台物理机或虚拟机上的应用程序，可以类比于在 Kubernetes 中运行在同一逻辑主机上的应用。</p>]]></description>
 </item>
 <item>
     <title>Prometheus_and_grafana</title>
-    <link>http://localhost:1313/posts/prometheus_and_grafana/</link>
+    <link>http://example.org/posts/prometheus_and_grafana/</link>
     <pubDate>Sat, 01 Feb 2025 19:42:56 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/prometheus_and_grafana/</guid>
+    <guid>http://example.org/posts/prometheus_and_grafana/</guid>
     <description><![CDATA[<h2 id="prometheus">Prometheus</h2>
 <p><a href="https://www.youtube.com/watch?v=h4Sl21AKiDg" target="_blank" rel="noopener noreffer ">https://www.youtube.com/watch?v=h4Sl21AKiDg</a></p>
 <p></p>
@@ -114,10 +114,10 @@
 </item>
 <item>
     <title>MinIO大杂烩</title>
-    <link>http://localhost:1313/posts/minio-get-started/</link>
+    <link>http://example.org/posts/minio-get-started/</link>
     <pubDate>Wed, 22 Jan 2025 19:03:56 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/minio-get-started/</guid>
+    <guid>http://example.org/posts/minio-get-started/</guid>
     <description><![CDATA[<h2 id="xlmeta-数据结构">xl.meta 数据结构</h2>
 <p>当对象大小超过 128KiB 后，比如<code>a.txt</code>，数据和元数据分开存储</p>
 <p>MinIO 提供了命令行工具<code>xl-meta</code>用来查看<code>xl.meta</code>文件</p>

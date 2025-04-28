@@ -1,14 +1,14 @@
 <rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
     <channel>
         <title>Spark - Category - 爱吃芒果</title>
-        <link>http://localhost:1313/categories/spark/</link>
+        <link>http://example.org/categories/spark/</link>
         <description>Spark - Category - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 05 Apr 2025 22:05:09 &#43;0800</lastBuildDate><atom:link href="http://localhost:1313/categories/spark/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 05 Apr 2025 22:05:09 &#43;0800</lastBuildDate><atom:link href="http://example.org/categories/spark/" rel="self" type="application/rss+xml" /><item>
     <title>Spark_optimizer</title>
-    <link>http://localhost:1313/posts/spark_optimizer/</link>
+    <link>http://example.org/posts/spark_optimizer/</link>
     <pubDate>Sat, 05 Apr 2025 22:05:09 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/spark_optimizer/</guid>
+    <guid>http://example.org/posts/spark_optimizer/</guid>
     <description><![CDATA[<h2 id="遇到的问题">遇到的问题</h2>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-java">
@@ -41,10 +41,10 @@
 </item>
 <item>
     <title>Spark内存管理</title>
-    <link>http://localhost:1313/posts/spark_memory_manager/</link>
+    <link>http://example.org/posts/spark_memory_manager/</link>
     <pubDate>Sun, 09 Mar 2025 22:32:09 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/spark_memory_manager/</guid>
+    <guid>http://example.org/posts/spark_memory_manager/</guid>
     <description><![CDATA[<h2 id="关键问题">关键问题</h2>
 <ol>
 <li>

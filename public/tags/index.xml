@@ -1,86 +1,86 @@
 <rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
     <channel>
         <title>Tags - Tag - 爱吃芒果</title>
-        <link>http://localhost:1313/tags/</link>
+        <link>http://example.org/tags/</link>
         <description>Tags - Tag - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</lastBuildDate><atom:link href="http://localhost:1313/tags/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</lastBuildDate><atom:link href="http://example.org/tags/" rel="self" type="application/rss+xml" /><item>
     <title>Java</title>
-    <link>http://localhost:1313/tags/java/</link>
+    <link>http://example.org/tags/java/</link>
     <pubDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</pubDate>
     <author>xxxx</author>
-    <guid>http://localhost:1313/tags/java/</guid>
+    <guid>http://example.org/tags/java/</guid>
     <description><![CDATA[]]></description>
 </item>
 <item>
     <title>JDK11</title>
-    <link>http://localhost:1313/tags/jdk11/</link>
+    <link>http://example.org/tags/jdk11/</link>
     <pubDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</pubDate>
     <author>xxxx</author>
-    <guid>http://localhost:1313/tags/jdk11/</guid>
+    <guid>http://example.org/tags/jdk11/</guid>
     <description><![CDATA[]]></description>
 </item>
 <item>
     <title>JVM</title>
-    <link>http://localhost:1313/tags/jvm/</link>
+    <link>http://example.org/tags/jvm/</link>
     <pubDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</pubDate>
     <author>xxxx</author>
-    <guid>http://localhost:1313/tags/jvm/</guid>
+    <guid>http://example.org/tags/jvm/</guid>
     <description><![CDATA[]]></description>
 </item>
 <item>
     <title>线程池</title>
-    <link>http://localhost:1313/tags/%E7%BA%BF%E7%A8%8B%E6%B1%A0/</link>
+    <link>http://example.org/tags/%E7%BA%BF%E7%A8%8B%E6%B1%A0/</link>
     <pubDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</pubDate>
     <author>xxxx</author>
-    <guid>http://localhost:1313/tags/%E7%BA%BF%E7%A8%8B%E6%B1%A0/</guid>
+    <guid>http://example.org/tags/%E7%BA%BF%E7%A8%8B%E6%B1%A0/</guid>
     <description><![CDATA[]]></description>
 </item>
 <item>
     <title>Spark</title>
-    <link>http://localhost:1313/tags/spark/</link>
+    <link>http://example.org/tags/spark/</link>
     <pubDate>Sat, 05 Apr 2025 22:05:09 &#43;0800</pubDate>
     <author>xxxx</author>
-    <guid>http://localhost:1313/tags/spark/</guid>
+    <guid>http://example.org/tags/spark/</guid>
     <description><![CDATA[]]></description>
 </item>
 <item>
     <title>优化器</title>
-    <link>http://localhost:1313/tags/%E4%BC%98%E5%8C%96%E5%99%A8/</link>
+    <link>http://example.org/tags/%E4%BC%98%E5%8C%96%E5%99%A8/</link>
     <pubDate>Sat, 05 Apr 2025 22:05:09 &#43;0800</pubDate>
     <author>xxxx</author>
-    <guid>http://localhost:1313/tags/%E4%BC%98%E5%8C%96%E5%99%A8/</guid>
+    <guid>http://example.org/tags/%E4%BC%98%E5%8C%96%E5%99%A8/</guid>
     <description><![CDATA[]]></description>
 </item>
 <item>
     <title>内存管理</title>
-    <link>http://localhost:1313/tags/%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/</link>
+    <link>http://example.org/tags/%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/</link>
     <pubDate>Sun, 09 Mar 2025 22:32:09 &#43;0800</pubDate>
     <author>xxxx</author>
-    <guid>http://localhost:1313/tags/%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/</guid>
+    <guid>http://example.org/tags/%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/</guid>
     <description><![CDATA[]]></description>
 </item>
 <item>
     <title>Grafana</title>
-    <link>http://localhost:1313/tags/grafana/</link>
+    <link>http://example.org/tags/grafana/</link>
     <pubDate>Sat, 01 Feb 2025 19:42:56 &#43;0800</pubDate>
     <author>xxxx</author>
-    <guid>http://localhost:1313/tags/grafana/</guid>
+    <guid>http://example.org/tags/grafana/</guid>
     <description><![CDATA[]]></description>
 </item>
 <item>
     <title>Prometheus</title>
-    <link>http://localhost:1313/tags/prometheus/</link>
+    <link>http://example.org/tags/prometheus/</link>
     <pubDate>Sat, 01 Feb 2025 19:42:56 &#43;0800</pubDate>
     <author>xxxx</author>
-    <guid>http://localhost:1313/tags/prometheus/</guid>
+    <guid>http://example.org/tags/prometheus/</guid>
     <description><![CDATA[]]></description>
 </item>
 <item>
     <title>MinIO</title>
-    <link>http://localhost:1313/tags/minio/</link>
+    <link>http://example.org/tags/minio/</link>
     <pubDate>Wed, 22 Jan 2025 19:03:56 &#43;0800</pubDate>
     <author>xxxx</author>
-    <guid>http://localhost:1313/tags/minio/</guid>
+    <guid>http://example.org/tags/minio/</guid>
     <description><![CDATA[]]></description>
 </item>
 </channel>
