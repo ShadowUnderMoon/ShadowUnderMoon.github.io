@@ -193,3 +193,13 @@ hasCJKLanguage = true
 [caches]
   [caches.images]
     dir = ':cacheDir/images'
+
+
+[params.page.comment.utterances]
+  enable = true
+  # owner/repo
+  repo = "ShadowUnderMoon/blog"
+  issueTerm = "pathname"
+  label = ""
+  lightTheme = "github-light"
+  darkTheme = "github-dark"
