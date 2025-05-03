@@ -35,7 +35,7 @@
         "mainEntityOfPage": {
             "@type": "WebPage",
             "@id": "http:\/\/example.org\/posts\/grpc-in-practice\/"
-        },"genre": "posts","keywords": "grpc","wordcount":  3265 ,
+        },"genre": "posts","keywords": "grpc","wordcount":  8087 ,
         "url": "http:\/\/example.org\/posts\/grpc-in-practice\/","datePublished": "2025-05-02T13:26:57+08:00","dateModified": "2025-05-02T13:26:57+08:00","publisher": {
             "@type": "Organization",
             "name": ""},"author": {
@@ -109,8 +109,8 @@
             <div class="toc-content" id="toc-content-auto"></div>
         </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Grpc源码分析</h1><div class="post-meta">
             <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/grpc/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Grpc</a></span></div>
-            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-02">2025-05-02</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;3265 words&nbsp;
-                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;7 minutes&nbsp;</div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-02">2025-05-02</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;8087 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;17 minutes&nbsp;</div>
         </div><div class="details toc" id="toc-static"  data-kept="">
                 <div class="details-summary toc-title">
                     <span>Contents</span>
@@ -129,6 +129,14 @@
         <li><a href="#grpc服务端http2握手">grpc服务端HTTP2握手</a></li>
       </ul>
     </li>
+    <li><a href="#grpc-server的rpc交互阶段">grpc server的rpc交互阶段</a>
+      <ul>
+        <li><a href="#headers-frame的处理">Headers Frame的处理</a></li>
+        <li><a href="#data-frame的处理">Data Frame的处理</a></li>
+        <li><a href="#setting-frame的处理">Setting Frame的处理</a></li>
+      </ul>
+    </li>
+    <li><a href="#server如何发送frame">server如何发送frame</a></li>
     <li><a href="#参考文献">参考文献</a></li>
   </ul>
 </nav></div>
@@ -287,7 +295,7 @@
 </span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
 <p>grpc server端首先明确自己的HTTP2的初始配置，比如MaxFrameSize等，并将这些配置信息通过<code>frame.fr</code>发送给client，<code>frame.fr</code>实际上就是golang原生的<code>http2.Framer</code>，在底层，这些配置信息会被包装成一个Setting Frame发送给client。</p>
 <p>client在收到Setting Frame后，根据自身情况调整参数，同样发送一个Setting Frame给sever。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-go">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -318,7 +326,7 @@
 </span></span><span class="line"><span class="cl"><span class="c1">// flush framer，确保向client发送了setting frame
 </span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="nx">t</span><span class="p">.</span><span class="nx">framer</span><span class="p">.</span><span class="nx">writer</span><span class="p">.</span><span class="nf">Flush</span><span class="p">()</span></span></span></code></pre></div></div>
 <p>grpc server在发送了setting frame之后，创建好<code>http2Server</code>对象，并等待client的后续消息。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-go">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -416,6 +424,762 @@
 </span></span><span class="line"><span class="cl"><span class="k">go</span> <span class="nx">t</span><span class="p">.</span><span class="nf">keepalive</span><span class="p">()</span></span></span></code></pre></div></div>
 <p>此时server和client之间的HTTP2链接已经建立完成，RPC连接阶段完毕。在<code>NewServerTransport</code>的最后启动了<code>loopyWriter</code>，开始了rpc交互阶段，<code>loopyWriter</code>不断从<code>controlBuf</code>中读取control frames（包括setting frame)，并将缓存中的frame发送给client，可以说<code>loopyWriter</code>就是grpc server控制流量已经发送数据的地方。</p>
 <p>这里另外启动了一个keepalive的goroutine，这个goroutine应该和grpc的keepalive机制有关。</p>
+<h2 id="grpc-server的rpc交互阶段">grpc server的rpc交互阶段</h2>
+<p>HTTP2中定义了很多类型的frame，包括data, headers等，具体如下，对于不同的frame类型，HTTP2 server应该有不同的处理逻辑。在grpc中，对frame类型的分类和处理，被包含在<code>func (s *Server) serveStreams</code>中。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// FrameType represents the type of an HTTP/2 Frame.
+</span></span></span><span class="line"><span class="cl"><span class="c1">// See [Frame Type].
+</span></span></span><span class="line"><span class="cl"><span class="c1">//
+</span></span></span><span class="line"><span class="cl"><span class="c1">// [Frame Type]: https://httpwg.org/specs/rfc7540.html#FrameType
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">type</span> <span class="nx">FrameType</span> <span class="kt">uint8</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// Frame types defined in the HTTP/2 Spec.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">const</span> <span class="p">(</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">FrameTypeData</span>         <span class="nx">FrameType</span> <span class="p">=</span> <span class="mh">0x0</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">FrameTypeHeaders</span>      <span class="nx">FrameType</span> <span class="p">=</span> <span class="mh">0x1</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">FrameTypeRSTStream</span>    <span class="nx">FrameType</span> <span class="p">=</span> <span class="mh">0x3</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">FrameTypeSettings</span>     <span class="nx">FrameType</span> <span class="p">=</span> <span class="mh">0x4</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">FrameTypePing</span>         <span class="nx">FrameType</span> <span class="p">=</span> <span class="mh">0x6</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">FrameTypeGoAway</span>       <span class="nx">FrameType</span> <span class="p">=</span> <span class="mh">0x7</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">FrameTypeWindowUpdate</span> <span class="nx">FrameType</span> <span class="p">=</span> <span class="mh">0x8</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">FrameTypeContinuation</span> <span class="nx">FrameType</span> <span class="p">=</span> <span class="mh">0x9</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span></span></span></code></pre></div></div>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">Server</span><span class="p">)</span> <span class="nf">serveStreams</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">st</span> <span class="nx">transport</span><span class="p">.</span><span class="nx">ServerTransport</span><span class="p">,</span> <span class="nx">rawConn</span> <span class="nx">net</span><span class="p">.</span><span class="nx">Conn</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">streamQuota</span> <span class="o">:=</span> <span class="nf">newHandlerQuota</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">opts</span><span class="p">.</span><span class="nx">maxConcurrentStreams</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 阻塞并接受来自client的frame
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">st</span><span class="p">.</span><span class="nf">HandleStreams</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="kd">func</span><span class="p">(</span><span class="nx">stream</span> <span class="o">*</span><span class="nx">transport</span><span class="p">.</span><span class="nx">ServerStream</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">s</span><span class="p">.</span><span class="nx">handlersWG</span><span class="p">.</span><span class="nf">Add</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">streamQuota</span><span class="p">.</span><span class="nf">acquire</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">f</span> <span class="o">:=</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">defer</span> <span class="nx">streamQuota</span><span class="p">.</span><span class="nf">release</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">			<span class="k">defer</span> <span class="nx">s</span><span class="p">.</span><span class="nx">handlersWG</span><span class="p">.</span><span class="nf">Done</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">      <span class="c1">// 当一个新的stream被创建之后，进行一些配置
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">s</span><span class="p">.</span><span class="nf">handleStream</span><span class="p">(</span><span class="nx">st</span><span class="p">,</span> <span class="nx">stream</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">s</span><span class="p">.</span><span class="nx">opts</span><span class="p">.</span><span class="nx">numServerWorkers</span> <span class="p">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">select</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">case</span> <span class="nx">s</span><span class="p">.</span><span class="nx">serverWorkerChannel</span> <span class="o">&lt;-</span> <span class="nx">f</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">				<span class="k">return</span>
+</span></span><span class="line"><span class="cl">			<span class="k">default</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">				<span class="c1">// If all stream workers are busy, fallback to the default code path.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">go</span> <span class="nf">f</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p><code>st.HandleStreams</code>会阻塞当前goroutine，并等待来自client的frame，在一个for循环中等待并读取来自client的frame，并采取不同的处理方式。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">http2Server</span><span class="p">)</span> <span class="nf">HandleStreams</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">handle</span> <span class="kd">func</span><span class="p">(</span><span class="o">*</span><span class="nx">ServerStream</span><span class="p">))</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">defer</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nb">close</span><span class="p">(</span><span class="nx">t</span><span class="p">.</span><span class="nx">readerDone</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="o">&lt;-</span><span class="nx">t</span><span class="p">.</span><span class="nx">loopyWriterDone</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}()</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// for循环，持续处理一个连接的上请求
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">for</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 限流
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">throttle</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 读取frame
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">frame</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">t</span><span class="p">.</span><span class="nx">framer</span><span class="p">.</span><span class="nx">fr</span><span class="p">.</span><span class="nf">ReadFrame</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">atomic</span><span class="p">.</span><span class="nf">StoreInt64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">t</span><span class="p">.</span><span class="nx">lastRead</span><span class="p">,</span> <span class="nx">time</span><span class="p">.</span><span class="nf">Now</span><span class="p">().</span><span class="nf">UnixNano</span><span class="p">())</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 根据frame的类型分别处理
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">switch</span> <span class="nx">frame</span> <span class="o">:=</span> <span class="nx">frame</span><span class="p">.(</span><span class="kd">type</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// MetaHeaderFrame并不是http2的frame类型，而是经过包装的类型
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="c1">// headers frame + zero or more continuation frame + hspack编码内容的解码
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">case</span> <span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">MetaHeadersFrame</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">t</span><span class="p">.</span><span class="nf">operateHeaders</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">frame</span><span class="p">,</span> <span class="nx">handle</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="c1">// Any error processing client headers, e.g. invalid stream ID,
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>				<span class="c1">// is considered a protocol violation.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>				<span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">put</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">goAway</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">code</span><span class="p">:</span>      <span class="nx">http2</span><span class="p">.</span><span class="nx">ErrCodeProtocol</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">debugData</span><span class="p">:</span> <span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="nx">err</span><span class="p">.</span><span class="nf">Error</span><span class="p">()),</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">closeConn</span><span class="p">:</span> <span class="nx">err</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">				<span class="p">})</span>
+</span></span><span class="line"><span class="cl">				<span class="k">continue</span>
+</span></span><span class="line"><span class="cl">			<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">case</span> <span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">DataFrame</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">t</span><span class="p">.</span><span class="nf">handleData</span><span class="p">(</span><span class="nx">frame</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">case</span> <span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">RSTStreamFrame</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">t</span><span class="p">.</span><span class="nf">handleRSTStream</span><span class="p">(</span><span class="nx">frame</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">case</span> <span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">SettingsFrame</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">t</span><span class="p">.</span><span class="nf">handleSettings</span><span class="p">(</span><span class="nx">frame</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">case</span> <span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">PingFrame</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">t</span><span class="p">.</span><span class="nf">handlePing</span><span class="p">(</span><span class="nx">frame</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">case</span> <span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">WindowUpdateFrame</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">t</span><span class="p">.</span><span class="nf">handleWindowUpdate</span><span class="p">(</span><span class="nx">frame</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">case</span> <span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">GoAwayFrame</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// TODO: Handle GoAway from the client appropriately.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">default</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="k">if</span> <span class="nx">t</span><span class="p">.</span><span class="nx">logger</span><span class="p">.</span><span class="nf">V</span><span class="p">(</span><span class="nx">logLevel</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">t</span><span class="p">.</span><span class="nx">logger</span><span class="p">.</span><span class="nf">Infof</span><span class="p">(</span><span class="s">&#34;Received unsupported frame type %T&#34;</span><span class="p">,</span> <span class="nx">frame</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<h3 id="headers-frame的处理">Headers Frame的处理</h3>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">http2Server</span><span class="p">)</span> <span class="nf">operateHeaders</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">frame</span> <span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">MetaHeadersFrame</span><span class="p">,</span> <span class="nx">handle</span> <span class="kd">func</span><span class="p">(</span><span class="o">*</span><span class="nx">ServerStream</span><span class="p">))</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// Acquire max stream ID lock for entire duration
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">t</span><span class="p">.</span><span class="nx">maxStreamMu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="k">defer</span> <span class="nx">t</span><span class="p">.</span><span class="nx">maxStreamMu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 从客户端frame中获取streamID
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">streamID</span> <span class="o">:=</span> <span class="nx">frame</span><span class="p">.</span><span class="nf">Header</span><span class="p">().</span><span class="nx">StreamID</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 校验stream id
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">streamID</span><span class="o">%</span><span class="mi">2</span> <span class="o">!=</span> <span class="mi">1</span> <span class="o">||</span> <span class="nx">streamID</span> <span class="o">&lt;=</span> <span class="nx">t</span><span class="p">.</span><span class="nx">maxStreamID</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// illegal gRPC stream id.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">return</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Errorf</span><span class="p">(</span><span class="s">&#34;received an illegal stream id: %v. headers frame: %+v&#34;</span><span class="p">,</span> <span class="nx">streamID</span><span class="p">,</span> <span class="nx">frame</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 将获得的streamID设置到http2Server
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">t</span><span class="p">.</span><span class="nx">maxStreamID</span> <span class="p">=</span> <span class="nx">streamID</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 无界message缓冲
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">buf</span> <span class="o">:=</span> <span class="nf">newRecvBuffer</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 创建stream
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">s</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">ServerStream</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Stream</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">Stream</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">id</span><span class="p">:</span>  <span class="nx">streamID</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">buf</span><span class="p">:</span> <span class="nx">buf</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">fc</span><span class="p">:</span>  <span class="o">&amp;</span><span class="nx">inFlow</span><span class="p">{</span><span class="nx">limit</span><span class="p">:</span> <span class="nb">uint32</span><span class="p">(</span><span class="nx">t</span><span class="p">.</span><span class="nx">initialWindowSize</span><span class="p">)},</span>
+</span></span><span class="line"><span class="cl">		<span class="p">},</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">st</span><span class="p">:</span>               <span class="nx">t</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">headerWireLength</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="nx">frame</span><span class="p">.</span><span class="nf">Header</span><span class="p">().</span><span class="nx">Length</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span></span></span></code></pre></div></div>
+<p>在grpc server和client端，存在这一个stream的概念，用来表征一次grpc call。一个grpc call总是以一个来自client的headers frame开始，因此server会在<code>operateHeaders</code>中创建一个<code>Stream</code>对象，stream有一个client和server端一致的id，也有一个buf缓存。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">hf</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">frame</span><span class="p">.</span><span class="nx">Fields</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">switch</span> <span class="nx">hf</span><span class="p">.</span><span class="nx">Name</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">case</span> <span class="s">&#34;grpc-encoding&#34;</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">s</span><span class="p">.</span><span class="nx">recvCompress</span> <span class="p">=</span> <span class="nx">hf</span><span class="p">.</span><span class="nx">Value</span>
+</span></span><span class="line"><span class="cl">  <span class="k">case</span> <span class="s">&#34;:method&#34;</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// POST, GET这些
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="nx">httpMethod</span> <span class="p">=</span> <span class="nx">hf</span><span class="p">.</span><span class="nx">Value</span>
+</span></span><span class="line"><span class="cl">  <span class="k">case</span> <span class="s">&#34;:path&#34;</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 使用grpc那个服务的那个方法
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="nx">s</span><span class="p">.</span><span class="nx">method</span> <span class="p">=</span> <span class="nx">hf</span><span class="p">.</span><span class="nx">Value</span>
+</span></span><span class="line"><span class="cl">  <span class="k">case</span> <span class="s">&#34;grpc-timeout&#34;</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">timeoutSet</span> <span class="p">=</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl">    <span class="kd">var</span> <span class="nx">err</span> <span class="kt">error</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="nx">timeout</span><span class="p">,</span> <span class="nx">err</span> <span class="p">=</span> <span class="nf">decodeTimeout</span><span class="p">(</span><span class="nx">hf</span><span class="p">.</span><span class="nx">Value</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">      <span class="nx">headerError</span> <span class="p">=</span> <span class="nx">status</span><span class="p">.</span><span class="nf">Newf</span><span class="p">(</span><span class="nx">codes</span><span class="p">.</span><span class="nx">Internal</span><span class="p">,</span> <span class="s">&#34;malformed grpc-timeout: %v&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>grpc server会遍历frame中的field，并将filed中的信息记录在stream中。<code>:method</code>和<code>:path</code>这两个field需要特别注意，client端需要填写好这两个field来明确地指定要调用server端提供的那一个方法，也就是说，调用哪一个server方法的信息是和调用方法的参数分开在不同的frame中的。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="k">if</span> <span class="nx">frame</span><span class="p">.</span><span class="nf">StreamEnded</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// s is just created by the caller. No lock needed.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="nx">s</span><span class="p">.</span><span class="nx">state</span> <span class="p">=</span> <span class="nx">streamReadDone</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// 超时设置
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">if</span> <span class="nx">timeoutSet</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">s</span><span class="p">.</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">s</span><span class="p">.</span><span class="nx">cancel</span> <span class="p">=</span> <span class="nx">context</span><span class="p">.</span><span class="nf">WithTimeout</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">timeout</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">s</span><span class="p">.</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">s</span><span class="p">.</span><span class="nx">cancel</span> <span class="p">=</span> <span class="nx">context</span><span class="p">.</span><span class="nf">WithCancel</span><span class="p">(</span><span class="nx">ctx</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="nb">uint32</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nx">t</span><span class="p">.</span><span class="nx">activeStreams</span><span class="p">))</span> <span class="o">&gt;=</span> <span class="nx">t</span><span class="p">.</span><span class="nx">maxStreams</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">t</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">put</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">cleanupStream</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">streamID</span><span class="p">:</span> <span class="nx">streamID</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">rst</span><span class="p">:</span>      <span class="kc">true</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">rstCode</span><span class="p">:</span>  <span class="nx">http2</span><span class="p">.</span><span class="nx">ErrCodeRefusedStream</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">onWrite</span><span class="p">:</span>  <span class="kd">func</span><span class="p">()</span> <span class="p">{},</span>
+</span></span><span class="line"><span class="cl">  <span class="p">})</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">s</span><span class="p">.</span><span class="nf">cancel</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// 将stream加入activeStreams map
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="nx">t</span><span class="p">.</span><span class="nx">activeStreams</span><span class="p">[</span><span class="nx">streamID</span><span class="p">]</span> <span class="p">=</span> <span class="nx">s</span>
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">t</span><span class="p">.</span><span class="nx">activeStreams</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">t</span><span class="p">.</span><span class="nx">idle</span> <span class="p">=</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Time</span><span class="p">{}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// Start a timer to close the stream on reaching the deadline.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">if</span> <span class="nx">timeoutSet</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// We need to wait for s.cancel to be updated before calling
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// t.closeStream to avoid data races.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="nx">cancelUpdated</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kd">struct</span><span class="p">{})</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">timer</span> <span class="o">:=</span> <span class="nx">internal</span><span class="p">.</span><span class="nf">TimeAfterFunc</span><span class="p">(</span><span class="nx">timeout</span><span class="p">,</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="o">&lt;-</span><span class="nx">cancelUpdated</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">t</span><span class="p">.</span><span class="nf">closeStream</span><span class="p">(</span><span class="nx">s</span><span class="p">,</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">http2</span><span class="p">.</span><span class="nx">ErrCodeCancel</span><span class="p">,</span> <span class="kc">false</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="p">})</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">oldCancel</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.</span><span class="nx">cancel</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">s</span><span class="p">.</span><span class="nx">cancel</span> <span class="p">=</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nf">oldCancel</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">timer</span><span class="p">.</span><span class="nf">Stop</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="nb">close</span><span class="p">(</span><span class="nx">cancelUpdated</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="nx">s</span><span class="p">.</span><span class="nx">trReader</span> <span class="p">=</span> <span class="o">&amp;</span><span class="nx">transportReader</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">reader</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">recvBufferReader</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">ctx</span><span class="p">:</span>     <span class="nx">s</span><span class="p">.</span><span class="nx">ctx</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">ctxDone</span><span class="p">:</span> <span class="nx">s</span><span class="p">.</span><span class="nx">ctxDone</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">recv</span><span class="p">:</span>    <span class="nx">s</span><span class="p">.</span><span class="nx">buf</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">windowHandler</span><span class="p">:</span> <span class="kd">func</span><span class="p">(</span><span class="nx">n</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">t</span><span class="p">.</span><span class="nf">updateWindow</span><span class="p">(</span><span class="nx">s</span><span class="p">,</span> <span class="nb">uint32</span><span class="p">(</span><span class="nx">n</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">  <span class="p">},</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// Register the stream with loopy.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">put</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">registerStream</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">streamID</span><span class="p">:</span> <span class="nx">s</span><span class="p">.</span><span class="nx">id</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">wq</span><span class="p">:</span>       <span class="nx">s</span><span class="p">.</span><span class="nx">wq</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl"><span class="p">})</span>
+</span></span><span class="line"><span class="cl"><span class="nf">handle</span><span class="p">(</span><span class="nx">s</span><span class="p">)</span></span></span></code></pre></div></div>
+<p>这个新建的stream对象会被放到server的<code>activeStreams</code> map中，并调用回调函数<code>handle(s)</code>来进一步处理这个stream，其中最重要的是调用<code>s.handleStream</code>。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="nx">st</span><span class="p">.</span><span class="nf">HandleStreams</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="kd">func</span><span class="p">(</span><span class="nx">stream</span> <span class="o">*</span><span class="nx">transport</span><span class="p">.</span><span class="nx">ServerStream</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">s</span><span class="p">.</span><span class="nx">handlersWG</span><span class="p">.</span><span class="nf">Add</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">streamQuota</span><span class="p">.</span><span class="nf">acquire</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">f</span> <span class="o">:=</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">defer</span> <span class="nx">streamQuota</span><span class="p">.</span><span class="nf">release</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">    <span class="k">defer</span> <span class="nx">s</span><span class="p">.</span><span class="nx">handlersWG</span><span class="p">.</span><span class="nf">Done</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">s</span><span class="p">.</span><span class="nf">handleStream</span><span class="p">(</span><span class="nx">st</span><span class="p">,</span> <span class="nx">stream</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 如果设置了worker池，则先尝试提交任务到worker池中，如果不行，新起goroutine执行
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">if</span> <span class="nx">s</span><span class="p">.</span><span class="nx">opts</span><span class="p">.</span><span class="nx">numServerWorkers</span> <span class="p">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">select</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="nx">s</span><span class="p">.</span><span class="nx">serverWorkerChannel</span> <span class="o">&lt;-</span> <span class="nx">f</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">      <span class="k">return</span>
+</span></span><span class="line"><span class="cl">    <span class="k">default</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">      <span class="c1">// If all stream workers are busy, fallback to the default code path.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="k">go</span> <span class="nf">f</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl"><span class="p">})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// initServerWorkers creates worker goroutines and a channel to process incoming
+</span></span></span><span class="line"><span class="cl"><span class="c1">// connections to reduce the time spent overall on runtime.morestack.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">Server</span><span class="p">)</span> <span class="nf">initServerWorkers</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">s</span><span class="p">.</span><span class="nx">serverWorkerChannel</span> <span class="p">=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kd">func</span><span class="p">())</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">s</span><span class="p">.</span><span class="nx">serverWorkerChannelClose</span> <span class="p">=</span> <span class="nx">sync</span><span class="p">.</span><span class="nf">OnceFunc</span><span class="p">(</span><span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nb">close</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">serverWorkerChannel</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="nb">uint32</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="nx">s</span><span class="p">.</span><span class="nx">opts</span><span class="p">.</span><span class="nx">numServerWorkers</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">go</span> <span class="nx">s</span><span class="p">.</span><span class="nf">serverWorker</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>回调函数中会将处理stream的任务提交到其他goroutine中，如果可用的worker，则由worker执行，否则另起goroutine来执行。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">Server</span><span class="p">)</span> <span class="nf">handleStream</span><span class="p">(</span><span class="nx">t</span> <span class="nx">transport</span><span class="p">.</span><span class="nx">ServerTransport</span><span class="p">,</span> <span class="nx">stream</span> <span class="o">*</span><span class="nx">transport</span><span class="p">.</span><span class="nx">ServerStream</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 获取grpc路径
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">sm</span> <span class="o">:=</span> <span class="nx">stream</span><span class="p">.</span><span class="nf">Method</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">pos</span> <span class="o">:=</span> <span class="nx">strings</span><span class="p">.</span><span class="nf">LastIndex</span><span class="p">(</span><span class="nx">sm</span><span class="p">,</span> <span class="s">&#34;/&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 调用的grpc service name
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">service</span> <span class="o">:=</span> <span class="nx">sm</span><span class="p">[:</span><span class="nx">pos</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 调用的grpc method name
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">method</span> <span class="o">:=</span> <span class="nx">sm</span><span class="p">[</span><span class="nx">pos</span><span class="o">+</span><span class="mi">1</span><span class="p">:]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="c1">// 从grpc server注册的service和method中找是否存在
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">srv</span><span class="p">,</span> <span class="nx">knownService</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.</span><span class="nx">services</span><span class="p">[</span><span class="nx">service</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">knownService</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// unary rpc
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">if</span> <span class="nx">md</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">srv</span><span class="p">.</span><span class="nx">methods</span><span class="p">[</span><span class="nx">method</span><span class="p">];</span> <span class="nx">ok</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">s</span><span class="p">.</span><span class="nf">processUnaryRPC</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">stream</span><span class="p">,</span> <span class="nx">srv</span><span class="p">,</span> <span class="nx">md</span><span class="p">,</span> <span class="nx">ti</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// stream rpc
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">if</span> <span class="nx">sd</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">srv</span><span class="p">.</span><span class="nx">streams</span><span class="p">[</span><span class="nx">method</span><span class="p">];</span> <span class="nx">ok</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">s</span><span class="p">.</span><span class="nf">processStreamingRPC</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">stream</span><span class="p">,</span> <span class="nx">srv</span><span class="p">,</span> <span class="nx">sd</span><span class="p">,</span> <span class="nx">ti</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>根据handers frame中service和method的信息，grpc server找到注册好的method并执行，这里区分unary调用和streaming调用，分别对应<code>s.processUnaryRPC</code>和<code>s.processStreamingRPC</code>。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">Server</span><span class="p">)</span> <span class="nf">processUnaryRPC</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">stream</span> <span class="o">*</span><span class="nx">transport</span><span class="p">.</span><span class="nx">ServerStream</span><span class="p">,</span> <span class="nx">info</span> <span class="o">*</span><span class="nx">serviceInfo</span><span class="p">,</span> <span class="nx">md</span> <span class="o">*</span><span class="nx">MethodDesc</span><span class="p">,</span> <span class="nx">trInfo</span> <span class="o">*</span><span class="nx">traceInfo</span><span class="p">)</span> <span class="p">(</span><span class="nx">err</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 接收message并且解压缩
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">d</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nf">recvAndDecompress</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">parser</span><span class="p">{</span><span class="nx">r</span><span class="p">:</span> <span class="nx">stream</span><span class="p">,</span> <span class="nx">bufferPool</span><span class="p">:</span> <span class="nx">s</span><span class="p">.</span><span class="nx">opts</span><span class="p">.</span><span class="nx">bufferPool</span><span class="p">},</span> <span class="nx">stream</span><span class="p">,</span> <span class="nx">dc</span><span class="p">,</span> <span class="nx">s</span><span class="p">.</span><span class="nx">opts</span><span class="p">.</span><span class="nx">maxReceiveMessageSize</span><span class="p">,</span> <span class="nx">payInfo</span><span class="p">,</span> <span class="nx">decomp</span><span class="p">,</span> <span class="kc">true</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">df</span> <span class="o">:=</span> <span class="kd">func</span><span class="p">(</span><span class="nx">v</span> <span class="nx">any</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">defer</span> <span class="nf">dataFree</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 使用proto codec将获取到的数据unmarshal到对应的请求类型
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.</span><span class="nf">getCodec</span><span class="p">(</span><span class="nx">stream</span><span class="p">.</span><span class="nf">ContentSubtype</span><span class="p">()).</span><span class="nf">Unmarshal</span><span class="p">(</span><span class="nx">d</span><span class="p">,</span> <span class="nx">v</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">      <span class="k">return</span> <span class="nx">status</span><span class="p">.</span><span class="nf">Errorf</span><span class="p">(</span><span class="nx">codes</span><span class="p">.</span><span class="nx">Internal</span><span class="p">,</span> <span class="s">&#34;grpc: error unmarshalling request: %v&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">    <span class="o">...</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">ctx</span> <span class="p">=</span> <span class="nf">NewContextWithServerTransportStream</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">stream</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 调用实际的server端方法，得到返回结果
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">reply</span><span class="p">,</span> <span class="nx">appErr</span> <span class="o">:=</span> <span class="nx">md</span><span class="p">.</span><span class="nf">Handler</span><span class="p">(</span><span class="nx">info</span><span class="p">.</span><span class="nx">serviceImpl</span><span class="p">,</span> <span class="nx">ctx</span><span class="p">,</span> <span class="nx">df</span><span class="p">,</span> <span class="nx">s</span><span class="p">.</span><span class="nx">opts</span><span class="p">.</span><span class="nx">unaryInt</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// Last=true表示stream最后的写操作，实际上好像没啥用
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">opts</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">transport</span><span class="p">.</span><span class="nx">WriteOptions</span><span class="p">{</span><span class="nx">Last</span><span class="p">:</span> <span class="kc">true</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.</span><span class="nf">sendResponse</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">stream</span><span class="p">,</span> <span class="nx">reply</span><span class="p">,</span> <span class="nx">cp</span><span class="p">,</span> <span class="nx">opts</span><span class="p">,</span> <span class="nx">comp</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">stream</span><span class="p">.</span><span class="nf">WriteStatus</span><span class="p">(</span><span class="nx">statusOK</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>可以看到处理UnaryRPC请求时，会先接受data frame消息，然后unmarshal到对应的请求类型，调用实际的server端方法，得到返回结果，最后将status <code>statusOK</code>发送给client，关闭stream。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">recvAndDecompress</span><span class="p">(</span><span class="nx">p</span> <span class="o">*</span><span class="nx">parser</span><span class="p">,</span> <span class="nx">s</span> <span class="nx">recvCompressor</span><span class="p">,</span> <span class="nx">dc</span> <span class="nx">Decompressor</span><span class="p">,</span> <span class="nx">maxReceiveMessageSize</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">payInfo</span> <span class="o">*</span><span class="nx">payloadInfo</span><span class="p">,</span> <span class="nx">compressor</span> <span class="nx">encoding</span><span class="p">.</span><span class="nx">Compressor</span><span class="p">,</span> <span class="nx">isServer</span> <span class="kt">bool</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span> <span class="p">(</span><span class="nx">out</span> <span class="nx">mem</span><span class="p">.</span><span class="nx">BufferSlice</span><span class="p">,</span> <span class="nx">err</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">pf</span><span class="p">,</span> <span class="nx">compressed</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">p</span><span class="p">.</span><span class="nf">recvMsg</span><span class="p">(</span><span class="nx">maxReceiveMessageSize</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">compressedLength</span> <span class="o">:=</span> <span class="nx">compressed</span><span class="p">.</span><span class="nf">Len</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">pf</span><span class="p">.</span><span class="nf">isCompressed</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">defer</span> <span class="nx">compressed</span><span class="p">.</span><span class="nf">Free</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// To match legacy behavior, if the decompressor is set by WithDecompressor or RPCDecompressor,
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="c1">// use this decompressor as the default.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">out</span><span class="p">,</span> <span class="nx">err</span> <span class="p">=</span> <span class="nf">decompress</span><span class="p">(</span><span class="nx">compressor</span><span class="p">,</span> <span class="nx">compressed</span><span class="p">,</span> <span class="nx">dc</span><span class="p">,</span> <span class="nx">maxReceiveMessageSize</span><span class="p">,</span> <span class="nx">p</span><span class="p">.</span><span class="nx">bufferPool</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">out</span> <span class="p">=</span> <span class="nx">compressed</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">payInfo</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">payInfo</span><span class="p">.</span><span class="nx">compressedLength</span> <span class="p">=</span> <span class="nx">compressedLength</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">out</span><span class="p">.</span><span class="nf">Ref</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">payInfo</span><span class="p">.</span><span class="nx">uncompressedBytes</span> <span class="p">=</span> <span class="nx">out</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">out</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="o">*</span><span class="nx">parser</span><span class="p">)</span> <span class="nf">recvMsg</span><span class="p">(</span><span class="nx">maxReceiveMessageSize</span> <span class="kt">int</span><span class="p">)</span> <span class="p">(</span><span class="nx">payloadFormat</span><span class="p">,</span> <span class="nx">mem</span><span class="p">.</span><span class="nx">BufferSlice</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 读取message的header，总共5个字节
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">err</span> <span class="o">:=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">r</span><span class="p">.</span><span class="nf">ReadMessageHeader</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">header</span><span class="p">[:])</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 是否压缩
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">pf</span> <span class="o">:=</span> <span class="nf">payloadFormat</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">header</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 数据长度
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">length</span> <span class="o">:=</span> <span class="nx">binary</span><span class="p">.</span><span class="nx">BigEndian</span><span class="p">.</span><span class="nf">Uint32</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">header</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 读取数据
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">data</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">r</span><span class="p">.</span><span class="nf">Read</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="nx">length</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">pf</span><span class="p">,</span> <span class="nx">data</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p><code>recvMsg</code>根据http2的格式，读取message，<code>recvAndDecompress</code>如果数据被压缩过，返回解压缩后的数据。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">_Greeter_SayHello_Handler</span><span class="p">(</span><span class="nx">srv</span> <span class="kd">interface</span><span class="p">{},</span> <span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">dec</span> <span class="kd">func</span><span class="p">(</span><span class="kd">interface</span><span class="p">{})</span> <span class="kt">error</span><span class="p">,</span> <span class="nx">interceptor</span> <span class="nx">grpc</span><span class="p">.</span><span class="nx">UnaryServerInterceptor</span><span class="p">)</span> <span class="p">(</span><span class="kd">interface</span><span class="p">{},</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">in</span> <span class="o">:=</span> <span class="nb">new</span><span class="p">(</span><span class="nx">HelloRequest</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// unmarshal操作
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nf">dec</span><span class="p">(</span><span class="nx">in</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">interceptor</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">srv</span><span class="p">.(</span><span class="nx">GreeterServer</span><span class="p">).</span><span class="nf">SayHello</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">in</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">info</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">grpc</span><span class="p">.</span><span class="nx">UnaryServerInfo</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Server</span><span class="p">:</span>     <span class="nx">srv</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">FullMethod</span><span class="p">:</span> <span class="nx">Greeter_SayHello_FullMethodName</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">handler</span> <span class="o">:=</span> <span class="kd">func</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">req</span> <span class="kd">interface</span><span class="p">{})</span> <span class="p">(</span><span class="kd">interface</span><span class="p">{},</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">srv</span><span class="p">.(</span><span class="nx">GreeterServer</span><span class="p">).</span><span class="nf">SayHello</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">req</span><span class="p">.(</span><span class="o">*</span><span class="nx">HelloRequest</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nf">interceptor</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">in</span><span class="p">,</span> <span class="nx">info</span><span class="p">,</span> <span class="nx">handler</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>这里以入门的<code>sayHello</code>服务为例，可以看到最终没有使用反射，而是直接调用。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">const</span> <span class="p">(</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">payloadLen</span> <span class="p">=</span> <span class="mi">1</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">sizeLen</span>    <span class="p">=</span> <span class="mi">4</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">headerLen</span>  <span class="p">=</span> <span class="nx">payloadLen</span> <span class="o">+</span> <span class="nx">sizeLen</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// 这个方法很好理解，构造message header和payload
+</span></span></span><span class="line"><span class="cl"><span class="c1">// msgHeader returns a 5-byte header for the message being transmitted and the
+</span></span></span><span class="line"><span class="cl"><span class="c1">// payload, which is compData if non-nil or data otherwise.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="nf">msgHeader</span><span class="p">(</span><span class="nx">data</span><span class="p">,</span> <span class="nx">compData</span> <span class="nx">mem</span><span class="p">.</span><span class="nx">BufferSlice</span><span class="p">,</span> <span class="nx">pf</span> <span class="nx">payloadFormat</span><span class="p">)</span> <span class="p">(</span><span class="nx">hdr</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">,</span> <span class="nx">payload</span> <span class="nx">mem</span><span class="p">.</span><span class="nx">BufferSlice</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">hdr</span> <span class="p">=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="nx">headerLen</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">hdr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">=</span> <span class="nb">byte</span><span class="p">(</span><span class="nx">pf</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">length</span> <span class="kt">uint32</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">pf</span><span class="p">.</span><span class="nf">isCompressed</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">length</span> <span class="p">=</span> <span class="nb">uint32</span><span class="p">(</span><span class="nx">compData</span><span class="p">.</span><span class="nf">Len</span><span class="p">())</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">payload</span> <span class="p">=</span> <span class="nx">compData</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">length</span> <span class="p">=</span> <span class="nb">uint32</span><span class="p">(</span><span class="nx">data</span><span class="p">.</span><span class="nf">Len</span><span class="p">())</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">payload</span> <span class="p">=</span> <span class="nx">data</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// Write length of payload into buf
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">binary</span><span class="p">.</span><span class="nx">BigEndian</span><span class="p">.</span><span class="nf">PutUint32</span><span class="p">(</span><span class="nx">hdr</span><span class="p">[</span><span class="nx">payloadLen</span><span class="p">:],</span> <span class="nx">length</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">hdr</span><span class="p">,</span> <span class="nx">payload</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">Server</span><span class="p">)</span> <span class="nf">sendResponse</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">stream</span> <span class="o">*</span><span class="nx">transport</span><span class="p">.</span><span class="nx">ServerStream</span><span class="p">,</span> <span class="nx">msg</span> <span class="nx">any</span><span class="p">,</span> <span class="nx">cp</span> <span class="nx">Compressor</span><span class="p">,</span> <span class="nx">opts</span> <span class="o">*</span><span class="nx">transport</span><span class="p">.</span><span class="nx">WriteOptions</span><span class="p">,</span> <span class="nx">comp</span> <span class="nx">encoding</span><span class="p">.</span><span class="nx">Compressor</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 编码
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">data</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nf">encode</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nf">getCodec</span><span class="p">(</span><span class="nx">stream</span><span class="p">.</span><span class="nf">ContentSubtype</span><span class="p">()),</span> <span class="nx">msg</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 压缩
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">compData</span><span class="p">,</span> <span class="nx">pf</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nf">compress</span><span class="p">(</span><span class="nx">data</span><span class="p">,</span> <span class="nx">cp</span><span class="p">,</span> <span class="nx">comp</span><span class="p">,</span> <span class="nx">s</span><span class="p">.</span><span class="nx">opts</span><span class="p">.</span><span class="nx">bufferPool</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 构造header和payload
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">hdr</span><span class="p">,</span> <span class="nx">payload</span> <span class="o">:=</span> <span class="nf">msgHeader</span><span class="p">(</span><span class="nx">data</span><span class="p">,</span> <span class="nx">compData</span><span class="p">,</span> <span class="nx">pf</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 交给http2server实际发送数据
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">err</span> <span class="p">=</span> <span class="nx">stream</span><span class="p">.</span><span class="nf">Write</span><span class="p">(</span><span class="nx">hdr</span><span class="p">,</span> <span class="nx">payload</span><span class="p">,</span> <span class="nx">opts</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// Write converts the data into HTTP2 data frame and sends it out. Non-nil error
+</span></span></span><span class="line"><span class="cl"><span class="c1">// is returns if it fails (e.g., framing error, transport error).
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">http2Server</span><span class="p">)</span> <span class="nf">write</span><span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">ServerStream</span><span class="p">,</span> <span class="nx">hdr</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">,</span> <span class="nx">data</span> <span class="nx">mem</span><span class="p">.</span><span class="nx">BufferSlice</span><span class="p">,</span> <span class="nx">_</span> <span class="o">*</span><span class="nx">WriteOptions</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">reader</span> <span class="o">:=</span> <span class="nx">data</span><span class="p">.</span><span class="nf">Reader</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="p">!</span><span class="nx">s</span><span class="p">.</span><span class="nf">isHeaderSent</span><span class="p">()</span> <span class="p">{</span> <span class="c1">// Headers haven&#39;t been written yet.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">t</span><span class="p">.</span><span class="nf">writeHeader</span><span class="p">(</span><span class="nx">s</span><span class="p">,</span> <span class="kc">nil</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">_</span> <span class="p">=</span> <span class="nx">reader</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// Writing headers checks for this condition.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">if</span> <span class="nx">s</span><span class="p">.</span><span class="nf">getState</span><span class="p">()</span> <span class="o">==</span> <span class="nx">streamDone</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">_</span> <span class="p">=</span> <span class="nx">reader</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span> <span class="nx">t</span><span class="p">.</span><span class="nf">streamContextErr</span><span class="p">(</span><span class="nx">s</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 构造 data frame
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">df</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">dataFrame</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">streamID</span><span class="p">:</span>    <span class="nx">s</span><span class="p">.</span><span class="nx">id</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">h</span><span class="p">:</span>           <span class="nx">hdr</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">reader</span><span class="p">:</span>      <span class="nx">reader</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">onEachWrite</span><span class="p">:</span> <span class="nx">t</span><span class="p">.</span><span class="nx">setResetPingStrikes</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 阻塞获取writeQuota
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.</span><span class="nx">wq</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="nb">int32</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nx">hdr</span><span class="p">)</span> <span class="o">+</span> <span class="nx">df</span><span class="p">.</span><span class="nx">reader</span><span class="p">.</span><span class="nf">Remaining</span><span class="p">()));</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">_</span> <span class="p">=</span> <span class="nx">reader</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">t</span><span class="p">.</span><span class="nf">streamContextErr</span><span class="p">(</span><span class="nx">s</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 将data frame放入controlBuf，异步发送
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">put</span><span class="p">(</span><span class="nx">df</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">_</span> <span class="p">=</span> <span class="nx">reader</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">t</span><span class="p">.</span><span class="nf">incrMsgSent</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">http2Server</span><span class="p">)</span> <span class="nf">writeStatus</span><span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">ServerStream</span><span class="p">,</span> <span class="nx">st</span> <span class="o">*</span><span class="nx">status</span><span class="p">.</span><span class="nx">Status</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">s</span><span class="p">.</span><span class="nx">hdrMu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="k">defer</span> <span class="nx">s</span><span class="p">.</span><span class="nx">hdrMu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">s</span><span class="p">.</span><span class="nf">getState</span><span class="p">()</span> <span class="o">==</span> <span class="nx">streamDone</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// Attach the trailer metadata.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">headerFields</span> <span class="p">=</span> <span class="nf">appendHeaderFieldsFromMD</span><span class="p">(</span><span class="nx">headerFields</span><span class="p">,</span> <span class="nx">s</span><span class="p">.</span><span class="nx">trailer</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">trailingHeader</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">headerFrame</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">streamID</span><span class="p">:</span>  <span class="nx">s</span><span class="p">.</span><span class="nx">id</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">hf</span><span class="p">:</span>        <span class="nx">headerFields</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">endStream</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">onWrite</span><span class="p">:</span>   <span class="nx">t</span><span class="p">.</span><span class="nx">setResetPingStrikes</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// Send a RST_STREAM after the trailers if the client has not already half-closed.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">rst</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.</span><span class="nf">getState</span><span class="p">()</span> <span class="o">==</span> <span class="nx">streamActive</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 调用 finishStream关闭stream
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">t</span><span class="p">.</span><span class="nf">finishStream</span><span class="p">(</span><span class="nx">s</span><span class="p">,</span> <span class="nx">rst</span><span class="p">,</span> <span class="nx">http2</span><span class="p">.</span><span class="nx">ErrCodeNo</span><span class="p">,</span> <span class="nx">trailingHeader</span><span class="p">,</span> <span class="kc">true</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p><code>sendResponse</code>构造响应，并且将消息存储在<code>controlBuf</code>中，最后由<code>loopyWriter</code>异步发送给client，<code>writeStatus</code>发送<code>traling header</code>尾部头信息，然后关闭流。</p>
+<h3 id="data-frame的处理">Data Frame的处理</h3>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">http2Server</span><span class="p">)</span> <span class="nf">handleData</span><span class="p">(</span><span class="nx">f</span> <span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">DataFrame</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">size</span> <span class="o">:=</span> <span class="nx">f</span><span class="p">.</span><span class="nf">Header</span><span class="p">().</span><span class="nx">Length</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// Select the right stream to dispatch.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">s</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">t</span><span class="p">.</span><span class="nf">getStream</span><span class="p">(</span><span class="nx">f</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="p">!</span><span class="nx">ok</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">s</span><span class="p">.</span><span class="nf">getState</span><span class="p">()</span> <span class="o">==</span> <span class="nx">streamReadDone</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">t</span><span class="p">.</span><span class="nf">closeStream</span><span class="p">(</span><span class="nx">s</span><span class="p">,</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">http2</span><span class="p">.</span><span class="nx">ErrCodeStreamClosed</span><span class="p">,</span> <span class="kc">false</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">size</span> <span class="p">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">f</span><span class="p">.</span><span class="nf">Data</span><span class="p">())</span> <span class="p">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">pool</span> <span class="o">:=</span> <span class="nx">t</span><span class="p">.</span><span class="nx">bufferPool</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">s</span><span class="p">.</span><span class="nf">write</span><span class="p">(</span><span class="nx">recvMsg</span><span class="p">{</span><span class="nx">buffer</span><span class="p">:</span> <span class="nx">mem</span><span class="p">.</span><span class="nf">Copy</span><span class="p">(</span><span class="nx">f</span><span class="p">.</span><span class="nf">Data</span><span class="p">(),</span> <span class="nx">pool</span><span class="p">)})</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">f</span><span class="p">.</span><span class="nf">StreamEnded</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// Received the end of stream from the client.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">s</span><span class="p">.</span><span class="nf">compareAndSwapState</span><span class="p">(</span><span class="nx">streamActive</span><span class="p">,</span> <span class="nx">streamReadDone</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">s</span><span class="p">.</span><span class="nf">write</span><span class="p">(</span><span class="nx">recvMsg</span><span class="p">{</span><span class="nx">err</span><span class="p">:</span> <span class="nx">io</span><span class="p">.</span><span class="nx">EOF</span><span class="p">})</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>在处理data frame时</p>
+<ol>
+<li>根据stream ID，从server的activeStreams map中找到stream对象</li>
+<li>从<code>bufferPool</code>中拿到一块buffer，并将frame的数据写入到buffer</li>
+<li>将这块buffer保存到stream的<code>recvBuffer</code>中</li>
+<li>如果读取结束，修改流状态为<code>streamReadDone</code>，并且写入<code>io.EOF</code>标记</li>
+</ol>
+<p><code>recvBuffer</code>中缓存的数据，最终会被前面提到的<code>recvAndDecompress</code>函数读取，从而在server端重建rpc的参数。</p>
+<h3 id="setting-frame的处理">Setting Frame的处理</h3>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">http2Server</span><span class="p">)</span> <span class="nf">handleSettings</span><span class="p">(</span><span class="nx">f</span> <span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">SettingsFrame</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">f</span><span class="p">.</span><span class="nf">IsAck</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">ss</span> <span class="p">[]</span><span class="nx">http2</span><span class="p">.</span><span class="nx">Setting</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">updateFuncs</span> <span class="p">[]</span><span class="kd">func</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nf">ForeachSetting</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">s</span> <span class="nx">http2</span><span class="p">.</span><span class="nx">Setting</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">switch</span> <span class="nx">s</span><span class="p">.</span><span class="nx">ID</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">case</span> <span class="nx">http2</span><span class="p">.</span><span class="nx">SettingMaxHeaderListSize</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">updateFuncs</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">updateFuncs</span><span class="p">,</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">t</span><span class="p">.</span><span class="nx">maxSendHeaderListSize</span> <span class="p">=</span> <span class="nb">new</span><span class="p">(</span><span class="kt">uint32</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">				<span class="o">*</span><span class="nx">t</span><span class="p">.</span><span class="nx">maxSendHeaderListSize</span> <span class="p">=</span> <span class="nx">s</span><span class="p">.</span><span class="nx">Val</span>
+</span></span><span class="line"><span class="cl">			<span class="p">})</span>
+</span></span><span class="line"><span class="cl">		<span class="k">default</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">ss</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">ss</span><span class="p">,</span> <span class="nx">s</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">executeAndPut</span><span class="p">(</span><span class="kd">func</span><span class="p">()</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">f</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">updateFuncs</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nf">f</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl">	<span class="p">},</span> <span class="o">&amp;</span><span class="nx">incomingSettings</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">ss</span><span class="p">:</span> <span class="nx">ss</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p><code>handleSettings</code>并没有直接将settting frame的参数应用在server上，而是将其放到了<code>controlBuf</code>中。</p>
+<h2 id="server如何发送frame">server如何发送frame</h2>
+<p>grpc server在每次收到一个新的来自client的连接后，会创建一个Framer，这个Framer就是实际上负责发送和接收HTTP2 frame的接口，每一个client都对应一个Framer来处理来自该client的所有frame，不管这些frame是否属于同一个stream。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">framer</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 一个包含了buffer的net.Conn的writer
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">writer</span> <span class="o">*</span><span class="nx">bufWriter</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 原生的http2.Framer，负责数据读写
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">fr</span>     <span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">Framer</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p><code>framer</code>其实就是对golang原生<code>http2.Framer</code>的封装。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">bufWriter</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">pool</span>      <span class="o">*</span><span class="nx">sync</span><span class="p">.</span><span class="nx">Pool</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">buf</span>       <span class="p">[]</span><span class="kt">byte</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">offset</span>    <span class="kt">int</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">batchSize</span> <span class="kt">int</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">conn</span>      <span class="nx">net</span><span class="p">.</span><span class="nx">Conn</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">err</span>       <span class="kt">error</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">newBufWriter</span><span class="p">(</span><span class="nx">conn</span> <span class="nx">net</span><span class="p">.</span><span class="nx">Conn</span><span class="p">,</span> <span class="nx">batchSize</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">pool</span> <span class="o">*</span><span class="nx">sync</span><span class="p">.</span><span class="nx">Pool</span><span class="p">)</span> <span class="o">*</span><span class="nx">bufWriter</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">w</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">bufWriter</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">batchSize</span><span class="p">:</span> <span class="nx">batchSize</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">conn</span><span class="p">:</span>      <span class="nx">conn</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">pool</span><span class="p">:</span>      <span class="nx">pool</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// this indicates that we should use non shared buf
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">pool</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">w</span><span class="p">.</span><span class="nx">buf</span> <span class="p">=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="nx">batchSize</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">w</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">w</span> <span class="o">*</span><span class="nx">bufWriter</span><span class="p">)</span> <span class="nf">Write</span><span class="p">(</span><span class="nx">b</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">)</span> <span class="p">(</span><span class="kt">int</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 在write之间检查上一次write是否发生了错误
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">w</span><span class="p">.</span><span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">w</span><span class="p">.</span><span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 如果batchsize为0，说明不需要写缓存，直接向net.Conn写数据
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">w</span><span class="p">.</span><span class="nx">batchSize</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span> <span class="c1">// Buffer has been disabled.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">n</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">w</span><span class="p">.</span><span class="nx">conn</span><span class="p">.</span><span class="nf">Write</span><span class="p">(</span><span class="nx">b</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">n</span><span class="p">,</span> <span class="nf">toIOError</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">w</span><span class="p">.</span><span class="nx">buf</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">b</span> <span class="o">:=</span> <span class="nx">w</span><span class="p">.</span><span class="nx">pool</span><span class="p">.</span><span class="nf">Get</span><span class="p">().(</span><span class="o">*</span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">w</span><span class="p">.</span><span class="nx">buf</span> <span class="p">=</span> <span class="o">*</span><span class="nx">b</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">written</span> <span class="o">:=</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 如果写入的数据少于batchSize，则缓存，暂时不写入conn
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// 如果写入的数据多余batchSize，则调用flushKeepBuffer不断写数据
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">for</span> <span class="nb">len</span><span class="p">(</span><span class="nx">b</span><span class="p">)</span> <span class="p">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">copied</span> <span class="o">:=</span> <span class="nb">copy</span><span class="p">(</span><span class="nx">w</span><span class="p">.</span><span class="nx">buf</span><span class="p">[</span><span class="nx">w</span><span class="p">.</span><span class="nx">offset</span><span class="p">:],</span> <span class="nx">b</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">b</span> <span class="p">=</span> <span class="nx">b</span><span class="p">[</span><span class="nx">copied</span><span class="p">:]</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">written</span> <span class="o">+=</span> <span class="nx">copied</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">w</span><span class="p">.</span><span class="nx">offset</span> <span class="o">+=</span> <span class="nx">copied</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">w</span><span class="p">.</span><span class="nx">offset</span> <span class="p">&lt;</span> <span class="nx">w</span><span class="p">.</span><span class="nx">batchSize</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">continue</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">w</span><span class="p">.</span><span class="nf">flushKeepBuffer</span><span class="p">();</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span> <span class="nx">written</span><span class="p">,</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">written</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">w</span> <span class="o">*</span><span class="nx">bufWriter</span><span class="p">)</span> <span class="nf">Flush</span><span class="p">()</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 刷新数据到conn
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">err</span> <span class="o">:=</span> <span class="nx">w</span><span class="p">.</span><span class="nf">flushKeepBuffer</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// Only release the buffer if we are in a &#34;shared&#34; mode
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">w</span><span class="p">.</span><span class="nx">buf</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">w</span><span class="p">.</span><span class="nx">pool</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">b</span> <span class="o">:=</span> <span class="nx">w</span><span class="p">.</span><span class="nx">buf</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">w</span><span class="p">.</span><span class="nx">pool</span><span class="p">.</span><span class="nf">Put</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">b</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">w</span><span class="p">.</span><span class="nx">buf</span> <span class="p">=</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">w</span> <span class="o">*</span><span class="nx">bufWriter</span><span class="p">)</span> <span class="nf">flushKeepBuffer</span><span class="p">()</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">w</span><span class="p">.</span><span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">w</span><span class="p">.</span><span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">w</span><span class="p">.</span><span class="nx">offset</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">_</span><span class="p">,</span> <span class="nx">w</span><span class="p">.</span><span class="nx">err</span> <span class="p">=</span> <span class="nx">w</span><span class="p">.</span><span class="nx">conn</span><span class="p">.</span><span class="nf">Write</span><span class="p">(</span><span class="nx">w</span><span class="p">.</span><span class="nx">buf</span><span class="p">[:</span><span class="nx">w</span><span class="p">.</span><span class="nx">offset</span><span class="p">])</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">w</span><span class="p">.</span><span class="nx">err</span> <span class="p">=</span> <span class="nf">toIOError</span><span class="p">(</span><span class="nx">w</span><span class="p">.</span><span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">w</span><span class="p">.</span><span class="nx">offset</span> <span class="p">=</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">w</span><span class="p">.</span><span class="nx">err</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>grpc server实现了一个简单的缓存写给<code>http2.framer</code>作为<code>io.Writer</code>。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// 全局writeBufferPool
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">var</span> <span class="nx">writeBufferPoolMap</span> <span class="p">=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">map</span><span class="p">[</span><span class="kt">int</span><span class="p">]</span><span class="o">*</span><span class="nx">sync</span><span class="p">.</span><span class="nx">Pool</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="kd">var</span> <span class="nx">writeBufferMutex</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">Mutex</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">newFramer</span><span class="p">(</span><span class="nx">conn</span> <span class="nx">net</span><span class="p">.</span><span class="nx">Conn</span><span class="p">,</span> <span class="nx">writeBufferSize</span><span class="p">,</span> <span class="nx">readBufferSize</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">sharedWriteBuffer</span> <span class="kt">bool</span><span class="p">,</span> <span class="nx">maxHeaderListSize</span> <span class="kt">uint32</span><span class="p">)</span> <span class="o">*</span><span class="nx">framer</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">writeBufferSize</span> <span class="p">&lt;</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">writeBufferSize</span> <span class="p">=</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">r</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span> <span class="p">=</span> <span class="nx">conn</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">readBufferSize</span> <span class="p">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 设置io.Reader
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">r</span> <span class="p">=</span> <span class="nx">bufio</span><span class="p">.</span><span class="nf">NewReaderSize</span><span class="p">(</span><span class="nx">r</span><span class="p">,</span> <span class="nx">readBufferSize</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">pool</span> <span class="o">*</span><span class="nx">sync</span><span class="p">.</span><span class="nx">Pool</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">sharedWriteBuffer</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">pool</span> <span class="p">=</span> <span class="nf">getWriteBufferPool</span><span class="p">(</span><span class="nx">writeBufferSize</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 设置io.Writer
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">w</span> <span class="o">:=</span> <span class="nf">newBufWriter</span><span class="p">(</span><span class="nx">conn</span><span class="p">,</span> <span class="nx">writeBufferSize</span><span class="p">,</span> <span class="nx">pool</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 创建framer
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">f</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">framer</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">writer</span><span class="p">:</span> <span class="nx">w</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">fr</span><span class="p">:</span>     <span class="nx">http2</span><span class="p">.</span><span class="nf">NewFramer</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="nx">r</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nx">fr</span><span class="p">.</span><span class="nf">SetMaxReadFrameSize</span><span class="p">(</span><span class="nx">http2MaxFrameLen</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// Opt-in to Frame reuse API on framer to reduce garbage.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// Frames aren&#39;t safe to read from after a subsequent call to ReadFrame.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">f</span><span class="p">.</span><span class="nx">fr</span><span class="p">.</span><span class="nf">SetReuseFrames</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nx">fr</span><span class="p">.</span><span class="nx">MaxHeaderListSize</span> <span class="p">=</span> <span class="nx">maxHeaderListSize</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nx">fr</span><span class="p">.</span><span class="nx">ReadMetaHeaders</span> <span class="p">=</span> <span class="nx">hpack</span><span class="p">.</span><span class="nf">NewDecoder</span><span class="p">(</span><span class="nx">http2InitHeaderTableSize</span><span class="p">,</span> <span class="kc">nil</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">f</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// writeBuffer 使用sync.Pool
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="nf">getWriteBufferPool</span><span class="p">(</span><span class="nx">size</span> <span class="kt">int</span><span class="p">)</span> <span class="o">*</span><span class="nx">sync</span><span class="p">.</span><span class="nx">Pool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">writeBufferMutex</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="k">defer</span> <span class="nx">writeBufferMutex</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">pool</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">writeBufferPoolMap</span><span class="p">[</span><span class="nx">size</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">ok</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">pool</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">pool</span> <span class="p">=</span> <span class="o">&amp;</span><span class="nx">sync</span><span class="p">.</span><span class="nx">Pool</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">New</span><span class="p">:</span> <span class="kd">func</span><span class="p">()</span> <span class="nx">any</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">b</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="nx">size</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span> <span class="o">&amp;</span><span class="nx">b</span>
+</span></span><span class="line"><span class="cl">		<span class="p">},</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">writeBufferPoolMap</span><span class="p">[</span><span class="nx">size</span><span class="p">]</span> <span class="p">=</span> <span class="nx">pool</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">pool</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>传递给<code>http2.framer</code>的<code>io.Reader</code>使用了<code>bifio</code> package。</p>
+<p><code>writeBuffer</code>使用了go标准库中的<code>sync.Pool</code>，根据需要的size获取对应的<code>sync.Pool</code>，如果池中有对应的<code>byte[]</code>，获取然后返回，如果没有，创建新的<code>byte[]</code>并返回。池中元素的回收时机，go允许在任何时候自动回收池中的元素（gc）。</p>
+<p>grpc server为每一个client创建一个<code>loopyWriter</code>，有这个<code>loopyWriter</code>负责发送数据。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">loopyWriter</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">side</span>      <span class="nx">side</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">cbuf</span>      <span class="o">*</span><span class="nx">controlBuffer</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">sendQuota</span> <span class="kt">uint32</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">oiws</span>      <span class="kt">uint32</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">estdStreams</span> <span class="kd">map</span><span class="p">[</span><span class="kt">uint32</span><span class="p">]</span><span class="o">*</span><span class="nx">outStream</span> <span class="c1">// Established streams.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// activeStreams is a linked-list of all streams that have data to send and some
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// stream-level flow control quota.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// Each of these streams internally have a list of data items(and perhaps trailers
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// on the server-side) to be sent out.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">activeStreams</span> <span class="o">*</span><span class="nx">outStreamList</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">framer</span>        <span class="o">*</span><span class="nx">framer</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">hBuf</span>          <span class="o">*</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span>  <span class="c1">// The buffer for HPACK encoding.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">hEnc</span>          <span class="o">*</span><span class="nx">hpack</span><span class="p">.</span><span class="nx">Encoder</span> <span class="c1">// HPACK encoder.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">bdpEst</span>        <span class="o">*</span><span class="nx">bdpEstimator</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">draining</span>      <span class="kt">bool</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">conn</span>          <span class="nx">net</span><span class="p">.</span><span class="nx">Conn</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">logger</span>        <span class="o">*</span><span class="nx">grpclog</span><span class="p">.</span><span class="nx">PrefixLogger</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">bufferPool</span>    <span class="nx">mem</span><span class="p">.</span><span class="nx">BufferPool</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// Side-specific handlers
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">ssGoAwayHandler</span> <span class="kd">func</span><span class="p">(</span><span class="o">*</span><span class="nx">goAway</span><span class="p">)</span> <span class="p">(</span><span class="kt">bool</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
 <h2 id="参考文献">参考文献</h2>
 <p>[^1] <a href="https://juejin.cn/post/7089739785035579429" target="_blank" rel="noopener noreffer ">gprc源码分析 zhengxinzx</a> 一系列grpc源码分析，主要介绍了grpc的原理和流量控制</p>
 </div><div class="post-footer" id="post-footer">
