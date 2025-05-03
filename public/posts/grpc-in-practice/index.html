@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noodp" />
+        <title>Grpc源码分析 - 爱吃芒果</title><meta name="Description" content="This is my cool site"><meta property="og:url" content="http://example.org/posts/grpc-in-practice/">
+  <meta property="og:site_name" content="爱吃芒果">
+  <meta property="og:title" content="Grpc源码分析">
+  <meta property="og:description" content="gprc流程概括 grpc的流程可以大致分成两个阶段，分别为grpc连接阶段和grpc交互阶段，如图[^1]所示。
+在RPC连接阶段，client和server之间建立起TCP连接，grpc底层依赖于HTTP2，因此client和server还需要协调frame的相关设置，例如frame的大小，滑动窗口的大小等。">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-05-02T13:26:57+08:00">
+    <meta property="article:modified_time" content="2025-05-02T13:26:57+08:00">
+    <meta property="article:tag" content="Grpc">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Grpc源码分析">
+  <meta name="twitter:description" content="gprc流程概括 grpc的流程可以大致分成两个阶段，分别为grpc连接阶段和grpc交互阶段，如图[^1]所示。
+在RPC连接阶段，client和server之间建立起TCP连接，grpc底层依赖于HTTP2，因此client和server还需要协调frame的相关设置，例如frame的大小，滑动窗口的大小等。">
+<meta name="application-name" content="My cool site">
+<meta name="apple-mobile-web-app-title" content="My cool site">
+<meta name="referrer" content="no-referrer" /><meta name="theme-color" content="#ffffff"><meta name="msapplication-TileColor" content="#da532c"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/grpc-in-practice/" /><link rel="prev" href="http://example.org/posts/java-concurrency-jmm/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css"></noscript><link rel="preload" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css"></noscript><script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "headline": "Grpc源码分析",
+        "inLanguage": "zh-CN",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "http:\/\/example.org\/posts\/grpc-in-practice\/"
+        },"genre": "posts","keywords": "grpc","wordcount":  3265 ,
+        "url": "http:\/\/example.org\/posts\/grpc-in-practice\/","datePublished": "2025-05-02T13:26:57+08:00","dateModified": "2025-05-02T13:26:57+08:00","publisher": {
+            "@type": "Organization",
+            "name": ""},"author": {
+                "@type": "Person",
+                "name": "爱吃芒果"
+            },"description": ""
+    }
+    </script></head>
+    <body data-header-desktop="fixed" data-header-mobile="auto"><script>(window.localStorage && localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : ('auto' === 'auto' ? window.matchMedia('(prefers-color-scheme: dark)').matches : 'auto' === 'dark')) && document.body.setAttribute('theme', 'dark');</script>
+
+        <div id="mask"></div><div class="wrapper"><header class="desktop" id="header-desktop">
+    <div class="header-wrapper">
+        <div class="header-title">
+            <a href="/" title="爱吃芒果">My cool site</a>
+        </div>
+        <div class="menu">
+            <div class="menu-inner"><a class="menu-item" href="/posts/"> 文章 </a><a class="menu-item" href="/page/archives/" title="Archives"> Archives </a><a class="menu-item" href="/tags/"> 标签 </a><a class="menu-item" href="/page/search/" title="Search"> Search </a><a class="menu-item" href="/categories/"> 分类 </a><span class="menu-item delimiter"></span><span class="menu-item search" id="search-desktop">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-desktop">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-desktop" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-desktop" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-desktop">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </span><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                    <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+                </a></div>
+        </div>
+    </div>
+</header><header class="mobile" id="header-mobile">
+    <div class="header-container">
+        <div class="header-wrapper">
+            <div class="header-title">
+                <a href="/" title="爱吃芒果">My cool site</a>
+            </div>
+            <div class="menu-toggle" id="menu-toggle-mobile">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div class="menu" id="menu-mobile"><div class="search-wrapper">
+                    <div class="search mobile" id="search-mobile">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-mobile">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-mobile" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-mobile" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-mobile">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </div>
+                    <a href="javascript:void(0);" class="search-cancel" id="search-cancel-mobile">
+                        Cancel
+                    </a>
+                </div><a class="menu-item" href="/posts/" title="">文章</a><a class="menu-item" href="/page/archives/" title="Archives">Archives</a><a class="menu-item" href="/tags/" title="">标签</a><a class="menu-item" href="/page/search/" title="Search">Search</a><a class="menu-item" href="/categories/" title="">分类</a><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+            </a></div>
+    </div>
+</header><div class="search-dropdown desktop">
+        <div id="search-dropdown-desktop"></div>
+    </div>
+    <div class="search-dropdown mobile">
+        <div id="search-dropdown-mobile"></div>
+    </div><main class="main">
+                <div class="container"><div class="toc" id="toc-auto">
+            <h2 class="toc-title">Contents</h2>
+            <div class="toc-content" id="toc-content-auto"></div>
+        </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Grpc源码分析</h1><div class="post-meta">
+            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/grpc/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Grpc</a></span></div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-02">2025-05-02</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;3265 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;7 minutes&nbsp;</div>
+        </div><div class="details toc" id="toc-static"  data-kept="">
+                <div class="details-summary toc-title">
+                    <span>Contents</span>
+                    <span><i class="details-icon fas fa-angle-right" aria-hidden="true"></i></span>
+                </div>
+                <div class="details-content toc-content" id="toc-content-static"><nav id="TableOfContents">
+  <ul>
+    <li><a href="#gprc流程概括">gprc流程概括</a>
+      <ul>
+        <li><a href="#client的流程">Client的流程</a></li>
+        <li><a href="#server流程">Server流程</a></li>
+      </ul>
+    </li>
+    <li><a href="#grpc-server的rpc连接阶段">grpc Server的rpc连接阶段</a>
+      <ul>
+        <li><a href="#grpc服务端http2握手">grpc服务端HTTP2握手</a></li>
+      </ul>
+    </li>
+    <li><a href="#参考文献">参考文献</a></li>
+  </ul>
+</nav></div>
+            </div><div class="content" id="content"><h2 id="gprc流程概括">gprc流程概括</h2>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/grpc-in-practice/grpc%E6%B5%81%E7%A8%8B%E6%A6%82%E6%8B%AC.png"
+        data-srcset="/posts/grpc-in-practice/grpc%E6%B5%81%E7%A8%8B%E6%A6%82%E6%8B%AC.png, /posts/grpc-in-practice/grpc%E6%B5%81%E7%A8%8B%E6%A6%82%E6%8B%AC.png 1.5x, /posts/grpc-in-practice/grpc%E6%B5%81%E7%A8%8B%E6%A6%82%E6%8B%AC.png 2x"
+        data-sizes="auto"
+        alt="/posts/grpc-in-practice/grpc%E6%B5%81%E7%A8%8B%E6%A6%82%E6%8B%AC.png"
+        title="Image.png" width="837" height="884" /></p>
+<p>grpc的流程可以大致分成两个阶段，分别为grpc连接阶段和grpc交互阶段，如图[^1]所示。</p>
+<p>在RPC连接阶段，client和server之间建立起TCP连接，grpc底层依赖于HTTP2，因此client和server还需要协调frame的相关设置，例如frame的大小，滑动窗口的大小等。</p>
+<p>在RPC交互阶段，client将数据发送给server，并等待server执行执行method之后返回结果。</p>
+<h3 id="client的流程">Client的流程</h3>
+<p>在RPC连接阶段，client接收到一个目标地址和一系列的DialOptions，然后</p>
+<ol>
+<li>配置连接参数，interceptor等，启动resolver</li>
+<li>Rosovler根据目标地址获取server的地址列表（比如一个DNS name可能会指向多个server ip，dnsResolver是grpc内置的resolver之一），启动balancer</li>
+<li>Balancer根据平衡策略，从诸多server地址中选择一个或者多个建立TCP连接</li>
+<li>client在TCP连接建立完成之后，等待server发来的HTTP2 Setting frame，并调整自身的HTTP2相关配置，随后向server发送HTTP2 Setting frame</li>
+</ol>
+<p>在RPC交互阶段，某个rpc方法被调用后</p>
+<ol>
+<li>Client创建一个stream对象用来管理整个交互流程</li>
+<li>Client将service name, method name等信息放到header frame中并发送给server</li>
+<li>client将method的参数信息放到data frame中并发送给server</li>
+<li>client等待server传回的header frame和data frame，一次rpc call的result status会被包含在header frame中，而method的返回值被包含在data frame中</li>
+</ol>
+<h3 id="server流程">Server流程</h3>
+<p>在rpc连接阶段，server在完成一些初始化的配置之后，开始监听某个tcp端口，在和某个client建立了tcp连接之后完成http2 settting frame的交互。</p>
+<p>在rpc交互阶段：</p>
+<ol>
+<li>server等待client发来的header frame，从而创建出一个stream对象来管理真个交互流程，根据header frame中的信息，server知道client请求的是哪一个service的那一个method</li>
+<li>server接受到client发来的data frame，并执行method</li>
+<li>server将执行是否成功等信息放在header frame中发送给client</li>
+<li>server将method执行的结果（返回值）放在data frame中发送给client</li>
+</ol>
+<h2 id="grpc-server的rpc连接阶段">grpc Server的rpc连接阶段</h2>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">flag</span><span class="p">.</span><span class="nf">Parse</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">lis</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">net</span><span class="p">.</span><span class="nf">Listen</span><span class="p">(</span><span class="s">&#34;tcp&#34;</span><span class="p">,</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Sprintf</span><span class="p">(</span><span class="s">&#34;:%d&#34;</span><span class="p">,</span> <span class="o">*</span><span class="nx">port</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Fatalf</span><span class="p">(</span><span class="s">&#34;failed to listen: %v&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">s</span> <span class="o">:=</span> <span class="nx">grpc</span><span class="p">.</span><span class="nf">NewServer</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">pb</span><span class="p">.</span><span class="nf">RegisterGreeterServer</span><span class="p">(</span><span class="nx">s</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">server</span><span class="p">{})</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">log</span><span class="p">.</span><span class="nf">Printf</span><span class="p">(</span><span class="s">&#34;server listening at %v&#34;</span><span class="p">,</span> <span class="nx">lis</span><span class="p">.</span><span class="nf">Addr</span><span class="p">())</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.</span><span class="nf">Serve</span><span class="p">(</span><span class="nx">lis</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Fatalf</span><span class="p">(</span><span class="s">&#34;failed to serve: %v&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>如上是一个简单的服务端程序，流程如下</p>
+<ol>
+<li>首先通过<code>net.Listener</code>监听tcp端口，毕竟grpc服务是基于tcp的</li>
+<li>创建grpc server，并注册服务，<code>&amp;server{}</code>实际上就是服务的实现</li>
+<li>阻塞等待来自client的访问</li>
+</ol>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">Server</span><span class="p">)</span> <span class="nf">Serve</span><span class="p">(</span><span class="nx">lis</span> <span class="nx">net</span><span class="p">.</span><span class="nx">Listener</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">s</span><span class="p">.</span><span class="nx">serve</span> <span class="p">=</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">rawConn</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">lis</span><span class="p">.</span><span class="nf">Accept</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">s</span><span class="p">.</span><span class="nx">serveWG</span><span class="p">.</span><span class="nf">Add</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">s</span><span class="p">.</span><span class="nf">handleRawConn</span><span class="p">(</span><span class="nx">lis</span><span class="p">.</span><span class="nf">Addr</span><span class="p">().</span><span class="nf">String</span><span class="p">(),</span> <span class="nx">rawConn</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">s</span><span class="p">.</span><span class="nx">serveWG</span><span class="p">.</span><span class="nf">Done</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>grpc在一个for循环中等待来自client的访问，每次有新的client端访问，创建一个<code>net.Conn</code>，并创建一个新的goroutine处理这个<code>net.Conn</code>，所以这个连接上的请求，无论客户端调用哪一个远程访问或者调用几次，都会由这个goroutine处理。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">Server</span><span class="p">)</span> <span class="nf">handleRawConn</span><span class="p">(</span><span class="nx">lisAddr</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">rawConn</span> <span class="nx">net</span><span class="p">.</span><span class="nx">Conn</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 如果grpc server已经关闭，那么同样关闭这个tcp连接
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">s</span><span class="p">.</span><span class="nx">quit</span><span class="p">.</span><span class="nf">HasFired</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">rawConn</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 设置tcp超时时间
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">rawConn</span><span class="p">.</span><span class="nf">SetDeadline</span><span class="p">(</span><span class="nx">time</span><span class="p">.</span><span class="nf">Now</span><span class="p">().</span><span class="nf">Add</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">opts</span><span class="p">.</span><span class="nx">connectionTimeout</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// Finish handshaking (HTTP2)
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">st</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.</span><span class="nf">newHTTP2Transport</span><span class="p">(</span><span class="nx">rawConn</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 清理tcp超时时间
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">rawConn</span><span class="p">.</span><span class="nf">SetDeadline</span><span class="p">(</span><span class="nx">time</span><span class="p">.</span><span class="nx">Time</span><span class="p">{})</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// rpc交互阶段，创建新的goroutine处理来自client的数据
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">s</span><span class="p">.</span><span class="nf">serveStreams</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nf">Background</span><span class="p">(),</span> <span class="nx">st</span><span class="p">,</span> <span class="nx">rawConn</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">s</span><span class="p">.</span><span class="nf">removeConn</span><span class="p">(</span><span class="nx">lisAddr</span><span class="p">,</span> <span class="nx">st</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}()</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>在这里，首先判断gprc server是否关闭，如果关闭，则同样关闭tcp连接。然后进行HTTP2的握手，这里专门设置了tcp超时时间，避免握手迟迟不结束，导致资源占用，在握手结束后，清理tcp超时时间，避免对后面请求的影响。最后新启动一个goroutine，用来处理实际的请求。</p>
+<h3 id="grpc服务端http2握手">grpc服务端HTTP2握手</h3>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">Server</span><span class="p">)</span> <span class="nf">newHTTP2Transport</span><span class="p">(</span><span class="nx">c</span> <span class="nx">net</span><span class="p">.</span><span class="nx">Conn</span><span class="p">)</span> <span class="nx">transport</span><span class="p">.</span><span class="nx">ServerTransport</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 组装 serverconfig
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">config</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">transport</span><span class="p">.</span><span class="nx">ServerConfig</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">MaxStreams</span><span class="p">:</span>            <span class="nx">s</span><span class="p">.</span><span class="nx">opts</span><span class="p">.</span><span class="nx">maxConcurrentStreams</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">ConnectionTimeout</span><span class="p">:</span>     <span class="nx">s</span><span class="p">.</span><span class="nx">opts</span><span class="p">.</span><span class="nx">connectionTimeout</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="o">...</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 根据config的配置项，和client进行http2的握手
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">st</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">transport</span><span class="p">.</span><span class="nf">NewServerTransport</span><span class="p">(</span><span class="nx">c</span><span class="p">,</span> <span class="nx">config</span><span class="p">)</span></span></span></code></pre></div></div>
+<p>根据使用者在启动grpc server时的配置项，或者默认的配置项，调用<code>transport.NewServerTransport</code>完成和client的http2握手。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl">	<span class="nx">writeBufSize</span> <span class="o">:=</span> <span class="nx">config</span><span class="p">.</span><span class="nx">WriteBufferSize</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">readBufSize</span> <span class="o">:=</span> <span class="nx">config</span><span class="p">.</span><span class="nx">ReadBufferSize</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">maxHeaderListSize</span> <span class="o">:=</span> <span class="nx">defaultServerMaxHeaderListSize</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">config</span><span class="p">.</span><span class="nx">MaxHeaderListSize</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">maxHeaderListSize</span> <span class="p">=</span> <span class="o">*</span><span class="nx">config</span><span class="p">.</span><span class="nx">MaxHeaderListSize</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">framer</span> <span class="o">:=</span> <span class="nf">newFramer</span><span class="p">(</span><span class="nx">conn</span><span class="p">,</span> <span class="nx">writeBufSize</span><span class="p">,</span> <span class="nx">readBufSize</span><span class="p">,</span> <span class="nx">config</span><span class="p">.</span><span class="nx">SharedWriteBuffer</span><span class="p">,</span> <span class="nx">maxHeaderListSize</span><span class="p">)</span></span></span></code></pre></div></div>
+<p>首先创建framer，用来负责接受和发送HTTP2 frame，是server和client交流的实际接口。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// Send initial settings as connection preface to client.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="nx">isettings</span> <span class="o">:=</span> <span class="p">[]</span><span class="nx">http2</span><span class="p">.</span><span class="nx">Setting</span><span class="p">{{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">ID</span><span class="p">:</span>  <span class="nx">http2</span><span class="p">.</span><span class="nx">SettingMaxFrameSize</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">Val</span><span class="p">:</span> <span class="nx">http2MaxFrameLen</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl"><span class="p">}}</span>
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="nx">config</span><span class="p">.</span><span class="nx">MaxStreams</span> <span class="o">!=</span> <span class="nx">math</span><span class="p">.</span><span class="nx">MaxUint32</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">isettings</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">isettings</span><span class="p">,</span> <span class="nx">http2</span><span class="p">.</span><span class="nx">Setting</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">ID</span><span class="p">:</span>  <span class="nx">http2</span><span class="p">.</span><span class="nx">SettingMaxConcurrentStreams</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">Val</span><span class="p">:</span> <span class="nx">config</span><span class="p">.</span><span class="nx">MaxStreams</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="p">})</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="o">...</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">framer</span><span class="p">.</span><span class="nx">fr</span><span class="p">.</span><span class="nf">WriteSettings</span><span class="p">(</span><span class="nx">isettings</span><span class="o">...</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nf">connectionErrorf</span><span class="p">(</span><span class="kc">false</span><span class="p">,</span> <span class="nx">err</span><span class="p">,</span> <span class="s">&#34;transport: %v&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>grpc server端首先明确自己的HTTP2的初始配置，比如MaxFrameSize等，并将这些配置信息通过<code>frame.fr</code>发送给client，<code>frame.fr</code>实际上就是golang原生的<code>http2.Framer</code>，在底层，这些配置信息会被包装成一个Setting Frame发送给client。</p>
+<p>client在收到Setting Frame后，根据自身情况调整参数，同样发送一个Setting Frame给sever。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="nx">t</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">http2Server</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">done</span><span class="p">:</span>              <span class="nx">done</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">conn</span><span class="p">:</span>              <span class="nx">conn</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">peer</span><span class="p">:</span>              <span class="nx">peer</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">framer</span><span class="p">:</span>            <span class="nx">framer</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">readerDone</span><span class="p">:</span>        <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kd">struct</span><span class="p">{}),</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">loopyWriterDone</span><span class="p">:</span>   <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kd">struct</span><span class="p">{}),</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">maxStreams</span><span class="p">:</span>        <span class="nx">config</span><span class="p">.</span><span class="nx">MaxStreams</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">inTapHandle</span><span class="p">:</span>       <span class="nx">config</span><span class="p">.</span><span class="nx">InTapHandle</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">fc</span><span class="p">:</span>                <span class="o">&amp;</span><span class="nx">trInFlow</span><span class="p">{</span><span class="nx">limit</span><span class="p">:</span> <span class="nb">uint32</span><span class="p">(</span><span class="nx">icwz</span><span class="p">)},</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">state</span><span class="p">:</span>             <span class="nx">reachable</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">activeStreams</span><span class="p">:</span>     <span class="nb">make</span><span class="p">(</span><span class="kd">map</span><span class="p">[</span><span class="kt">uint32</span><span class="p">]</span><span class="o">*</span><span class="nx">ServerStream</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">stats</span><span class="p">:</span>             <span class="nx">config</span><span class="p">.</span><span class="nx">StatsHandlers</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">kp</span><span class="p">:</span>                <span class="nx">kp</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">idle</span><span class="p">:</span>              <span class="nx">time</span><span class="p">.</span><span class="nf">Now</span><span class="p">(),</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">kep</span><span class="p">:</span>               <span class="nx">kep</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">initialWindowSize</span><span class="p">:</span> <span class="nx">iwz</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">bufferPool</span><span class="p">:</span>        <span class="nx">config</span><span class="p">.</span><span class="nx">BufferPool</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// controlbuf用来缓存Setting Frame等和设置相关的Frame的缓存
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span> <span class="p">=</span> <span class="nf">newControlBuffer</span><span class="p">(</span><span class="nx">t</span><span class="p">.</span><span class="nx">done</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// 自增连接id
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="nx">t</span><span class="p">.</span><span class="nx">connectionID</span> <span class="p">=</span> <span class="nx">atomic</span><span class="p">.</span><span class="nf">AddUint64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">serverConnectionCounter</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// flush framer，确保向client发送了setting frame
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="nx">t</span><span class="p">.</span><span class="nx">framer</span><span class="p">.</span><span class="nx">writer</span><span class="p">.</span><span class="nf">Flush</span><span class="p">()</span></span></span></code></pre></div></div>
+<p>grpc server在发送了setting frame之后，创建好<code>http2Server</code>对象，并等待client的后续消息。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// Check the validity of client preface.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="nx">preface</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">clientPreface</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// 读取客户端发来的client preface，并验证是否和预期一致
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">if</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">io</span><span class="p">.</span><span class="nf">ReadFull</span><span class="p">(</span><span class="nx">t</span><span class="p">.</span><span class="nx">conn</span><span class="p">,</span> <span class="nx">preface</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// In deployments where a gRPC server runs behind a cloud load balancer
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// which performs regular TCP level health checks, the connection is
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// closed immediately by the latter.  Returning io.EOF here allows the
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// grpc server implementation to recognize this scenario and suppress
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// logging to reduce spam.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">if</span> <span class="nx">err</span> <span class="o">==</span> <span class="nx">io</span><span class="p">.</span><span class="nx">EOF</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">io</span><span class="p">.</span><span class="nx">EOF</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nf">connectionErrorf</span><span class="p">(</span><span class="kc">false</span><span class="p">,</span> <span class="nx">err</span><span class="p">,</span> <span class="s">&#34;transport: http2Server.HandleStreams failed to receive the preface from client: %v&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="p">!</span><span class="nx">bytes</span><span class="p">.</span><span class="nf">Equal</span><span class="p">(</span><span class="nx">preface</span><span class="p">,</span> <span class="nx">clientPreface</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nf">connectionErrorf</span><span class="p">(</span><span class="kc">false</span><span class="p">,</span> <span class="kc">nil</span><span class="p">,</span> <span class="s">&#34;transport: http2Server.HandleStreams received bogus greeting from client: %q&#34;</span><span class="p">,</span> <span class="nx">preface</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 读取client端发来的frame
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="nx">frame</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">t</span><span class="p">.</span><span class="nx">framer</span><span class="p">.</span><span class="nx">fr</span><span class="p">.</span><span class="nf">ReadFrame</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="nx">err</span> <span class="o">==</span> <span class="nx">io</span><span class="p">.</span><span class="nx">EOF</span> <span class="o">||</span> <span class="nx">err</span> <span class="o">==</span> <span class="nx">io</span><span class="p">.</span><span class="nx">ErrUnexpectedEOF</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nf">connectionErrorf</span><span class="p">(</span><span class="kc">false</span><span class="p">,</span> <span class="nx">err</span><span class="p">,</span> <span class="s">&#34;transport: http2Server.HandleStreams failed to read initial settings frame: %v&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="nx">atomic</span><span class="p">.</span><span class="nf">StoreInt64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">t</span><span class="p">.</span><span class="nx">lastRead</span><span class="p">,</span> <span class="nx">time</span><span class="p">.</span><span class="nf">Now</span><span class="p">().</span><span class="nf">UnixNano</span><span class="p">())</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// 转成SettingFrame
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="nx">sf</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">frame</span><span class="p">.(</span><span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">SettingsFrame</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="p">!</span><span class="nx">ok</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nf">connectionErrorf</span><span class="p">(</span><span class="kc">false</span><span class="p">,</span> <span class="kc">nil</span><span class="p">,</span> <span class="s">&#34;transport: http2Server.HandleStreams saw invalid preface type %T from client&#34;</span><span class="p">,</span> <span class="nx">frame</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// 处理SettingFrame
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="nx">t</span><span class="p">.</span><span class="nf">handleSettings</span><span class="p">(</span><span class="nx">sf</span><span class="p">)</span></span></span></code></pre></div></div>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">http2Server</span><span class="p">)</span> <span class="nf">handleSettings</span><span class="p">(</span><span class="nx">f</span> <span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">SettingsFrame</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 如果是ack frame，则直接返回
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">f</span><span class="p">.</span><span class="nf">IsAck</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">ss</span> <span class="p">[]</span><span class="nx">http2</span><span class="p">.</span><span class="nx">Setting</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">updateFuncs</span> <span class="p">[]</span><span class="kd">func</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nf">ForeachSetting</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">s</span> <span class="nx">http2</span><span class="p">.</span><span class="nx">Setting</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">switch</span> <span class="nx">s</span><span class="p">.</span><span class="nx">ID</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 更新http2Server中的配置信息
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">case</span> <span class="nx">http2</span><span class="p">.</span><span class="nx">SettingMaxHeaderListSize</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">updateFuncs</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">updateFuncs</span><span class="p">,</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">t</span><span class="p">.</span><span class="nx">maxSendHeaderListSize</span> <span class="p">=</span> <span class="nb">new</span><span class="p">(</span><span class="kt">uint32</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">				<span class="o">*</span><span class="nx">t</span><span class="p">.</span><span class="nx">maxSendHeaderListSize</span> <span class="p">=</span> <span class="nx">s</span><span class="p">.</span><span class="nx">Val</span>
+</span></span><span class="line"><span class="cl">			<span class="p">})</span>
+</span></span><span class="line"><span class="cl">		<span class="k">default</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">ss</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">ss</span><span class="p">,</span> <span class="nx">s</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 这里又遇到了controlBuf
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// 执行updateFuncs()，然后将incommingSetting加入到controlBuf的队列中
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">executeAndPut</span><span class="p">(</span><span class="kd">func</span><span class="p">()</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">f</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">updateFuncs</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nf">f</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl">	<span class="p">},</span> <span class="o">&amp;</span><span class="nx">incomingSettings</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">ss</span><span class="p">:</span> <span class="nx">ss</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>在HTTP2中，client和server都要求在建立连接前发送一个connection preface，作为对所使用协议的最终确认，并确定HTTP2连接的初始设置，client发送的preface一一个24字节的序列开始，之后紧跟着一个setting frame，用来表示client端最终决定的HTTP2配置参数。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">t</span><span class="p">.</span><span class="nx">loopy</span> <span class="p">=</span> <span class="nf">newLoopyWriter</span><span class="p">(</span><span class="nx">serverSide</span><span class="p">,</span> <span class="nx">t</span><span class="p">.</span><span class="nx">framer</span><span class="p">,</span> <span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">,</span> <span class="nx">t</span><span class="p">.</span><span class="nx">bdpEst</span><span class="p">,</span> <span class="nx">t</span><span class="p">.</span><span class="nx">conn</span><span class="p">,</span> <span class="nx">t</span><span class="p">.</span><span class="nx">logger</span><span class="p">,</span> <span class="nx">t</span><span class="p">.</span><span class="nx">outgoingGoAwayHandler</span><span class="p">,</span> <span class="nx">t</span><span class="p">.</span><span class="nx">bufferPool</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">err</span> <span class="o">:=</span> <span class="nx">t</span><span class="p">.</span><span class="nx">loopy</span><span class="p">.</span><span class="nf">run</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">  <span class="nb">close</span><span class="p">(</span><span class="nx">t</span><span class="p">.</span><span class="nx">loopyWriterDone</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="p">!</span><span class="nf">isIOError</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">timer</span> <span class="o">:=</span> <span class="nx">time</span><span class="p">.</span><span class="nf">NewTimer</span><span class="p">(</span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">    <span class="k">defer</span> <span class="nx">timer</span><span class="p">.</span><span class="nf">Stop</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">    <span class="k">select</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="o">&lt;-</span><span class="nx">t</span><span class="p">.</span><span class="nx">readerDone</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="o">&lt;-</span><span class="nx">timer</span><span class="p">.</span><span class="nx">C</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">t</span><span class="p">.</span><span class="nx">conn</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}()</span>
+</span></span><span class="line"><span class="cl"><span class="k">go</span> <span class="nx">t</span><span class="p">.</span><span class="nf">keepalive</span><span class="p">()</span></span></span></code></pre></div></div>
+<p>此时server和client之间的HTTP2链接已经建立完成，RPC连接阶段完毕。在<code>NewServerTransport</code>的最后启动了<code>loopyWriter</code>，开始了rpc交互阶段，<code>loopyWriter</code>不断从<code>controlBuf</code>中读取control frames（包括setting frame)，并将缓存中的frame发送给client，可以说<code>loopyWriter</code>就是grpc server控制流量已经发送数据的地方。</p>
+<p>这里另外启动了一个keepalive的goroutine，这个goroutine应该和grpc的keepalive机制有关。</p>
+<h2 id="参考文献">参考文献</h2>
+<p>[^1] <a href="https://juejin.cn/post/7089739785035579429" target="_blank" rel="noopener noreffer ">gprc源码分析 zhengxinzx</a> 一系列grpc源码分析，主要介绍了grpc的原理和流量控制</p>
+</div><div class="post-footer" id="post-footer">
+    <div class="post-info">
+        <div class="post-info-line">
+            <div class="post-info-mod">
+                <span>Updated on 2025-05-02</span>
+            </div></div>
+        <div class="post-info-line">
+            <div class="post-info-md"><span>
+                            <a class="link-to-markdown" href="/posts/grpc-in-practice/index.md" target="_blank">Read Markdown</a>
+                        </span></div>
+            <div class="post-info-share">
+                <span><a href="javascript:void(0);" title="Share on X" data-sharer="x" data-url="http://example.org/posts/grpc-in-practice/" data-title="Grpc源码分析" data-hashtags="grpc"><i class="fab fa-x-twitter fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Threads" data-sharer="threads" data-url="http://example.org/posts/grpc-in-practice/" data-title="Grpc源码分析"><i class="fab fa-threads fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Facebook" data-sharer="facebook" data-url="http://example.org/posts/grpc-in-practice/" data-hashtag="grpc"><i class="fab fa-facebook-square fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Hacker News" data-sharer="hackernews" data-url="http://example.org/posts/grpc-in-practice/" data-title="Grpc源码分析"><i class="fab fa-hacker-news fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Line" data-sharer="line" data-url="http://example.org/posts/grpc-in-practice/" data-title="Grpc源码分析"><i data-svg-src="https://cdn.jsdelivr.net/npm/simple-icons@14.9.0/icons/line.svg" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on 微博" data-sharer="weibo" data-url="http://example.org/posts/grpc-in-practice/" data-title="Grpc源码分析"><i class="fab fa-weibo fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Diaspora" data-sharer="diaspora" data-url="http://example.org/posts/grpc-in-practice/" data-title="Grpc源码分析" data-description=""><i class="fab fa-diaspora fa-fw" aria-hidden="true"></i></a><a href="https://t.me/share/url?url=http%3a%2f%2fexample.org%2fposts%2fgrpc-in-practice%2f&amp;text=Grpc%e6%ba%90%e7%a0%81%e5%88%86%e6%9e%90" target="_blank" title="Share on Telegram"><i class="fab fa-telegram fa-fw" aria-hidden="true"></i></a></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="post-info-more">
+        <section class="post-tags"><i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/grpc/">Grpc</a></section>
+        <section>
+            <span><a href="javascript:void(0);" onclick="window.history.back();">Back</a></span>&nbsp;|&nbsp;<span><a href="/">Home</a></span>
+        </section>
+    </div>
+
+    <div class="post-nav"><a href="/posts/java-concurrency-jmm/" class="prev" rel="prev" title="Java内存模型"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>Java内存模型</a></div>
+</div>
+<div id="comments"><div id="utterances" class="comment"></div><noscript>
+                Please enable JavaScript to view the comments powered by <a href="https://utteranc.es/">utterances</a>.
+            </noscript></div></article></div>
+            </main><footer class="footer">
+        <div class="footer-container"><div class="footer-line">Powered by <a href="https://gohugo.io/" target="_blank" rel="noopener noreffer" title="Hugo 0.140.2">Hugo</a> | Theme - <a href="https://github.com/dillonzq/LoveIt" target="_blank" rel="noopener noreffer" title="LoveIt 0.3.1-DEV"><i class="far fa-kiss-wink-heart fa-fw" aria-hidden="true"></i> LoveIt</a>
+                </div><div class="footer-line" itemscope itemtype="http://schema.org/CreativeWork"><i class="far fa-copyright fa-fw" aria-hidden="true"></i><span itemprop="copyrightYear">2022 - 2025</span><span class="author" itemprop="copyrightHolder">&nbsp;<a href="/" target="_blank">xxxx</a></span></div>
+        </div>
+    </footer></div>
+
+        <div id="fixed-buttons"><a href="#" id="back-to-top" class="fixed-button" title="Back to Top">
+                <i class="fas fa-arrow-up fa-fw" aria-hidden="true"></i>
+            </a>
+        </div>
+
+        <div id="fixed-buttons-hidden"><a href="#" id="view-comments" class="fixed-button" title="View Comments">
+                <i class="fas fa-comment fa-fw" aria-hidden="true"></i>
+            </a>
+        </div><script src="https://cdn.jsdelivr.net/npm/autocomplete.js@0.38.1/dist/autocomplete.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lunr@2.3.9/lunr.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lazysizes@5.3.2/lazysizes.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js"></script><script src="https://cdn.jsdelivr.net/npm/sharer.js@0.5.2/sharer.min.js"></script><script>window.config={"comment":{"utterances":{"darkTheme":"github-dark","issueTerm":"pathname","label":"","lightTheme":"github-light","repo":"ShadowUnderMoon/ShadowUnderMoon.github.io"}},"search":{"highlightTag":"em","lunrIndexURL":"/index.json","maxResultLength":10,"noResultsFound":"No results found","snippetLength":50,"type":"lunr"}};</script><script src="/js/theme.min.js"></script></body>
+</html>

@@ -1,0 +1,18 @@
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+    <channel>
+        <title>Grpc - Tag - 爱吃芒果</title>
+        <link>http://example.org/tags/grpc/</link>
+        <description>Grpc - Tag - 爱吃芒果</description>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Fri, 02 May 2025 13:26:57 &#43;0800</lastBuildDate><atom:link href="http://example.org/tags/grpc/" rel="self" type="application/rss+xml" /><item>
+    <title>Grpc源码分析</title>
+    <link>http://example.org/posts/grpc-in-practice/</link>
+    <pubDate>Fri, 02 May 2025 13:26:57 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://example.org/posts/grpc-in-practice/</guid>
+    <description><![CDATA[<h2 id="gprc流程概括">gprc流程概括</h2>
+<p></p>
+<p>grpc的流程可以大致分成两个阶段，分别为grpc连接阶段和grpc交互阶段，如图[^1]所示。</p>
+<p>在RPC连接阶段，client和server之间建立起TCP连接，grpc底层依赖于HTTP2，因此client和server还需要协调frame的相关设置，例如frame的大小，滑动窗口的大小等。</p>]]></description>
+</item>
+</channel>
+</rss>

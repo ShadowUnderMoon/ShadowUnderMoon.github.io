@@ -2,10 +2,14 @@
     xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
     xmlns:xhtml="http://www.w3.org/1999/xhtml"
     ><url>
+            <loc>http://example.org/categories/</loc><lastmod>2025-05-02T13:26:57&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/tags/grpc/</loc><lastmod>2025-05-02T13:26:57&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/categories/grpc/</loc><lastmod>2025-05-02T13:26:57&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/posts/grpc-in-practice/</loc><lastmod>2025-05-02T13:26:57&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/posts/</loc><lastmod>2025-05-02T13:26:57&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/tags/</loc><lastmod>2025-05-02T13:26:57&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/</loc><lastmod>2025-05-02T13:26:57&#43;08:00</lastmod></url><url>
             <loc>http://example.org/posts/java-concurrency-jmm/</loc><lastmod>2025-04-28T22:02:31&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/posts/</loc><lastmod>2025-04-28T22:02:31&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/</loc><lastmod>2025-04-28T22:02:31&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/categories/</loc><lastmod>2025-04-26T09:47:55&#43;08:00</lastmod></url><url>
             <loc>http://example.org/tags/java/</loc><lastmod>2025-04-26T09:47:55&#43;08:00</lastmod></url><url>
             <loc>http://example.org/categories/java/</loc><lastmod>2025-04-26T09:47:55&#43;08:00</lastmod></url><url>
             <loc>http://example.org/posts/java_thread_pool/</loc><lastmod>2025-04-26T09:47:55&#43;08:00</lastmod></url><url>
@@ -13,7 +17,6 @@
             <loc>http://example.org/categories/jdk11/</loc><lastmod>2025-04-26T09:47:55&#43;08:00</lastmod></url><url>
             <loc>http://example.org/tags/jvm/</loc><lastmod>2025-04-26T09:47:55&#43;08:00</lastmod></url><url>
             <loc>http://example.org/categories/jvm/</loc><lastmod>2025-04-26T09:47:55&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/tags/</loc><lastmod>2025-04-26T09:47:55&#43;08:00</lastmod></url><url>
             <loc>http://example.org/tags/%E7%BA%BF%E7%A8%8B%E6%B1%A0/</loc><lastmod>2025-04-26T09:47:55&#43;08:00</lastmod></url><url>
             <loc>http://example.org/categories/%E7%BA%BF%E7%A8%8B%E6%B1%A0/</loc><lastmod>2025-04-26T09:47:55&#43;08:00</lastmod></url><url>
             <loc>http://example.org/tags/spark/</loc><lastmod>2025-04-05T22:05:09&#43;08:00</lastmod></url><url>
