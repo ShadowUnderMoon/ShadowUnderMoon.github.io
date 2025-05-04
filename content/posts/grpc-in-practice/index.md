@@ -1007,21 +1007,26 @@ grpc server为每一个client创建一个`loopyWriter`，有这个`loopyWriter`�
 
 ```go
 type loopyWriter struct {
+  // 客户端还是服务端
 	side      side
+  // controlBuffer
 	cbuf      *controlBuffer
+  // 发送配额
 	sendQuota uint32
+  // 发送端初始窗口大小 outbound initial window size
 	oiws      uint32
-	estdStreams map[uint32]*outStream // Established streams.
-	// activeStreams is a linked-list of all streams that have data to send and some
-	// stream-level flow control quota.
-	// Each of these streams internally have a list of data items(and perhaps trailers
-	// on the server-side) to be sent out.
+  // 已经建立未清理的stream，在客户端，指所有已经将Headers发送出去的stream，
+  // 在服务端，指所有已经接收到Headers的stream
+	estdStreams map[uint32]*outStream
+  // 活跃stream列表，有数据需要发送且包含stream-level流控，里面的每个stream内部都有一个数据列表用来存放发送的数据
 	activeStreams *outStreamList
+  // http2.Framer的包装，用来实际读写数
 	framer        *framer
 	hBuf          *bytes.Buffer  // The buffer for HPACK encoding.
 	hEnc          *hpack.Encoder // HPACK encoder.
 	bdpEst        *bdpEstimator
 	draining      bool
+  // 底层tcp连接
 	conn          net.Conn
 	logger        *grpclog.PrefixLogger
 	bufferPool    mem.BufferPool
@@ -1030,6 +1035,265 @@ type loopyWriter struct {
 	ssGoAwayHandler func(*goAway) (bool, error)
 }
 ```
+
+`loopyWriter`从control buffer中接收frame，每个frame被单独处理，`loopyWriter`所做的大部分工作都用在处理data frame。loopWriter维护一个活跃stream的队列，每个stream维护data frame的列表。当loopyWriter获取到data frame，它将被加入对应stream的队列中。
+
+loopyWriter遍历活跃stream的列表，每次处理一个节点，可以视作在所有stream上做round-robin调度。当处理一个stream时，loopyWriter将数据发送到对端，但不能超过流控的最大值，即需要小于`http2MaxFrameLen`，也要小于connection-level流控和stream-level流控的限制。
+
+```go
+go func() {
+  t.loopy = newLoopyWriter(serverSide, t.framer, t.controlBuf, t.bdpEst, t.conn, t.logger, t.outgoingGoAwayHandler, t.bufferPool)
+  err := t.loopy.run()
+  close(t.loopyWriterDone)
+  if !isIOError(err) {
+    timer := time.NewTimer(time.Second)
+    defer timer.Stop()
+    select {
+    case <-t.readerDone:
+    case <-timer.C:
+    }
+    t.conn.Close()
+  }
+}()
+```
+
+还记得之前在gprc server端rpc连接阶段启动的一个goroutine吗？在其中创建了`loopWriter`，并且调用了`loopyWriter#run`方法。
+
+```go
+func (l *loopyWriter) run() (err error) {
+	for {
+    // 阻塞获取数据
+		it, err := l.cbuf.get(true)
+		if err != nil {
+			return err
+		}
+    // 处理controlBuffer中取出的数据，对于dataFrame来说，会将dataFrame放到对应stream的itemList的末尾
+		if err = l.handle(it); err != nil {
+			return err
+		}
+    // 发送acitveStreams中第一个stream中最多16kb的数据
+		if _, err = l.processData(); err != nil {
+			return err
+		}
+		gosched := true
+	hasdata:
+		for {
+      // 非阻塞获取数据
+			it, err := l.cbuf.get(false)
+			if err != nil {
+				return err
+			}
+			if it != nil {
+				if err = l.handle(it); err != nil {
+					return err
+				}
+				if _, err = l.processData(); err != nil {
+					return err
+				}
+        // 将controlBuffer中所有数据都处理完
+				continue hasdata
+			}
+      // 没有activeStreams或者没有connection-level write quota时isEmpty为true
+			isEmpty, err := l.processData()
+			if err != nil {
+				return err
+			}
+      // 如果还有数据需要处理，继续处理
+			if !isEmpty {
+				continue hasdata
+			}
+			if gosched {
+				gosched = false
+        // 当framer的writer buffer中数据过少时，yield processor来让其他goroutine向controlBuffer中填充数据
+				if l.framer.writer.offset < minBatchSize {
+					runtime.Gosched()
+					continue hasdata
+				}
+			}
+      // 将写数据刷新，返回到上层循环阻塞等待
+			l.framer.writer.Flush()
+			break hasdata
+		}
+	}
+}
+```
+
+`run`方法从`controlBuf`中读取control frame，然后更新loopyWriter的内部状态或者将http2 frame发送到对端。loopyWriter将有数据需要发送的活跃stream保存在链表中，所有在活跃stream链表中的stream必须同时满足两个条件：
+
+1. 有数据需要发送
+2. stream-level流控配额可用
+
+在每次run循环的迭代中，除了处理传入的control frame外，loopyWriter还会调用`processData`，每次处理activeStreams中的一个节点。这导致HTTP2 frame被写入底层的write buffer，当controlBuf没有更多的control frame可供读取时，loopyWriter会刷新写缓冲区。作为一种优化，如果批大小过小loopyWriter会让出处理器，从而给流的goroutine一个机会来填充controlBuf。
+
+```go
+func (l *loopyWriter) handle(i any) error {
+	switch i := i.(type) {
+	case *incomingWindowUpdate:
+		l.incomingWindowUpdateHandler(i)
+	case *outgoingWindowUpdate:
+		return l.outgoingWindowUpdateHandler(i)
+	case *incomingSettings:
+		return l.incomingSettingsHandler(i)
+	case *outgoingSettings:
+		return l.outgoingSettingsHandler(i)
+	case *headerFrame:
+		return l.headerHandler(i)
+	case *registerStream:
+		l.registerStreamHandler(i)
+	case *cleanupStream:
+		return l.cleanupStreamHandler(i)
+	case *earlyAbortStream:
+		return l.earlyAbortStreamHandler(i)
+	case *incomingGoAway:
+		return l.incomingGoAwayHandler(i)
+	case *dataFrame:
+		l.preprocessData(i)
+	case *ping:
+		return l.pingHandler(i)
+	case *goAway:
+		return l.goAwayHandler(i)
+	case *outFlowControlSizeRequest:
+		l.outFlowControlSizeRequestHandler(i)
+	case closeConnection:
+		// Just return a non-I/O error and run() will flush and close the
+		// connection.
+		return ErrConnClosing
+	default:
+		return fmt.Errorf("transport: unknown control message type %T", i)
+	}
+	return nil
+}
+```
+
+```go
+func (l *loopyWriter) preprocessData(df *dataFrame) {
+	str, ok := l.estdStreams[df.streamID]
+	if !ok {
+		return
+	}
+	// If we got data for a stream it means that
+	// stream was originated and the headers were sent out.
+	str.itl.enqueue(df)
+	if str.state == empty {
+		str.state = active
+		l.activeStreams.enqueue(str)
+	}
+}
+```
+
+`handle`函数对于不同类型的消息，使用不同的处理函数进行处理，如果消息是data frame，会将data frame塞进对应stream的itemList，如果stream状态为empty，则将stream状态切换成active，并将stream加入到activeStreams。
+
+```go
+func (l *loopyWriter) processData() (bool, error) {
+  // connection level流量控制
+	if l.sendQuota == 0 {
+		return true, nil
+	}
+  // 取出activeStreams中的第一个stream
+	str := l.activeStreams.dequeue() // Remove the first stream.
+	if str == nil {
+		return true, nil
+	}
+  // 第一个item一定是dataFrame，dataFrame是grpc中定义的数据结构，可能转换成多个http2 data frame在网络中传输
+  // 每个dataFrame有两个buffer，h保存grpc-message的header，data保存实际数据， 为了降低网络通信流量，data中
+  // 的数据会被拷贝到h中，从而使http2 frame尽可能大
+	dataItem := str.itl.peek().(*dataFrame) // Peek at the first data item this stream.
+
+	if len(dataItem.h) == 0 && dataItem.reader.Remaining() == 0 { // Empty data frame
+    ...
+	}
+
+	// Figure out the maximum size we can send
+  // http2MaxFrameLen是一个常数，16kb
+	maxSize := http2MaxFrameLen
+  // stream-level流控，byteOutStanding 表示未收到确认的字节数
+	if strQuota := int(l.oiws) - str.bytesOutStanding; strQuota <= 0 { // stream-level flow control.
+		str.state = waitingOnStreamQuota
+		return false, nil
+	} else if maxSize > strQuota {
+		maxSize = strQuota
+	}
+  // connection-level流控
+	if maxSize > int(l.sendQuota) { // connection-level flow control.
+		maxSize = int(l.sendQuota)
+	}
+	// Compute how much of the header and data we can send within quota and max frame length
+	hSize := min(maxSize, len(dataItem.h))
+	dSize := min(maxSize-hSize, dataItem.reader.Remaining())
+	remainingBytes := len(dataItem.h) + dataItem.reader.Remaining() - hSize - dSize
+	size := hSize + dSize
+
+	var buf *[]byte
+
+	if hSize != 0 && dSize == 0 {
+		buf = &dataItem.h
+	} else {
+    // 将header和data的一部分写入buf中
+		pool := l.bufferPool
+		buf = pool.Get(size)
+		defer pool.Put(buf)
+
+		copy((*buf)[:hSize], dataItem.h)
+		_, _ = dataItem.reader.Read((*buf)[hSize:])
+	}
+
+	// 补充stream-level write quota
+	str.wq.replenish(size)
+	var endStream bool
+	// If this is the last data message on this stream and all of it can be written in this iteration.
+	if dataItem.endStream && remainingBytes == 0 {
+		endStream = true
+	}
+	if dataItem.onEachWrite != nil {
+		dataItem.onEachWrite()
+	}
+  // 通过framer向client发送数据
+	if err := l.framer.fr.WriteData(dataItem.streamID, endStream, (*buf)[:size]); err != nil {
+		return false, err
+	}
+	str.bytesOutStanding += size
+  // 更新connection-level流量控制
+	l.sendQuota -= uint32(size)
+	dataItem.h = dataItem.h[hSize:]
+
+	if remainingBytes == 0 { // All the data from that message was written out.
+		_ = dataItem.reader.Close()
+		str.itl.dequeue()
+	}
+	if str.itl.isEmpty() {
+		str.state = empty
+	} else if trailer, ok := str.itl.peek().(*headerFrame); ok { // The next item is trailers.
+		if err := l.writeHeader(trailer.streamID, trailer.endStream, trailer.hf, trailer.onWrite); err != nil {
+			return false, err
+		}
+		if err := l.cleanupStreamHandler(trailer.cleanup); err != nil {
+			return false, err
+		}
+	} else if int(l.oiws)-str.bytesOutStanding <= 0 { // Ran out of stream quota.
+		str.state = waitingOnStreamQuota
+	} else { // Otherwise add it back to the list of active streams.
+    // 如果 stream 中还有数据待发送, 那么将这个 stream enqueue 回 activeStreams
+		l.activeStreams.enqueue(str)
+	}
+	return false, nil
+}
+```
+
+```go
+type dataFrame struct {
+	streamID  uint32
+	endStream bool
+	h         []byte
+	reader    mem.Reader
+	// onEachWrite is called every time
+	// a part of data is written out.
+	onEachWrite func()
+}
+```
+
+
+
+`processData`从activeStreams中移除第一个stream，向对端发送最多16kb的数据，如果有更多数据需要发送且还具有stream-level流控配额的话，将stream加入到activeStreams的末尾。
 
 
 
