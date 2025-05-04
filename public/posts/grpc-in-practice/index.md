@@ -1515,6 +1515,294 @@ func (t *http2Server) updateFlowControl(n uint32) {
 
 对于server来说，bdp影响的是incoming traffic，也就是说影响的是client发送数据的速率和server接收数据的速率，而并不会影响server发送数据的速率。bdp采样结果会影响http2的窗口大小、connection-level的窗口大小以及stream-level的窗口大小。
 
+### controlBuffer数据结构
+
+先介绍一个重要的数据结果`controlBuffer`，这个在之前已经提到过了，在向外发送数据前，其实都会加入`controlBuffer`中，然后再进行处理。
+
+```go
+type controlBuffer struct {
+  // wakeupch的作用是在阻塞读取缓存中的内容时，当有新的frame加入itemList，可以解决阻塞并返回itemList中的frame
+	wakeupCh chan struct{}   // Unblocks readers waiting for something to read.
+  // 
+	done     <-chan struct{} // Closed when the transport is done.
+
+	// Mutex guards all the fields below, except trfChan which can be read
+	// atomically without holding mu.
+	mu              sync.Mutex
+  // 和wakeupCh配置使用，确保不向wakeupCh中放入多余的struct，保证阻塞读取缓存不会因为wakeupCh中的多余元素错误解除阻塞
+	consumerWaiting bool      // True when readers are blocked waiting for new data.
+	closed          bool      // True when the controlbuf is finished.
+	list            *itemList // List of queued control frames.
+
+  // 记录排队的响应帧数量
+	transportResponseFrames int
+  // 当transportResponseFrames >= maxQueuedTransportResponseFrames时，
+  // 创建trfChan，用于控制是否继续从client读取frame
+	trfChan                 atomic.Pointer[chan struct{}]
+}
+```
+
+`controlBuffer`中的数据被称为control frame，一个control frame不止表示向外发送的data、message、headers，也被用来指示`loopyWriter`更新自身的内部状态。control frame和http2 frame没有直接关系，尽管有些control frame，比如说 dataFrame和headerFrame确实作为http2 frame向外传输。
+
+controlBuffer维护了一个`itemList`（单向链表），本质上是一块缓存区，这块缓存区主要有两个作用：
+
+1. 缓存需要发送的frame
+2. 根据缓存中`transportResponseFrame`的数量，决定是否暂时停止读取从client发来的frame
+
+下面看`controlBuffer`中的一些主要函数，加深理解
+
+```go
+func newControlBuffer(done <-chan struct{}) *controlBuffer {
+	return &controlBuffer{
+		wakeupCh: make(chan struct{}, 1),
+		list:     &itemList{},
+		done:     done,
+	}
+}
+```
+
+`newControlBuffer`用于创建controlBuffer实例，其中wakeupCh是缓冲区为1的channel。
+
+```go
+func (c *controlBuffer) throttle() {
+	if ch := c.trfChan.Load(); ch != nil {
+		select {
+		case <-(*ch):
+		case <-c.done:
+		}
+	}
+}
+```
+
+`throttle`函数会被阻塞，如果controlBuffer中存在太多的响应帧，比如incommingSettings、cleanupStrema等。在grpc server的代码中，`throttle`函数通常出现在grpc server接收client frame的开头，也就是说，当`transportResponseFrames`数量过多时，grpc server会暂停接受来自client的frame，maxQueuedTransportResponseFrames为50。
+
+```go
+func (c *controlBuffer) executeAndPut(f func() bool, it cbItem) (bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.closed {
+		return false, ErrConnClosing
+	}
+	if f != nil {
+		if !f() { // f wasn't successful
+			return false, nil
+		}
+	}
+	if it == nil {
+		return true, nil
+	}
+
+	var wakeUp bool
+	if c.consumerWaiting {
+		wakeUp = true
+		c.consumerWaiting = false
+	}
+  // 将item加入到buffer中
+	c.list.enqueue(it)
+	if it.isTransportResponseFrame() {
+		c.transportResponseFrames++
+		if c.transportResponseFrames == maxQueuedTransportResponseFrames {
+			// We are adding the frame that puts us over the threshold; create
+			// a throttling channel.
+			ch := make(chan struct{})
+			c.trfChan.Store(&ch)
+		}
+	}
+	if wakeUp {
+		select {
+		case c.wakeupCh <- struct{}{}:
+		default:
+		}
+	}
+	return true, nil
+}
+```
+
+`executeAndPut`运行f函数，如果f函数返回true，添加给定的item到controlBuf。如果`consumerWaiting`为true，也就是`loopyWriter`发现没有消息可供处理，所以阻塞获取control frame，这里会向`wakeupCh`中放入一个元素，来通知消费者可以读取frame了。在这里也会检查响应帧的数量，如果超过阈值，则创建`trfChan`。
+
+```go
+func (c *controlBuffer) get(block bool) (any, error) {
+  // for循环
+	for {
+		c.mu.Lock()
+		frame, err := c.getOnceLocked()
+		if frame != nil || err != nil || !block {
+			c.mu.Unlock()
+			return frame, err
+		}
+    // 设置状态为consumerWaiting
+		c.consumerWaiting = true
+		c.mu.Unlock()
+
+		// Release the lock above and wait to be woken up.
+		select {
+    // control buffer中没有control frame，阻塞等待
+		case <-c.wakeupCh:
+		case <-c.done:
+			return nil, errors.New("transport closed by client")
+		}
+	}
+}
+
+func (c *controlBuffer) getOnceLocked() (any, error) {
+	if c.closed {
+		return false, ErrConnClosing
+	}
+	if c.list.isEmpty() {
+		return nil, nil
+	}
+	h := c.list.dequeue().(cbItem)
+  // 将controlframe移除响应帧，可能会解封对client请求的读取
+	if h.isTransportResponseFrame() {
+		if c.transportResponseFrames == maxQueuedTransportResponseFrames {
+			// We are removing the frame that put us over the
+			// threshold; close and clear the throttling channel.
+			ch := c.trfChan.Swap(nil)
+			close(*ch)
+		}
+		c.transportResponseFrames--
+	}
+	return h, nil
+}
+```
+
+`get`从control buffer中获取下一个control frame，如果block参数为true并且control buffer中没有control frame，调用被阻塞直到有control frame或者buffer被关闭。
+
+### connection level流量控制
+
+connection level流量控制会控制对于某个client某一时刻能够发送的数据总量。
+
+```go
+type loopyWriter struct {
+	......
+	sendQuota uint32
+	......
+}
+```
+
+控制的方式就是在`loopyWriter`中用一个`sendQuota`来标记该client目前可发送数据的配额。
+
+```go
+func (l *loopyWriter) processData() (bool, error) {
+	......
+	l.sendQuota -= uint32(size)
+	......
+}
+```
+
+`sendQuota`会被初始化为65535，并且每当有数据被grpc server发送给client的时候，`sendQuota`都会减少和被发送数据相等的大小。
+
+```go
+func (l *loopyWriter) incomingWindowUpdateHandler(w *incomingWindowUpdate) error {
+	// Otherwise update the quota.
+	if w.streamID == 0 {
+		l.sendQuota += w.increment
+		return nil
+	}
+	......
+}
+```
+
+当grpc server收到来自client的http2 FrameWindowUpdate frame时，才会将这一quota增加，也就是说`sendQuota`会在server发出数据时减少，在收到来自client的FrameWindowUpdate frame时增加，connection level的流量控制是server和client相互交互的结果，由双方共同决定窗口大小。
+
+为了配合server端的流量控制，client端在连接初始化时被分配了一个limit，默认为65536字节，client端会记录收到的数据量的总和unacked，当unacked超过了limit的1/4后，client就会向server段发送一个window update（数值为unacked）,通知server可以将quota加回来，同时将unacked置零。
+
+可以看到为了避免频繁的发送window update占用网络带宽，client并不会在每次接收到数据之后就发送window update，而是等待接收的数据量达到某一阈值后再发送。
+
+```go
+// trInFlow 是 client 端决定是否发送 window update 给 server 的核心
+type trInFlow struct {
+	// server 端能够发送数据的上限, 会被 server 端根据采用控制的结果更新
+	limit               uint32
+	// client 端已经接收到的数据
+	unacked             uint32
+	// 用于 metric 记录, 不影响流量控制
+	effectiveWindowSize uint32
+}
+// 参数 n 是 client 接收到的数据大小, 返回值表示需要向 server 发送的 window update 中的数值大小.
+// 返回 0 代表不需要发送 window update
+func (f *trInFlow) onData(n uint32) uint32 {
+	f.unacked += n
+	// 超过 1/4 * limit 才会发送 window update, 且数值为已经接收到的数据总量
+	if f.unacked >= f.limit/4 {
+		w := f.unacked
+		f.unacked = 0
+		f.updateEffectiveWindowSize()
+		return w
+	}
+	f.updateEffectiveWindowSize()
+	return 0
+}
+
+```
+
+`trInFlow`是client端控制是否发送window update的核心，limit会随server端发来的window update而改变。
+
+### stream level流量控制
+
+一个stream的流量控制有三种状态，分别是
+
+- active: stream中有数据且数据可以被发送
+- empty: stream中没有数据
+- waitingOnStreamQuota: stream的quota不足，等待有quota时再发送数据
+
+一个stream一开始的状态为empty，因为一个stream在被创建出来时还没有待发送的数据。
+
+```go
+func (l *loopyWriter) preprocessData(df *dataFrame) error {
+	str, ok := l.estdStreams[df.streamID]
+	if !ok {
+		return nil
+	}
+	// If we got data for a stream it means that
+	// stream was originated and the headers were sent out.
+	str.itl.enqueue(df)
+	if str.state == empty {
+		str.state = active
+		l.activeStreams.enqueue(str)
+	}
+	return nil
+}
+
+```
+
+当server处理controlBuffer时遇到某个stream的frame时，会将该stream转成active状态，active状态的stream可以发送数据。
+
+```go
+func (l *loopyWriter) processData() (bool, error) {
+	......
+	if strQuota := int(l.oiws) - str.bytesOutStanding; strQuota <= 0 { // stream-level flow control.
+		str.state = waitingOnStreamQuota
+		return false, nil
+	}
+	......
+	str.bytesOutStanding += size
+	......
+}
+
+```
+
+发送数据之后，`byteOutStanding`会增加相应的数据大小，表明该stream有这些数据被发送给client，还没有收到回应。而当`byteOutStanding`的大小超过`loopyWriter.oiws`，也就是65535后，会拒绝为该strema继续发送数据，这种策略避免了不断向一个失去回应的client发送数据，避免浪费网络带宽。
+
+TODO； 客户端处理
+
+### grpc流量控制小结
+
+流量控制，一般是指在网络传输过程中，发送者主动限制自身发送数据的速率或者发送的数据量，以适应接收者处理数据的速度，当接收者的处理速度较慢是，来不及处理的数据会被存放在内存中，而当内存中的数据缓存区被填满后，新收到的数据就会被扔掉，导致发送者不得不重新发送，造成网络带宽的浪费。
+
+流量控制是一个网络组件的基本功能，我们熟知的TCP协议就规定了流量控制算法，grpc建立在TCP之上，也依赖于http2 WindowUupdate Frame实现了自己在应用层的流量控制。
+
+在grpc中，流量控制体现在三个维度：
+
+1. 采样流量控制：grpc接收者检测一段时间内收到的数据量，从而推测出bdp，并指导发送者调整流量控制窗口
+2. connection level流量控制：发送者在初始化时被分配一定的quota，quota随数据发送而降低，并在收到接收者的反馈之后增加，发送者在耗尽quota之后不能再发送数据
+3. stream level流量控制：和connection level的流量控制类似，只不过connection level管理的是一个连接的所有流量，而stream level管理的是connection中诸多stream中的一个。
+
+grpc中的流量控制仅针对HTTP2 data frame。
+
+
+
 
 
 
