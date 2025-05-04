@@ -35,7 +35,7 @@
         "mainEntityOfPage": {
             "@type": "WebPage",
             "@id": "http:\/\/example.org\/posts\/grpc-in-practice\/"
-        },"genre": "posts","keywords": "grpc","wordcount":  10724 ,
+        },"genre": "posts","keywords": "grpc","wordcount":  13206 ,
         "url": "http:\/\/example.org\/posts\/grpc-in-practice\/","datePublished": "2025-05-02T13:26:57+08:00","dateModified": "2025-05-02T13:26:57+08:00","publisher": {
             "@type": "Organization",
             "name": ""},"author": {
@@ -109,8 +109,8 @@
             <div class="toc-content" id="toc-content-auto"></div>
         </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Grpc源码分析</h1><div class="post-meta">
             <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/grpc/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Grpc</a></span></div>
-            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-02">2025-05-02</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;10724 words&nbsp;
-                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;22 minutes&nbsp;</div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-02">2025-05-02</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;13206 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;27 minutes&nbsp;</div>
         </div><div class="details toc" id="toc-static"  data-kept="">
                 <div class="details-summary toc-title">
                     <span>Contents</span>
@@ -137,6 +137,11 @@
       </ul>
     </li>
     <li><a href="#server如何发送frame">server如何发送frame</a></li>
+    <li><a href="#grpc-server的流量控制">grpc server的流量控制</a>
+      <ul>
+        <li><a href="#采样流量控制">采样流量控制</a></li>
+      </ul>
+    </li>
     <li><a href="#参考文献">参考文献</a></li>
   </ul>
 </nav></div>
@@ -426,7 +431,7 @@
 <p>这里另外启动了一个keepalive的goroutine，这个goroutine应该和grpc的keepalive机制有关。</p>
 <h2 id="grpc-server的rpc交互阶段">grpc server的rpc交互阶段</h2>
 <p>HTTP2中定义了很多类型的frame，包括data, headers等，具体如下，对于不同的frame类型，HTTP2 server应该有不同的处理逻辑。在grpc中，对frame类型的分类和处理，被包含在<code>func (s *Server) serveStreams</code>中。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-go">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -448,7 +453,7 @@
 </span></span><span class="line"><span class="cl">	<span class="nx">FrameTypeWindowUpdate</span> <span class="nx">FrameType</span> <span class="p">=</span> <span class="mh">0x8</span>
 </span></span><span class="line"><span class="cl">	<span class="nx">FrameTypeContinuation</span> <span class="nx">FrameType</span> <span class="p">=</span> <span class="mh">0x9</span>
 </span></span><span class="line"><span class="cl"><span class="p">)</span></span></span></code></pre></div></div>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-go">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -478,7 +483,7 @@
 </span></span><span class="line"><span class="cl">	<span class="p">})</span>
 </span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
 <p><code>st.HandleStreams</code>会阻塞当前goroutine，并等待来自client的frame，在一个for循环中等待并读取来自client的frame，并采取不同的处理方式。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-go">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -1448,6 +1453,238 @@
 </span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">onEachWrite</span> <span class="kd">func</span><span class="p">()</span>
 </span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
 <p><code>processData</code>从activeStreams中移除第一个stream，向对端发送最多16kb的数据，如果有更多数据需要发送且还具有stream-level流控配额的话，将stream加入到activeStreams的末尾。</p>
+<h2 id="grpc-server的流量控制">grpc server的流量控制</h2>
+<p>grpc在应用层实现了自己的流量控制，并将流量控制分成了三个层级</p>
+<ul>
+<li>sample level 流量控制</li>
+<li>connection level 流量控制</li>
+<li>stream level 流量控制</li>
+</ul>
+<p>流量控制可以说是grpc高性能的关键，通过动态地控制数据发送和接收的速率，grpc保证在任何网络情况下都能发挥最大的性能，尽量提高传输带宽并降低传输延迟。</p>
+<h3 id="采样流量控制">采样流量控制</h3>
+<h4 id="bdp估算和动态流量控制窗口">BDP估算和动态流量控制窗口</h4>
+<p>BDP和动态流量控制窗口缩小了grpc和http1.1在高延迟网络中的性能表现。带宽延迟积（BDP，Bandwidth Delay Product）是网络连接的带宽和数据往返延迟的乘积，能够有效地表示在网络被完全利用时网络上有多少字节数据。</p>
+<p>BDP算法基本思路如下：</p>
+<p>每次接收方收到一个data frame时，它就会发送一个BDP ping（一个带有唯一数据、仅用于BDP估算的ping）。在这之后，接收方开始统计它接收到的字节数（包括触发该BDP ping的那部分数据），直到它收到该ping的ack为止。这个在大约1.5个RTT（round-trip time）内接收到的字节总数，约为BDP的1.5倍。如果这个总字节数接近当前的窗口（比如超过窗口的2/3），那么我们必须增大窗口。我们将窗口大小（包括stremaing和connection窗口）设为采样得到的BDP的两倍（也就是接收到的字节总数的两倍）。</p>
+<p>在grpc server端定义了一个<code>bdpEstimator</code>，是用来计算BDP的核心。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">const</span> <span class="p">(</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// bdpLimit is the maximum value the flow control windows will be increased
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// to.  TCP typically limits this to 4MB, but some systems go up to 16MB.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// Since this is only a limit, it is safe to make it optimistic.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">bdpLimit</span> <span class="p">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">20</span><span class="p">)</span> <span class="o">*</span> <span class="mi">16</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// alpha is a constant factor used to keep a moving average
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// of RTTs.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">alpha</span> <span class="p">=</span> <span class="mf">0.9</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// If the current bdp sample is greater than or equal to
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// our beta * our estimated bdp and the current bandwidth
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// sample is the maximum bandwidth observed so far, we
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// increase our bbp estimate by a factor of gamma.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">beta</span> <span class="p">=</span> <span class="mf">0.66</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// To put our bdp to be smaller than or equal to twice the real BDP,
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// we should multiply our current sample with 4/3, however to round things out
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// we use 2 as the multiplication factor.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">gamma</span> <span class="p">=</span> <span class="mi">2</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// Adding arbitrary data to ping so that its ack can be identified.
+</span></span></span><span class="line"><span class="cl"><span class="c1">// Easter-egg: what does the ping message say?
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">var</span> <span class="nx">bdpPing</span> <span class="p">=</span> <span class="o">&amp;</span><span class="nx">ping</span><span class="p">{</span><span class="nx">data</span><span class="p">:</span> <span class="p">[</span><span class="mi">8</span><span class="p">]</span><span class="kt">byte</span><span class="p">{</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">14</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">7</span><span class="p">}}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">bdpEstimator</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// sentAt is the time when the ping was sent.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">sentAt</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Time</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">mu</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">Mutex</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// bdp is the current bdp estimate.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">bdp</span> <span class="kt">uint32</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// sample is the number of bytes received in one measurement cycle.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">sample</span> <span class="kt">uint32</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// bwMax is the maximum bandwidth noted so far (bytes/sec).
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">bwMax</span> <span class="kt">float64</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// bool to keep track of the beginning of a new measurement cycle.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">isSent</span> <span class="kt">bool</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// Callback to update the window sizes.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">updateFlowControl</span> <span class="kd">func</span><span class="p">(</span><span class="nx">n</span> <span class="kt">uint32</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// sampleCount is the number of samples taken so far.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">sampleCount</span> <span class="kt">uint64</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// round trip time (seconds)
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">rtt</span> <span class="kt">float64</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p><code>bdpEstimator</code>有两个主要的方法<code>add</code>和<code>calculate</code></p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// add的返回值指示loopyWriter是否发送BDP ping frame给client
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">b</span> <span class="o">*</span><span class="nx">bdpEstimator</span><span class="p">)</span> <span class="nf">add</span><span class="p">(</span><span class="nx">n</span> <span class="kt">uint32</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">b</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="k">defer</span> <span class="nx">b</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 如果bdp已经达到上限，就不再发送bdp ping进行采样
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">b</span><span class="p">.</span><span class="nx">bdp</span> <span class="o">==</span> <span class="nx">bdpLimit</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">false</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 如果在当前时间点没有bdp ping frame发送出去，就应该发送，来进行采样
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="p">!</span><span class="nx">b</span><span class="p">.</span><span class="nx">isSent</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">b</span><span class="p">.</span><span class="nx">isSent</span> <span class="p">=</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">b</span><span class="p">.</span><span class="nx">sample</span> <span class="p">=</span> <span class="nx">n</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">b</span><span class="p">.</span><span class="nx">sentAt</span> <span class="p">=</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Time</span><span class="p">{}</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">b</span><span class="p">.</span><span class="nx">sampleCount</span><span class="o">++</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 已经有bdp ping frame发送出去了，但是还没有收到ack，累加收到的字节数
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">b</span><span class="p">.</span><span class="nx">sample</span> <span class="o">+=</span> <span class="nx">n</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="kc">false</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p><code>add</code>函数有两个作用：</p>
+<ul>
+<li>告知<code>loopyWriter</code>是否开始采样</li>
+<li>记录采样开始的时间和初始数据量</li>
+</ul>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">http2Server</span><span class="p">)</span> <span class="nf">handleData</span><span class="p">(</span><span class="nx">f</span> <span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">DataFrame</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">size</span> <span class="o">:=</span> <span class="nx">f</span><span class="p">.</span><span class="nf">Header</span><span class="p">().</span><span class="nx">Length</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">sendBDPPing</span> <span class="kt">bool</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">t</span><span class="p">.</span><span class="nx">bdpEst</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">sendBDPPing</span> <span class="p">=</span> <span class="nx">t</span><span class="p">.</span><span class="nx">bdpEst</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="nx">size</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">w</span> <span class="o">:=</span> <span class="nx">t</span><span class="p">.</span><span class="nx">fc</span><span class="p">.</span><span class="nf">onData</span><span class="p">(</span><span class="nx">size</span><span class="p">);</span> <span class="nx">w</span> <span class="p">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">put</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">outgoingWindowUpdate</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">streamID</span><span class="p">:</span>  <span class="mi">0</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">increment</span><span class="p">:</span> <span class="nx">w</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="p">})</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">sendBDPPing</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// Avoid excessive ping detection (e.g. in an L7 proxy)
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="c1">// by sending a window update prior to the BDP ping.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">if</span> <span class="nx">w</span> <span class="o">:=</span> <span class="nx">t</span><span class="p">.</span><span class="nx">fc</span><span class="p">.</span><span class="nf">reset</span><span class="p">();</span> <span class="nx">w</span> <span class="p">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">put</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">outgoingWindowUpdate</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">streamID</span><span class="p">:</span>  <span class="mi">0</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">increment</span><span class="p">:</span> <span class="nx">w</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">			<span class="p">})</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">put</span><span class="p">(</span><span class="nx">bdpPing</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// Select the right stream to dispatch.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">s</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">t</span><span class="p">.</span><span class="nf">getStream</span><span class="p">(</span><span class="nx">f</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p><code>handleData</code>函数是grpc serve收到来自client的http2 data frame之后执行的函数，可以看到，grpc server和每个client之间都维护着一个bdpEstimator，每次收到一个data frame，grpc server都会判断是否需要进行采样，如果需要采样，就向client发送一个bdpPing frame，这个frame也是加入controlBuffer，异步处理的。</p>
+<p>这里也将连接的流量控制和应用程序读取数据的行为解耦，也就是说，连接级别的窗口更新不应该依赖于应用是否读取了数据。stream-level流控已经有这个限制（必须等待应用读取后才能更新窗口），所以如果某个stream很慢，发送方已经被阻塞（因为窗口耗尽）。解耦可以避免下面的情况发生，当某些strema很慢（或者压根没有读取数据）时，导致其他活跃的stream由于没有connection-level流控窗口而被阻塞。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="o">*</span><span class="nx">loopyWriter</span><span class="p">)</span> <span class="nf">pingHandler</span><span class="p">(</span><span class="nx">p</span> <span class="o">*</span><span class="nx">ping</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="p">!</span><span class="nx">p</span><span class="p">.</span><span class="nx">ack</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">l</span><span class="p">.</span><span class="nx">bdpEst</span><span class="p">.</span><span class="nf">timesnap</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">data</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">l</span><span class="p">.</span><span class="nx">framer</span><span class="p">.</span><span class="nx">fr</span><span class="p">.</span><span class="nf">WritePing</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">ack</span><span class="p">,</span> <span class="nx">p</span><span class="p">.</span><span class="nx">data</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">b</span> <span class="o">*</span><span class="nx">bdpEstimator</span><span class="p">)</span> <span class="nf">timesnap</span><span class="p">(</span><span class="nx">d</span> <span class="p">[</span><span class="mi">8</span><span class="p">]</span><span class="kt">byte</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">bdpPing</span><span class="p">.</span><span class="nx">data</span> <span class="o">!=</span> <span class="nx">d</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">b</span><span class="p">.</span><span class="nx">sentAt</span> <span class="p">=</span> <span class="nx">time</span><span class="p">.</span><span class="nf">Now</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>前面提到bdp ping frame是通过control framer异步发送出去的，这个时间点可能和之前决定发送ping的时间点有一定的距离，为了更准确的计算RTT，所以在使用<code>http2.framer</code>实际发送数据前，重新更新了bdp ping frame的发送时间。</p>
+<p>Client端在收到一个bdp ping frame之后，会立刻返回一个ack，server会捕捉到这个ack。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">http2Server</span><span class="p">)</span> <span class="nf">handlePing</span><span class="p">(</span><span class="nx">f</span> <span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">PingFrame</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">f</span><span class="p">.</span><span class="nf">IsAck</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">f</span><span class="p">.</span><span class="nx">Data</span> <span class="o">==</span> <span class="nx">goAwayPing</span><span class="p">.</span><span class="nx">data</span> <span class="o">&amp;&amp;</span> <span class="nx">t</span><span class="p">.</span><span class="nx">drainEvent</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">t</span><span class="p">.</span><span class="nx">drainEvent</span><span class="p">.</span><span class="nf">Fire</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// Maybe it&#39;s a BDP ping.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">if</span> <span class="nx">t</span><span class="p">.</span><span class="nx">bdpEst</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">t</span><span class="p">.</span><span class="nx">bdpEst</span><span class="p">.</span><span class="nf">calculate</span><span class="p">(</span><span class="nx">f</span><span class="p">.</span><span class="nx">Data</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span></span></span></code></pre></div></div>
+<p><code>handlePing</code>是server在收到一个http2 ping frame之后调用的函数，可以看到当ping frame是一个ack时，会调用<code>calculate</code>这个函数。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">b</span> <span class="o">*</span><span class="nx">bdpEstimator</span><span class="p">)</span> <span class="nf">calculate</span><span class="p">(</span><span class="nx">d</span> <span class="p">[</span><span class="mi">8</span><span class="p">]</span><span class="kt">byte</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// Check if the ping acked for was the bdp ping.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">bdpPing</span><span class="p">.</span><span class="nx">data</span> <span class="o">!=</span> <span class="nx">d</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">b</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 这次RTT时间
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">rttSample</span> <span class="o">:=</span> <span class="nx">time</span><span class="p">.</span><span class="nf">Since</span><span class="p">(</span><span class="nx">b</span><span class="p">.</span><span class="nx">sentAt</span><span class="p">).</span><span class="nf">Seconds</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 最终得到的RTT是rtt的统计平均，越近的RTT时间权重越高
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">b</span><span class="p">.</span><span class="nx">sampleCount</span> <span class="p">&lt;</span> <span class="mi">10</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// Bootstrap rtt with an average of first 10 rtt samples.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">b</span><span class="p">.</span><span class="nx">rtt</span> <span class="o">+=</span> <span class="p">(</span><span class="nx">rttSample</span> <span class="o">-</span> <span class="nx">b</span><span class="p">.</span><span class="nx">rtt</span><span class="p">)</span> <span class="o">/</span> <span class="nb">float64</span><span class="p">(</span><span class="nx">b</span><span class="p">.</span><span class="nx">sampleCount</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// Heed to the recent past more.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">b</span><span class="p">.</span><span class="nx">rtt</span> <span class="o">+=</span> <span class="p">(</span><span class="nx">rttSample</span> <span class="o">-</span> <span class="nx">b</span><span class="p">.</span><span class="nx">rtt</span><span class="p">)</span> <span class="o">*</span> <span class="nb">float64</span><span class="p">(</span><span class="nx">alpha</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">b</span><span class="p">.</span><span class="nx">isSent</span> <span class="p">=</span> <span class="kc">false</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 1.5感觉是接收到一个data frame耗时 0.5 rtt，然后dbp ping frame以及ack花费 1 rtt
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">bwCurrent</span> <span class="o">:=</span> <span class="nb">float64</span><span class="p">(</span><span class="nx">b</span><span class="p">.</span><span class="nx">sample</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="nx">b</span><span class="p">.</span><span class="nx">rtt</span> <span class="o">*</span> <span class="nb">float64</span><span class="p">(</span><span class="mf">1.5</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">bwCurrent</span> <span class="p">&gt;</span> <span class="nx">b</span><span class="p">.</span><span class="nx">bwMax</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">b</span><span class="p">.</span><span class="nx">bwMax</span> <span class="p">=</span> <span class="nx">bwCurrent</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nb">float64</span><span class="p">(</span><span class="nx">b</span><span class="p">.</span><span class="nx">sample</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="nx">beta</span><span class="o">*</span><span class="nb">float64</span><span class="p">(</span><span class="nx">b</span><span class="p">.</span><span class="nx">bdp</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="nx">bwCurrent</span> <span class="o">==</span> <span class="nx">b</span><span class="p">.</span><span class="nx">bwMax</span> <span class="o">&amp;&amp;</span> <span class="nx">b</span><span class="p">.</span><span class="nx">bdp</span> <span class="o">!=</span> <span class="nx">bdpLimit</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">sampleFloat</span> <span class="o">:=</span> <span class="nb">float64</span><span class="p">(</span><span class="nx">b</span><span class="p">.</span><span class="nx">sample</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">b</span><span class="p">.</span><span class="nx">bdp</span> <span class="p">=</span> <span class="nb">uint32</span><span class="p">(</span><span class="nx">gamma</span> <span class="o">*</span> <span class="nx">sampleFloat</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">b</span><span class="p">.</span><span class="nx">bdp</span> <span class="p">&gt;</span> <span class="nx">bdpLimit</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">b</span><span class="p">.</span><span class="nx">bdp</span> <span class="p">=</span> <span class="nx">bdpLimit</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">bdp</span> <span class="o">:=</span> <span class="nx">b</span><span class="p">.</span><span class="nx">bdp</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">b</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">b</span><span class="p">.</span><span class="nf">updateFlowControl</span><span class="p">(</span><span class="nx">bdp</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">b</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>在<code>calculate</code>中，经过一系列的计算得到了最新的<code>bdp</code>值，如果需要更新流量控制（这里为什么没有降低bdp的操作），会调用之前注册在<code>bdpEstimator</code>中的<code>updateFlowControl</code>函数，并将新的bdp值传递进去。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">http2Server</span><span class="p">)</span> <span class="nf">updateFlowControl</span><span class="p">(</span><span class="nx">n</span> <span class="kt">uint32</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">t</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">s</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">t</span><span class="p">.</span><span class="nx">activeStreams</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">s</span><span class="p">.</span><span class="nx">fc</span><span class="p">.</span><span class="nf">newLimit</span><span class="p">(</span><span class="nx">n</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">t</span><span class="p">.</span><span class="nx">initialWindowSize</span> <span class="p">=</span> <span class="nb">int32</span><span class="p">(</span><span class="nx">n</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">t</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">put</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">outgoingWindowUpdate</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">streamID</span><span class="p">:</span>  <span class="mi">0</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">increment</span><span class="p">:</span> <span class="nx">t</span><span class="p">.</span><span class="nx">fc</span><span class="p">.</span><span class="nf">newLimit</span><span class="p">(</span><span class="nx">n</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">put</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">outgoingSettings</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">ss</span><span class="p">:</span> <span class="p">[]</span><span class="nx">http2</span><span class="p">.</span><span class="nx">Setting</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">ID</span><span class="p">:</span>  <span class="nx">http2</span><span class="p">.</span><span class="nx">SettingInitialWindowSize</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Val</span><span class="p">:</span> <span class="nx">n</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">			<span class="p">},</span>
+</span></span><span class="line"><span class="cl">		<span class="p">},</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>对于server来说，bdp影响的是incoming traffic，也就是说影响的是client发送数据的速率和server接收数据的速率，而并不会影响server发送数据的速率。bdp采样结果会影响http2的窗口大小、connection-level的窗口大小以及stream-level的窗口大小。</p>
 <h2 id="参考文献">参考文献</h2>
 <p>[^1] <a href="https://juejin.cn/post/7089739785035579429" target="_blank" rel="noopener noreffer ">gprc源码分析 zhengxinzx</a> 一系列grpc源码分析，主要介绍了grpc的原理和流量控制</p>
 </div><div class="post-footer" id="post-footer">

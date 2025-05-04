@@ -1295,6 +1295,242 @@ type dataFrame struct {
 
 `processData`从activeStreams中移除第一个stream，向对端发送最多16kb的数据，如果有更多数据需要发送且还具有stream-level流控配额的话，将stream加入到activeStreams的末尾。
 
+## grpc server的流量控制
+
+grpc在应用层实现了自己的流量控制，并将流量控制分成了三个层级
+
+- sample level 流量控制
+- connection level 流量控制
+- stream level 流量控制
+
+流量控制可以说是grpc高性能的关键，通过动态地控制数据发送和接收的速率，grpc保证在任何网络情况下都能发挥最大的性能，尽量提高传输带宽并降低传输延迟。
+
+### 采样流量控制
+
+#### BDP估算和动态流量控制窗口
+
+BDP和动态流量控制窗口缩小了grpc和http1.1在高延迟网络中的性能表现。带宽延迟积（BDP，Bandwidth Delay Product）是网络连接的带宽和数据往返延迟的乘积，能够有效地表示在网络被完全利用时网络上有多少字节数据。
+
+BDP算法基本思路如下：
+
+每次接收方收到一个data frame时，它就会发送一个BDP ping（一个带有唯一数据、仅用于BDP估算的ping）。在这之后，接收方开始统计它接收到的字节数（包括触发该BDP ping的那部分数据），直到它收到该ping的ack为止。这个在大约1.5个RTT（round-trip time）内接收到的字节总数，约为BDP的1.5倍。如果这个总字节数接近当前的窗口（比如超过窗口的2/3），那么我们必须增大窗口。我们将窗口大小（包括stremaing和connection窗口）设为采样得到的BDP的两倍（也就是接收到的字节总数的两倍）。
+
+在grpc server端定义了一个`bdpEstimator`，是用来计算BDP的核心。
+
+```go
+const (
+	// bdpLimit is the maximum value the flow control windows will be increased
+	// to.  TCP typically limits this to 4MB, but some systems go up to 16MB.
+	// Since this is only a limit, it is safe to make it optimistic.
+	bdpLimit = (1 << 20) * 16
+	// alpha is a constant factor used to keep a moving average
+	// of RTTs.
+	alpha = 0.9
+	// If the current bdp sample is greater than or equal to
+	// our beta * our estimated bdp and the current bandwidth
+	// sample is the maximum bandwidth observed so far, we
+	// increase our bbp estimate by a factor of gamma.
+	beta = 0.66
+	// To put our bdp to be smaller than or equal to twice the real BDP,
+	// we should multiply our current sample with 4/3, however to round things out
+	// we use 2 as the multiplication factor.
+	gamma = 2
+)
+
+// Adding arbitrary data to ping so that its ack can be identified.
+// Easter-egg: what does the ping message say?
+var bdpPing = &ping{data: [8]byte{2, 4, 16, 16, 9, 14, 7, 7}}
+
+type bdpEstimator struct {
+	// sentAt is the time when the ping was sent.
+	sentAt time.Time
+
+	mu sync.Mutex
+	// bdp is the current bdp estimate.
+	bdp uint32
+	// sample is the number of bytes received in one measurement cycle.
+	sample uint32
+	// bwMax is the maximum bandwidth noted so far (bytes/sec).
+	bwMax float64
+	// bool to keep track of the beginning of a new measurement cycle.
+	isSent bool
+	// Callback to update the window sizes.
+	updateFlowControl func(n uint32)
+	// sampleCount is the number of samples taken so far.
+	sampleCount uint64
+	// round trip time (seconds)
+	rtt float64
+}
+```
+
+`bdpEstimator`有两个主要的方法`add`和`calculate`
+
+```go
+// add的返回值指示loopyWriter是否发送BDP ping frame给client
+func (b *bdpEstimator) add(n uint32) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+  // 如果bdp已经达到上限，就不再发送bdp ping进行采样
+	if b.bdp == bdpLimit {
+		return false
+	}
+  // 如果在当前时间点没有bdp ping frame发送出去，就应该发送，来进行采样
+	if !b.isSent {
+		b.isSent = true
+		b.sample = n
+		b.sentAt = time.Time{}
+		b.sampleCount++
+		return true
+	}
+  // 已经有bdp ping frame发送出去了，但是还没有收到ack，累加收到的字节数
+	b.sample += n
+	return false
+}
+```
+
+`add`函数有两个作用：
+
+- 告知`loopyWriter`是否开始采样
+- 记录采样开始的时间和初始数据量
+
+```go
+func (t *http2Server) handleData(f *http2.DataFrame) {
+	size := f.Header().Length
+	var sendBDPPing bool
+	if t.bdpEst != nil {
+		sendBDPPing = t.bdpEst.add(size)
+	}
+	if w := t.fc.onData(size); w > 0 {
+		t.controlBuf.put(&outgoingWindowUpdate{
+			streamID:  0,
+			increment: w,
+		})
+	}
+	if sendBDPPing {
+		// Avoid excessive ping detection (e.g. in an L7 proxy)
+		// by sending a window update prior to the BDP ping.
+		if w := t.fc.reset(); w > 0 {
+			t.controlBuf.put(&outgoingWindowUpdate{
+				streamID:  0,
+				increment: w,
+			})
+		}
+		t.controlBuf.put(bdpPing)
+	}
+	// Select the right stream to dispatch.
+	s, ok := t.getStream(f)
+
+}
+```
+
+`handleData`函数是grpc serve收到来自client的http2 data frame之后执行的函数，可以看到，grpc server和每个client之间都维护着一个bdpEstimator，每次收到一个data frame，grpc server都会判断是否需要进行采样，如果需要采样，就向client发送一个bdpPing frame，这个frame也是加入controlBuffer，异步处理的。
+
+这里也将连接的流量控制和应用程序读取数据的行为解耦，也就是说，连接级别的窗口更新不应该依赖于应用是否读取了数据。stream-level流控已经有这个限制（必须等待应用读取后才能更新窗口），所以如果某个stream很慢，发送方已经被阻塞（因为窗口耗尽）。解耦可以避免下面的情况发生，当某些strema很慢（或者压根没有读取数据）时，导致其他活跃的stream由于没有connection-level流控窗口而被阻塞。
+
+```go
+func (l *loopyWriter) pingHandler(p *ping) error {
+	if !p.ack {
+		l.bdpEst.timesnap(p.data)
+	}
+	return l.framer.fr.WritePing(p.ack, p.data)
+}
+func (b *bdpEstimator) timesnap(d [8]byte) {
+	if bdpPing.data != d {
+		return
+	}
+	b.sentAt = time.Now()
+}
+```
+
+前面提到bdp ping frame是通过control framer异步发送出去的，这个时间点可能和之前决定发送ping的时间点有一定的距离，为了更准确的计算RTT，所以在使用`http2.framer`实际发送数据前，重新更新了bdp ping frame的发送时间。
+
+Client端在收到一个bdp ping frame之后，会立刻返回一个ack，server会捕捉到这个ack。
+
+```go
+func (t *http2Server) handlePing(f *http2.PingFrame) {
+	if f.IsAck() {
+		if f.Data == goAwayPing.data && t.drainEvent != nil {
+			t.drainEvent.Fire()
+			return
+		}
+		// Maybe it's a BDP ping.
+		if t.bdpEst != nil {
+			t.bdpEst.calculate(f.Data)
+		}
+		return
+	}
+```
+
+`handlePing`是server在收到一个http2 ping frame之后调用的函数，可以看到当ping frame是一个ack时，会调用`calculate`这个函数。
+
+```go
+func (b *bdpEstimator) calculate(d [8]byte) {
+	// Check if the ping acked for was the bdp ping.
+	if bdpPing.data != d {
+		return
+	}
+	b.mu.Lock()
+  // 这次RTT时间
+	rttSample := time.Since(b.sentAt).Seconds()
+  // 最终得到的RTT是rtt的统计平均，越近的RTT时间权重越高
+	if b.sampleCount < 10 {
+		// Bootstrap rtt with an average of first 10 rtt samples.
+		b.rtt += (rttSample - b.rtt) / float64(b.sampleCount)
+	} else {
+		// Heed to the recent past more.
+		b.rtt += (rttSample - b.rtt) * float64(alpha)
+	}
+	b.isSent = false
+  // 1.5感觉是接收到一个data frame耗时 0.5 rtt，然后dbp ping frame以及ack花费 1 rtt
+	bwCurrent := float64(b.sample) / (b.rtt * float64(1.5))
+	if bwCurrent > b.bwMax {
+		b.bwMax = bwCurrent
+	}
+	if float64(b.sample) >= beta*float64(b.bdp) && bwCurrent == b.bwMax && b.bdp != bdpLimit {
+		sampleFloat := float64(b.sample)
+		b.bdp = uint32(gamma * sampleFloat)
+		if b.bdp > bdpLimit {
+			b.bdp = bdpLimit
+		}
+		bdp := b.bdp
+		b.mu.Unlock()
+		b.updateFlowControl(bdp)
+		return
+	}
+	b.mu.Unlock()
+}
+```
+
+在`calculate`中，经过一系列的计算得到了最新的`bdp`值，如果需要更新流量控制（这里为什么没有降低bdp的操作），会调用之前注册在`bdpEstimator`中的`updateFlowControl`函数，并将新的bdp值传递进去。
+
+```go
+func (t *http2Server) updateFlowControl(n uint32) {
+	t.mu.Lock()
+	for _, s := range t.activeStreams {
+		s.fc.newLimit(n)
+	}
+	t.initialWindowSize = int32(n)
+	t.mu.Unlock()
+	t.controlBuf.put(&outgoingWindowUpdate{
+		streamID:  0,
+		increment: t.fc.newLimit(n),
+	})
+	t.controlBuf.put(&outgoingSettings{
+		ss: []http2.Setting{
+			{
+				ID:  http2.SettingInitialWindowSize,
+				Val: n,
+			},
+		},
+	})
+
+}
+```
+
+对于server来说，bdp影响的是incoming traffic，也就是说影响的是client发送数据的速率和server接收数据的速率，而并不会影响server发送数据的速率。bdp采样结果会影响http2的窗口大小、connection-level的窗口大小以及stream-level的窗口大小。
+
+
+
 
 
 ## 参考文献
