@@ -21,7 +21,7 @@ categories:
 
 ![Image.png](grpc流程概括.png)
 
-grpc的流程可以大致分成两个阶段，分别为grpc连接阶段和grpc交互阶段，如图[^1]所示。
+grpc的流程可以大致分成两个阶段，分别为grpc连接阶段和grpc交互阶段，如图所示（此图来自后面的参考文献）。
 
 在RPC连接阶段，client和server之间建立起TCP连接，grpc底层依赖于HTTP2，因此client和server还需要协调frame的相关设置，例如frame的大小，滑动窗口的大小等。
 
@@ -348,6 +348,8 @@ func (s *Server) serveStreams(ctx context.Context, st transport.ServerTransport,
 
 `st.HandleStreams`会阻塞当前goroutine，并等待来自client的frame，在一个for循环中等待并读取来自client的frame，并采取不同的处理方式。
 
+grpc服务端使用一个goroutine向外发送数据`loopyWriter`，使用另一个goroutine读取数据`serverStreams`。
+
 ```go
 func (t *http2Server) HandleStreams(ctx context.Context, handle func(*ServerStream)) {
 	defer func() {
@@ -577,6 +579,8 @@ func (s *Server) handleStream(t transport.ServerTransport, stream *transport.Ser
 	}
 }
 ```
+
+从这里也可以看出来，不同stream不会相互阻塞，不会因为应用层处理某个stream时间过长而导致其他stream失去响应。
 
 根据handers frame中service和method的信息，grpc server找到注册好的method并执行，这里区分unary调用和streaming调用，分别对应`s.processUnaryRPC`和`s.processStreamingRPC`。
 
@@ -1305,9 +1309,7 @@ grpc在应用层实现了自己的流量控制，并将流量控制分成了三�
 
 流量控制可以说是grpc高性能的关键，通过动态地控制数据发送和接收的速率，grpc保证在任何网络情况下都能发挥最大的性能，尽量提高传输带宽并降低传输延迟。
 
-### 采样流量控制
-
-#### BDP估算和动态流量控制窗口
+### 采样流量控制 BDP估算和动态流量控制窗口
 
 BDP和动态流量控制窗口缩小了grpc和http1.1在高延迟网络中的性能表现。带宽延迟积（BDP，Bandwidth Delay Product）是网络连接的带宽和数据往返延迟的乘积，能够有效地表示在网络被完全利用时网络上有多少字节数据。
 
@@ -1501,20 +1503,24 @@ func (b *bdpEstimator) calculate(d [8]byte) {
 }
 ```
 
-在`calculate`中，经过一系列的计算得到了最新的`bdp`值，如果需要更新流量控制（这里为什么没有降低bdp的操作），会调用之前注册在`bdpEstimator`中的`updateFlowControl`函数，并将新的bdp值传递进去。
+在`calculate`中，经过一系列的计算得到了最新的`bdp`值，如果需要更新流量控制，会调用之前注册在`bdpEstimator`中的`updateFlowControl`函数，并将新的bdp值传递进去。
 
 ```go
 func (t *http2Server) updateFlowControl(n uint32) {
 	t.mu.Lock()
+  // 将所有活跃activeStreams的inflow limit增加到n
 	for _, s := range t.activeStreams {
 		s.fc.newLimit(n)
 	}
+  // 如果新创建stream，会使用initialWindowSize作为inflow的limit，所以这里也进行了修改
 	t.initialWindowSize = int32(n)
 	t.mu.Unlock()
+  // 告诉client，增加整个连接的发送窗口trInflow, n - limit,最终会修改sendQuota
 	t.controlBuf.put(&outgoingWindowUpdate{
 		streamID:  0,
 		increment: t.fc.newLimit(n),
 	})
+  // 发送setting frame，增加所有strema的发送配额
 	t.controlBuf.put(&outgoingSettings{
 		ss: []http2.Setting{
 			{
@@ -1527,7 +1533,47 @@ func (t *http2Server) updateFlowControl(n uint32) {
 }
 ```
 
-对于server来说，bdp影响的是incoming traffic，也就是说影响的是client发送数据的速率和server接收数据的速率，而并不会影响server发送数据的速率。bdp采样结果会影响http2的窗口大小、connection-level的窗口大小以及stream-level的窗口大小。
+
+
+```go
+func (l *loopyWriter) applySettings(ss []http2.Setting) {
+	for _, s := range ss {
+		switch s.ID {
+		case http2.SettingInitialWindowSize:
+      // 修改outbound initial window size
+			o := l.oiws
+			l.oiws = s.Val
+			if o < l.oiws {
+				// If the new limit is greater make all depleted streams active.
+				for _, stream := range l.estdStreams {
+					if stream.state == waitingOnStreamQuota {
+						stream.state = active
+						l.activeStreams.enqueue(stream)
+					}
+				}
+			}
+		case http2.SettingHeaderTableSize:
+			updateHeaderTblSize(l.hEnc, s.Val)
+		}
+	}
+}
+```
+
+setting frame最终会被`applySetting`函数处理，修改outbound initial window size并且将所有等待stream quota的stream加入到activeStreams中。
+
+对于server来说，bdp影响的是incoming traffic，也就是说影响的是client发送数据的速率和server接收数据的速率，而并不会影响server发送数据的速率。bdp采样结果会影响connection-level的窗口大小以及stream-level的窗口大小。
+
+```go
+// newLimit updates the inflow window to a new value n.
+// It assumes that n is always greater than the old limit.
+func (f *inFlow) newLimit(n uint32) {
+	f.mu.Lock()
+	f.limit = n
+	f.mu.Unlock()
+}
+```
+
+
 
 ### controlBuffer数据结构
 
@@ -1707,19 +1753,6 @@ func (l *loopyWriter) processData() (bool, error) {
 
 `sendQuota`会被初始化为65535，并且每当有数据被grpc server发送给client的时候，`sendQuota`都会减少和被发送数据相等的大小。
 
-```go
-func (l *loopyWriter) incomingWindowUpdateHandler(w *incomingWindowUpdate) error {
-	// Otherwise update the quota.
-	if w.streamID == 0 {
-		l.sendQuota += w.increment
-		return nil
-	}
-	......
-}
-```
-
-当grpc server收到来自client的http2 FrameWindowUpdate frame时，才会将这一quota增加，也就是说`sendQuota`会在server发出数据时减少，在收到来自client的FrameWindowUpdate frame时增加，connection level的流量控制是server和client相互交互的结果，由双方共同决定窗口大小。
-
 为了配合server端的流量控制，client端在连接初始化时被分配了一个limit，默认为65536字节，client端会记录收到的数据量的总和unacked，当unacked超过了limit的1/4后，client就会向server段发送一个window update（数值为unacked）,通知server可以将quota加回来，同时将unacked置零。
 
 可以看到为了避免频繁的发送window update占用网络带宽，client并不会在每次接收到数据之后就发送window update，而是等待接收的数据量达到某一阈值后再发送。
@@ -1752,6 +1785,51 @@ func (f *trInFlow) onData(n uint32) uint32 {
 ```
 
 `trInFlow`是client端控制是否发送window update的核心，limit会随server端发来的window update而改变。
+
+```go
+type outgoingWindowUpdate struct {
+	streamID  uint32
+	increment uint32
+}
+```
+
+最终向对端发送的是WindowUpdate Frame，其中streamID为0，表示作用于整个连接，increment表示quota的增量。
+
+```go
+func (t *http2Server) handleWindowUpdate(f *http2.WindowUpdateFrame) {
+	t.controlBuf.put(&incomingWindowUpdate{
+		streamID:  f.Header().StreamID,
+		increment: f.Increment,
+	})
+}
+```
+
+服务端收到WindowUpdateFrame后，会将消息包装成`incomingWindowUpdate`放入controlBuf中
+
+```go
+func (l *loopyWriter) incomingWindowUpdateHandler(w *incomingWindowUpdate) error {
+	// Otherwise update the quota.
+	if w.streamID == 0 {
+		l.sendQuota += w.increment
+		return nil
+	}
+	......
+}
+```
+
+当grpc server收到来自client的http2 FrameWindowUpdate frame时，才会将这一quota增加，也就是说`sendQuota`会在server发出数据时减少，在收到来自client的FrameWindowUpdate frame时增加，connection level的流量控制是server和client相互交互的结果，由双方共同决定窗口大小。
+
+```go
+func (l *loopyWriter) processData() (bool, error) {
+	if l.sendQuota == 0 {
+		return true, nil
+	}
+	if maxSize > int(l.sendQuota) { // connection-level flow control.
+		maxSize = int(l.sendQuota)
+	}
+```
+
+当`loopyWriter`打算向外发送数据时，如果`sendQuota`为零，就停止向外发送数据，如果打算向外发送的数据超过sendquota，则只发送sendQuota大小的数据。
 
 ### stream level流量控制
 
@@ -1797,9 +1875,105 @@ func (l *loopyWriter) processData() (bool, error) {
 
 ```
 
-发送数据之后，`byteOutStanding`会增加相应的数据大小，表明该stream有这些数据被发送给client，还没有收到回应。而当`byteOutStanding`的大小超过`loopyWriter.oiws`，也就是65535后，会拒绝为该strema继续发送数据，这种策略避免了不断向一个失去回应的client发送数据，避免浪费网络带宽。
+发送数据之后，`byteOutStanding`会增加相应的数据大小，表明该stream有这些数据被发送给client，还没有收到回应。而当`byteOutStanding`的大小超过`loopyWriter.oiws`，也就是65535后，会拒绝为该stream继续发送数据，这种策略避免了不断向一个失去回应的client发送数据，避免浪费网络带宽。
 
-TODO； 客户端处理
+stream level的流量控制和connenction level的流量控制原理基本上一直，主要的区别有两点：
+
+- stream level的流量控制中的quota只针对单个stream，每个stream既受限于stream level流量控制，又受限于conection level流量控制
+- client端决定反馈给server windowUpdate frame的时机更负责一些
+
+```go
+// 入站流量控制（inbound flow control
+type inFlow struct {
+	mu sync.Mutex
+	// stream能接受的数据上限，初始为65535字节，受到采样流量控制的影响
+	limit uint32
+	// 收到但未被应用消费（未被读取）的数据量
+	pendingData uint32
+	// 应用已经消费但还未发送windowUpdate frame的数据量，用于减低windowUpdate frame的发送频率
+	pendingUpdate uint32
+	// 是在limit基础上额外增加的数据量，当应用试着读取超过limit大小的数据是，会临时在limit上增加delta，来允许应用读取数据
+	delta uint32
+}
+```
+
+steam level的流量控制不光要记录已经收到的数据量，还需要记录被stream消费掉的数据量，以达到更精准的流量控制，对应的数据结构为`inFlow`。
+
+```go
+// 当data frame被接收时，调用onData更新pendingData
+func (f *inFlow) onData(n uint32) error {
+	f.mu.Lock()
+	f.pendingData += n
+	if f.pendingData+f.pendingUpdate > f.limit+f.delta {
+		limit := f.limit
+		rcvd := f.pendingData + f.pendingUpdate
+		f.mu.Unlock()
+		return fmt.Errorf("received %d-bytes data exceeding the limit %d bytes", rcvd, limit)
+	}
+	f.mu.Unlock()
+	return nil
+}
+```
+
+当client接收到来自server的data frame的时候，pendingData增加接收到的数据量。
+
+```go
+// 当应用读取数据时调用onRead，返回增加的窗口大小
+func (f *inFlow) onRead(n uint32) uint32 {
+	f.mu.Lock()
+	if f.pendingData == 0 {
+		f.mu.Unlock()
+		return 0
+	}
+	f.pendingData -= n
+	if n > f.delta {
+		n -= f.delta
+		f.delta = 0
+	} else {
+		f.delta -= n
+		n = 0
+	}
+	f.pendingUpdate += n
+	if f.pendingUpdate >= f.limit/4 {
+		wu := f.pendingUpdate
+		f.pendingUpdate = 0
+		f.mu.Unlock()
+		return wu
+	}
+	f.mu.Unlock()
+	return 0
+}
+```
+
+当应用读取n字节数据时，pendingData减去n，pendingUpdate增加n，如果存在delta，则需要先还清之前delta的欠债，然后才能将余额增加到pengingUpdate，如果pendignUpdate超过1/4 limit，返回pendingUpdate作为增加的窗口大小，对端可以继续在stream上发送数据，这一切都是为了渐渐消除之前为了允许server发送大量数据而临时增加的额度。
+
+```go
+func (f *inFlow) maybeAdjust(n uint32) uint32 {
+	if n > uint32(math.MaxInt32) {
+		n = uint32(math.MaxInt32)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+  // 接收者的视角下发送者可以继续发送的最大字节数
+	estSenderQuota := int32(f.limit - (f.pendingData + f.pendingUpdate))
+  // 假设要读取n字节长度的grpc message，estUntransmittedData表示发送者可能还没有发送的最大字节数
+	estUntransmittedData := int32(n - f.pendingData)
+  // 这意味着除非我们发送一个window update frame，否则发送者可能无法发送message的所有字节
+  // 由于有来自应用的活跃读请求，因此我们需要发送window update frame，允许超过原先的limit
+	if estUntransmittedData > estSenderQuota {
+		if f.limit+n > maxWindowSize {
+			f.delta = maxWindowSize - f.limit
+		} else {
+      // 这里更新窗口到可以接受message，主要考虑到message可能存在padding
+			f.delta = n
+		}
+		return f.delta
+	}
+	return 0
+}
+```
+
+`maybeAdjust`的核心逻辑是保证grpc message一定有足够的窗口能够被发送，避免陷入停滞，如果由于message需要临时增加窗口大小，则增加delta，而不是limit。最终向对端发送window update frame，提示对端可以继续发送数据。
 
 ### grpc流量控制小结
 
@@ -1815,7 +1989,15 @@ TODO； 客户端处理
 
 grpc中的流量控制仅针对HTTP2 data frame。
 
+## grpc timeout实现
 
+[Deadline](https://grpc.io/docs/guides/deadlines/)对于一个网络服务来说很重要，client可以指定一个deadline，从而当时间超过后，可以及时放弃请求，当前grpc请求结果为`DEADLINE_EXCEEDED`。
+
+
+
+## grpc keepalive实现
+
+[grpc Keepalive是一种在http2连接空闲（没有数据传输）是保持连接活动状态的技术，通过定期发送ping帧来实现。http2保活机制能够提升http2连接的性能和可靠性，但需要仔细配置保活间隔时间。
 
 
 
@@ -1823,4 +2005,6 @@ grpc中的流量控制仅针对HTTP2 data frame。
 
 ## 参考文献
 
-[^1] [gprc源码分析 zhengxinzx](https://juejin.cn/post/7089739785035579429) 一系列grpc源码分析，主要介绍了grpc的原理和流量控制
+1. [gprc源码分析 zhengxinzx](https://juejin.cn/post/7089739785035579429) 一系列grpc源码分析，主要介绍了grpc的原理和流量控制，强烈推荐
+2. [grpc over http2](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md) 基于http2实现grpc协议规范
+

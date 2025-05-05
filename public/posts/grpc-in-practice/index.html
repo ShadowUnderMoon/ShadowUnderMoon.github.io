@@ -7,7 +7,7 @@
         <title>Grpc源码分析 - 爱吃芒果</title><meta name="Description" content="This is my cool site"><meta property="og:url" content="http://example.org/posts/grpc-in-practice/">
   <meta property="og:site_name" content="爱吃芒果">
   <meta property="og:title" content="Grpc源码分析">
-  <meta property="og:description" content="gprc流程概括 grpc的流程可以大致分成两个阶段，分别为grpc连接阶段和grpc交互阶段，如图[^1]所示。
+  <meta property="og:description" content="gprc流程概括 grpc的流程可以大致分成两个阶段，分别为grpc连接阶段和grpc交互阶段，如图所示（此图来自后面的参考文献）。
 在RPC连接阶段，client和server之间建立起TCP连接，grpc底层依赖于HTTP2，因此client和server还需要协调frame的相关设置，例如frame的大小，滑动窗口的大小等。">
   <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="article">
@@ -18,7 +18,7 @@
 
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Grpc源码分析">
-  <meta name="twitter:description" content="gprc流程概括 grpc的流程可以大致分成两个阶段，分别为grpc连接阶段和grpc交互阶段，如图[^1]所示。
+  <meta name="twitter:description" content="gprc流程概括 grpc的流程可以大致分成两个阶段，分别为grpc连接阶段和grpc交互阶段，如图所示（此图来自后面的参考文献）。
 在RPC连接阶段，client和server之间建立起TCP连接，grpc底层依赖于HTTP2，因此client和server还需要协调frame的相关设置，例如frame的大小，滑动窗口的大小等。">
 <meta name="application-name" content="My cool site">
 <meta name="apple-mobile-web-app-title" content="My cool site">
@@ -35,7 +35,7 @@
         "mainEntityOfPage": {
             "@type": "WebPage",
             "@id": "http:\/\/example.org\/posts\/grpc-in-practice\/"
-        },"genre": "posts","keywords": "grpc","wordcount":  16871 ,
+        },"genre": "posts","keywords": "grpc","wordcount":  19146 ,
         "url": "http:\/\/example.org\/posts\/grpc-in-practice\/","datePublished": "2025-05-02T13:26:57+08:00","dateModified": "2025-05-02T13:26:57+08:00","publisher": {
             "@type": "Organization",
             "name": ""},"author": {
@@ -109,8 +109,8 @@
             <div class="toc-content" id="toc-content-auto"></div>
         </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Grpc源码分析</h1><div class="post-meta">
             <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/grpc/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Grpc</a></span></div>
-            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-02">2025-05-02</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;16871 words&nbsp;
-                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;34 minutes&nbsp;</div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-02">2025-05-02</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;19146 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;39 minutes&nbsp;</div>
         </div><div class="details toc" id="toc-static"  data-kept="">
                 <div class="details-summary toc-title">
                     <span>Contents</span>
@@ -139,13 +139,15 @@
     <li><a href="#server如何发送frame">server如何发送frame</a></li>
     <li><a href="#grpc-server的流量控制">grpc server的流量控制</a>
       <ul>
-        <li><a href="#采样流量控制">采样流量控制</a></li>
+        <li><a href="#采样流量控制-bdp估算和动态流量控制窗口">采样流量控制 BDP估算和动态流量控制窗口</a></li>
         <li><a href="#controlbuffer数据结构">controlBuffer数据结构</a></li>
         <li><a href="#connection-level流量控制">connection level流量控制</a></li>
         <li><a href="#stream-level流量控制">stream level流量控制</a></li>
         <li><a href="#grpc流量控制小结">grpc流量控制小结</a></li>
       </ul>
     </li>
+    <li><a href="#grpc-timeout实现">grpc timeout实现</a></li>
+    <li><a href="#grpc-keepalive实现">grpc keepalive实现</a></li>
     <li><a href="#参考文献">参考文献</a></li>
   </ul>
 </nav></div>
@@ -158,7 +160,7 @@
         data-sizes="auto"
         alt="/posts/grpc-in-practice/grpc%E6%B5%81%E7%A8%8B%E6%A6%82%E6%8B%AC.png"
         title="Image.png" width="837" height="884" /></p>
-<p>grpc的流程可以大致分成两个阶段，分别为grpc连接阶段和grpc交互阶段，如图[^1]所示。</p>
+<p>grpc的流程可以大致分成两个阶段，分别为grpc连接阶段和grpc交互阶段，如图所示（此图来自后面的参考文献）。</p>
 <p>在RPC连接阶段，client和server之间建立起TCP连接，grpc底层依赖于HTTP2，因此client和server还需要协调frame的相关设置，例如frame的大小，滑动窗口的大小等。</p>
 <p>在RPC交互阶段，client将数据发送给server，并等待server执行执行method之后返回结果。</p>
 <h3 id="client的流程">Client的流程</h3>
@@ -374,7 +376,7 @@
 </span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span><span class="line"><span class="cl"><span class="c1">// 处理SettingFrame
 </span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="nx">t</span><span class="p">.</span><span class="nf">handleSettings</span><span class="p">(</span><span class="nx">sf</span><span class="p">)</span></span></span></code></pre></div></div>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-go">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -411,7 +413,7 @@
 </span></span><span class="line"><span class="cl">	<span class="p">})</span>
 </span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
 <p>在HTTP2中，client和server都要求在建立连接前发送一个connection preface，作为对所使用协议的最终确认，并确定HTTP2连接的初始设置，client发送的preface一一个24字节的序列开始，之后紧跟着一个setting frame，用来表示client端最终决定的HTTP2配置参数。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-go">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -487,6 +489,7 @@
 </span></span><span class="line"><span class="cl">	<span class="p">})</span>
 </span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
 <p><code>st.HandleStreams</code>会阻塞当前goroutine，并等待来自client的frame，在一个for循环中等待并读取来自client的frame，并采取不同的处理方式。</p>
+<p>grpc服务端使用一个goroutine向外发送数据<code>loopyWriter</code>，使用另一个goroutine读取数据<code>serverStreams</code>。</p>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-go">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
@@ -724,6 +727,7 @@
 </span></span><span class="line"><span class="cl">		<span class="p">}</span>
 </span></span><span class="line"><span class="cl">	<span class="p">}</span>
 </span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>从这里也可以看出来，不同stream不会相互阻塞，不会因为应用层处理某个stream时间过长而导致其他stream失去响应。</p>
 <p>根据handers frame中service和method的信息，grpc server找到注册好的method并执行，这里区分unary调用和streaming调用，分别对应<code>s.processUnaryRPC</code>和<code>s.processStreamingRPC</code>。</p>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-go">
@@ -1465,8 +1469,7 @@
 <li>stream level 流量控制</li>
 </ul>
 <p>流量控制可以说是grpc高性能的关键，通过动态地控制数据发送和接收的速率，grpc保证在任何网络情况下都能发挥最大的性能，尽量提高传输带宽并降低传输延迟。</p>
-<h3 id="采样流量控制">采样流量控制</h3>
-<h4 id="bdp估算和动态流量控制窗口">BDP估算和动态流量控制窗口</h4>
+<h3 id="采样流量控制-bdp估算和动态流量控制窗口">采样流量控制 BDP估算和动态流量控制窗口</h3>
 <p>BDP和动态流量控制窗口缩小了grpc和http1.1在高延迟网络中的性能表现。带宽延迟积（BDP，Bandwidth Delay Product）是网络连接的带宽和数据往返延迟的乘积，能够有效地表示在网络被完全利用时网络上有多少字节数据。</p>
 <p>BDP算法基本思路如下：</p>
 <p>每次接收方收到一个data frame时，它就会发送一个BDP ping（一个带有唯一数据、仅用于BDP估算的ping）。在这之后，接收方开始统计它接收到的字节数（包括触发该BDP ping的那部分数据），直到它收到该ping的ack为止。这个在大约1.5个RTT（round-trip time）内接收到的字节总数，约为BDP的1.5倍。如果这个总字节数接近当前的窗口（比如超过窗口的2/3），那么我们必须增大窗口。我们将窗口大小（包括stremaing和connection窗口）设为采样得到的BDP的两倍（也就是接收到的字节总数的两倍）。</p>
@@ -1661,7 +1664,7 @@
 </span></span><span class="line"><span class="cl">	<span class="p">}</span>
 </span></span><span class="line"><span class="cl">	<span class="nx">b</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
 </span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
-<p>在<code>calculate</code>中，经过一系列的计算得到了最新的<code>bdp</code>值，如果需要更新流量控制（这里为什么没有降低bdp的操作），会调用之前注册在<code>bdpEstimator</code>中的<code>updateFlowControl</code>函数，并将新的bdp值传递进去。</p>
+<p>在<code>calculate</code>中，经过一系列的计算得到了最新的<code>bdp</code>值，如果需要更新流量控制，会调用之前注册在<code>bdpEstimator</code>中的<code>updateFlowControl</code>函数，并将新的bdp值传递进去。</p>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-go">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
@@ -1669,16 +1672,20 @@
         <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
     </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">http2Server</span><span class="p">)</span> <span class="nf">updateFlowControl</span><span class="p">(</span><span class="nx">n</span> <span class="kt">uint32</span><span class="p">)</span> <span class="p">{</span>
 </span></span><span class="line"><span class="cl">	<span class="nx">t</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
-</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">s</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">t</span><span class="p">.</span><span class="nx">activeStreams</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 将所有活跃activeStreams的inflow limit增加到n
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">s</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">t</span><span class="p">.</span><span class="nx">activeStreams</span> <span class="p">{</span>
 </span></span><span class="line"><span class="cl">		<span class="nx">s</span><span class="p">.</span><span class="nx">fc</span><span class="p">.</span><span class="nf">newLimit</span><span class="p">(</span><span class="nx">n</span><span class="p">)</span>
 </span></span><span class="line"><span class="cl">	<span class="p">}</span>
-</span></span><span class="line"><span class="cl">	<span class="nx">t</span><span class="p">.</span><span class="nx">initialWindowSize</span> <span class="p">=</span> <span class="nb">int32</span><span class="p">(</span><span class="nx">n</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 如果新创建stream，会使用initialWindowSize作为inflow的limit，所以这里也进行了修改
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">t</span><span class="p">.</span><span class="nx">initialWindowSize</span> <span class="p">=</span> <span class="nb">int32</span><span class="p">(</span><span class="nx">n</span><span class="p">)</span>
 </span></span><span class="line"><span class="cl">	<span class="nx">t</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
-</span></span><span class="line"><span class="cl">	<span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">put</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">outgoingWindowUpdate</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 告诉client，增加整个连接的发送窗口trInflow, n - limit,最终会修改sendQuota
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">put</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">outgoingWindowUpdate</span><span class="p">{</span>
 </span></span><span class="line"><span class="cl">		<span class="nx">streamID</span><span class="p">:</span>  <span class="mi">0</span><span class="p">,</span>
 </span></span><span class="line"><span class="cl">		<span class="nx">increment</span><span class="p">:</span> <span class="nx">t</span><span class="p">.</span><span class="nx">fc</span><span class="p">.</span><span class="nf">newLimit</span><span class="p">(</span><span class="nx">n</span><span class="p">),</span>
 </span></span><span class="line"><span class="cl">	<span class="p">})</span>
-</span></span><span class="line"><span class="cl">	<span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">put</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">outgoingSettings</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 发送setting frame，增加所有strema的发送配额
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">put</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">outgoingSettings</span><span class="p">{</span>
 </span></span><span class="line"><span class="cl">		<span class="nx">ss</span><span class="p">:</span> <span class="p">[]</span><span class="nx">http2</span><span class="p">.</span><span class="nx">Setting</span><span class="p">{</span>
 </span></span><span class="line"><span class="cl">			<span class="p">{</span>
 </span></span><span class="line"><span class="cl">				<span class="nx">ID</span><span class="p">:</span>  <span class="nx">http2</span><span class="p">.</span><span class="nx">SettingInitialWindowSize</span><span class="p">,</span>
@@ -1688,7 +1695,46 @@
 </span></span><span class="line"><span class="cl">	<span class="p">})</span>
 </span></span><span class="line"><span class="cl">
 </span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
-<p>对于server来说，bdp影响的是incoming traffic，也就是说影响的是client发送数据的速率和server接收数据的速率，而并不会影响server发送数据的速率。bdp采样结果会影响http2的窗口大小、connection-level的窗口大小以及stream-level的窗口大小。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="o">*</span><span class="nx">loopyWriter</span><span class="p">)</span> <span class="nf">applySettings</span><span class="p">(</span><span class="nx">ss</span> <span class="p">[]</span><span class="nx">http2</span><span class="p">.</span><span class="nx">Setting</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">s</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">ss</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">switch</span> <span class="nx">s</span><span class="p">.</span><span class="nx">ID</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">case</span> <span class="nx">http2</span><span class="p">.</span><span class="nx">SettingInitialWindowSize</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">      <span class="c1">// 修改outbound initial window size
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">o</span> <span class="o">:=</span> <span class="nx">l</span><span class="p">.</span><span class="nx">oiws</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">l</span><span class="p">.</span><span class="nx">oiws</span> <span class="p">=</span> <span class="nx">s</span><span class="p">.</span><span class="nx">Val</span>
+</span></span><span class="line"><span class="cl">			<span class="k">if</span> <span class="nx">o</span> <span class="p">&lt;</span> <span class="nx">l</span><span class="p">.</span><span class="nx">oiws</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="c1">// If the new limit is greater make all depleted streams active.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>				<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">stream</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">l</span><span class="p">.</span><span class="nx">estdStreams</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">					<span class="k">if</span> <span class="nx">stream</span><span class="p">.</span><span class="nx">state</span> <span class="o">==</span> <span class="nx">waitingOnStreamQuota</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">						<span class="nx">stream</span><span class="p">.</span><span class="nx">state</span> <span class="p">=</span> <span class="nx">active</span>
+</span></span><span class="line"><span class="cl">						<span class="nx">l</span><span class="p">.</span><span class="nx">activeStreams</span><span class="p">.</span><span class="nf">enqueue</span><span class="p">(</span><span class="nx">stream</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">					<span class="p">}</span>
+</span></span><span class="line"><span class="cl">				<span class="p">}</span>
+</span></span><span class="line"><span class="cl">			<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">case</span> <span class="nx">http2</span><span class="p">.</span><span class="nx">SettingHeaderTableSize</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="nf">updateHeaderTblSize</span><span class="p">(</span><span class="nx">l</span><span class="p">.</span><span class="nx">hEnc</span><span class="p">,</span> <span class="nx">s</span><span class="p">.</span><span class="nx">Val</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>setting frame最终会被<code>applySetting</code>函数处理，修改outbound initial window size并且将所有等待stream quota的stream加入到activeStreams中。</p>
+<p>对于server来说，bdp影响的是incoming traffic，也就是说影响的是client发送数据的速率和server接收数据的速率，而并不会影响server发送数据的速率。bdp采样结果会影响connection-level的窗口大小以及stream-level的窗口大小。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// newLimit updates the inflow window to a new value n.
+</span></span></span><span class="line"><span class="cl"><span class="c1">// It assumes that n is always greater than the old limit.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">f</span> <span class="o">*</span><span class="nx">inFlow</span><span class="p">)</span> <span class="nf">newLimit</span><span class="p">(</span><span class="nx">n</span> <span class="kt">uint32</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nx">limit</span> <span class="p">=</span> <span class="nx">n</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
 <h3 id="controlbuffer数据结构">controlBuffer数据结构</h3>
 <p>先介绍一个重要的数据结果<code>controlBuffer</code>，这个在之前已经提到过了，在向外发送数据前，其实都会加入<code>controlBuffer</code>中，然后再进行处理。</p>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
@@ -1869,20 +1915,6 @@
 </span></span><span class="line"><span class="cl">	<span class="o">......</span>
 </span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
 <p><code>sendQuota</code>会被初始化为65535，并且每当有数据被grpc server发送给client的时候，<code>sendQuota</code>都会减少和被发送数据相等的大小。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-go">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="o">*</span><span class="nx">loopyWriter</span><span class="p">)</span> <span class="nf">incomingWindowUpdateHandler</span><span class="p">(</span><span class="nx">w</span> <span class="o">*</span><span class="nx">incomingWindowUpdate</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
-</span></span><span class="line"><span class="cl">	<span class="c1">// Otherwise update the quota.
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">w</span><span class="p">.</span><span class="nx">streamID</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
-</span></span><span class="line"><span class="cl">		<span class="nx">l</span><span class="p">.</span><span class="nx">sendQuota</span> <span class="o">+=</span> <span class="nx">w</span><span class="p">.</span><span class="nx">increment</span>
-</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span>
-</span></span><span class="line"><span class="cl">	<span class="p">}</span>
-</span></span><span class="line"><span class="cl">	<span class="o">......</span>
-</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
-<p>当grpc server收到来自client的http2 FrameWindowUpdate frame时，才会将这一quota增加，也就是说<code>sendQuota</code>会在server发出数据时减少，在收到来自client的FrameWindowUpdate frame时增加，connection level的流量控制是server和client相互交互的结果，由双方共同决定窗口大小。</p>
 <p>为了配合server端的流量控制，client端在连接初始化时被分配了一个limit，默认为65536字节，client端会记录收到的数据量的总和unacked，当unacked超过了limit的1/4后，client就会向server段发送一个window update（数值为unacked）,通知server可以将quota加回来，同时将unacked置零。</p>
 <p>可以看到为了避免频繁的发送window update占用网络带宽，client并不会在每次接收到数据之后就发送window update，而是等待接收的数据量达到某一阈值后再发送。</p>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
@@ -1914,6 +1946,55 @@
 </span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="mi">0</span>
 </span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
 <p><code>trInFlow</code>是client端控制是否发送window update的核心，limit会随server端发来的window update而改变。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">outgoingWindowUpdate</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">streamID</span>  <span class="kt">uint32</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">increment</span> <span class="kt">uint32</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>最终向对端发送的是WindowUpdate Frame，其中streamID为0，表示作用于整个连接，increment表示quota的增量。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">http2Server</span><span class="p">)</span> <span class="nf">handleWindowUpdate</span><span class="p">(</span><span class="nx">f</span> <span class="o">*</span><span class="nx">http2</span><span class="p">.</span><span class="nx">WindowUpdateFrame</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">t</span><span class="p">.</span><span class="nx">controlBuf</span><span class="p">.</span><span class="nf">put</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">incomingWindowUpdate</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">streamID</span><span class="p">:</span>  <span class="nx">f</span><span class="p">.</span><span class="nf">Header</span><span class="p">().</span><span class="nx">StreamID</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">increment</span><span class="p">:</span> <span class="nx">f</span><span class="p">.</span><span class="nx">Increment</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>服务端收到WindowUpdateFrame后，会将消息包装成<code>incomingWindowUpdate</code>放入controlBuf中</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="o">*</span><span class="nx">loopyWriter</span><span class="p">)</span> <span class="nf">incomingWindowUpdateHandler</span><span class="p">(</span><span class="nx">w</span> <span class="o">*</span><span class="nx">incomingWindowUpdate</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// Otherwise update the quota.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">w</span><span class="p">.</span><span class="nx">streamID</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">l</span><span class="p">.</span><span class="nx">sendQuota</span> <span class="o">+=</span> <span class="nx">w</span><span class="p">.</span><span class="nx">increment</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="o">......</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>当grpc server收到来自client的http2 FrameWindowUpdate frame时，才会将这一quota增加，也就是说<code>sendQuota</code>会在server发出数据时减少，在收到来自client的FrameWindowUpdate frame时增加，connection level的流量控制是server和client相互交互的结果，由双方共同决定窗口大小。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="o">*</span><span class="nx">loopyWriter</span><span class="p">)</span> <span class="nf">processData</span><span class="p">()</span> <span class="p">(</span><span class="kt">bool</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">l</span><span class="p">.</span><span class="nx">sendQuota</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">true</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">maxSize</span> <span class="p">&gt;</span> <span class="nb">int</span><span class="p">(</span><span class="nx">l</span><span class="p">.</span><span class="nx">sendQuota</span><span class="p">)</span> <span class="p">{</span> <span class="c1">// connection-level flow control.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">maxSize</span> <span class="p">=</span> <span class="nb">int</span><span class="p">(</span><span class="nx">l</span><span class="p">.</span><span class="nx">sendQuota</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span></span></span></code></pre></div></div>
+<p>当<code>loopyWriter</code>打算向外发送数据时，如果<code>sendQuota</code>为零，就停止向外发送数据，如果打算向外发送的数据超过sendquota，则只发送sendQuota大小的数据。</p>
 <h3 id="stream-level流量控制">stream level流量控制</h3>
 <p>一个stream的流量控制有三种状态，分别是</p>
 <ul>
@@ -1957,8 +2038,109 @@
 </span></span><span class="line"><span class="cl">	<span class="nx">str</span><span class="p">.</span><span class="nx">bytesOutStanding</span> <span class="o">+=</span> <span class="nx">size</span>
 </span></span><span class="line"><span class="cl">	<span class="o">......</span>
 </span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
-<p>发送数据之后，<code>byteOutStanding</code>会增加相应的数据大小，表明该stream有这些数据被发送给client，还没有收到回应。而当<code>byteOutStanding</code>的大小超过<code>loopyWriter.oiws</code>，也就是65535后，会拒绝为该strema继续发送数据，这种策略避免了不断向一个失去回应的client发送数据，避免浪费网络带宽。</p>
-<p>TODO； 客户端处理</p>
+<p>发送数据之后，<code>byteOutStanding</code>会增加相应的数据大小，表明该stream有这些数据被发送给client，还没有收到回应。而当<code>byteOutStanding</code>的大小超过<code>loopyWriter.oiws</code>，也就是65535后，会拒绝为该stream继续发送数据，这种策略避免了不断向一个失去回应的client发送数据，避免浪费网络带宽。</p>
+<p>stream level的流量控制和connenction level的流量控制原理基本上一直，主要的区别有两点：</p>
+<ul>
+<li>stream level的流量控制中的quota只针对单个stream，每个stream既受限于stream level流量控制，又受限于conection level流量控制</li>
+<li>client端决定反馈给server windowUpdate frame的时机更负责一些</li>
+</ul>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// 入站流量控制（inbound flow control
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">type</span> <span class="nx">inFlow</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">mu</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">Mutex</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// stream能接受的数据上限，初始为65535字节，受到采样流量控制的影响
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">limit</span> <span class="kt">uint32</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 收到但未被应用消费（未被读取）的数据量
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">pendingData</span> <span class="kt">uint32</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 应用已经消费但还未发送windowUpdate frame的数据量，用于减低windowUpdate frame的发送频率
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">pendingUpdate</span> <span class="kt">uint32</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 是在limit基础上额外增加的数据量，当应用试着读取超过limit大小的数据是，会临时在limit上增加delta，来允许应用读取数据
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">delta</span> <span class="kt">uint32</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>steam level的流量控制不光要记录已经收到的数据量，还需要记录被stream消费掉的数据量，以达到更精准的流量控制，对应的数据结构为<code>inFlow</code>。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// 当data frame被接收时，调用onData更新pendingData
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">f</span> <span class="o">*</span><span class="nx">inFlow</span><span class="p">)</span> <span class="nf">onData</span><span class="p">(</span><span class="nx">n</span> <span class="kt">uint32</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nx">pendingData</span> <span class="o">+=</span> <span class="nx">n</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">f</span><span class="p">.</span><span class="nx">pendingData</span><span class="o">+</span><span class="nx">f</span><span class="p">.</span><span class="nx">pendingUpdate</span> <span class="p">&gt;</span> <span class="nx">f</span><span class="p">.</span><span class="nx">limit</span><span class="o">+</span><span class="nx">f</span><span class="p">.</span><span class="nx">delta</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">limit</span> <span class="o">:=</span> <span class="nx">f</span><span class="p">.</span><span class="nx">limit</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">rcvd</span> <span class="o">:=</span> <span class="nx">f</span><span class="p">.</span><span class="nx">pendingData</span> <span class="o">+</span> <span class="nx">f</span><span class="p">.</span><span class="nx">pendingUpdate</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">f</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Errorf</span><span class="p">(</span><span class="s">&#34;received %d-bytes data exceeding the limit %d bytes&#34;</span><span class="p">,</span> <span class="nx">rcvd</span><span class="p">,</span> <span class="nx">limit</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>当client接收到来自server的data frame的时候，pendingData增加接收到的数据量。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// 当应用读取数据时调用onRead，返回增加的窗口大小
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">f</span> <span class="o">*</span><span class="nx">inFlow</span><span class="p">)</span> <span class="nf">onRead</span><span class="p">(</span><span class="nx">n</span> <span class="kt">uint32</span><span class="p">)</span> <span class="kt">uint32</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">f</span><span class="p">.</span><span class="nx">pendingData</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">f</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nx">pendingData</span> <span class="o">-=</span> <span class="nx">n</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">n</span> <span class="p">&gt;</span> <span class="nx">f</span><span class="p">.</span><span class="nx">delta</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">n</span> <span class="o">-=</span> <span class="nx">f</span><span class="p">.</span><span class="nx">delta</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">f</span><span class="p">.</span><span class="nx">delta</span> <span class="p">=</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">f</span><span class="p">.</span><span class="nx">delta</span> <span class="o">-=</span> <span class="nx">n</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">n</span> <span class="p">=</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nx">pendingUpdate</span> <span class="o">+=</span> <span class="nx">n</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">f</span><span class="p">.</span><span class="nx">pendingUpdate</span> <span class="o">&gt;=</span> <span class="nx">f</span><span class="p">.</span><span class="nx">limit</span><span class="o">/</span><span class="mi">4</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">wu</span> <span class="o">:=</span> <span class="nx">f</span><span class="p">.</span><span class="nx">pendingUpdate</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">f</span><span class="p">.</span><span class="nx">pendingUpdate</span> <span class="p">=</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">f</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">wu</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>当应用读取n字节数据时，pendingData减去n，pendingUpdate增加n，如果存在delta，则需要先还清之前delta的欠债，然后才能将余额增加到pengingUpdate，如果pendignUpdate超过1/4 limit，返回pendingUpdate作为增加的窗口大小，对端可以继续在stream上发送数据，这一切都是为了渐渐消除之前为了允许server发送大量数据而临时增加的额度。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">f</span> <span class="o">*</span><span class="nx">inFlow</span><span class="p">)</span> <span class="nf">maybeAdjust</span><span class="p">(</span><span class="nx">n</span> <span class="kt">uint32</span><span class="p">)</span> <span class="kt">uint32</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">n</span> <span class="p">&gt;</span> <span class="nb">uint32</span><span class="p">(</span><span class="nx">math</span><span class="p">.</span><span class="nx">MaxInt32</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">n</span> <span class="p">=</span> <span class="nb">uint32</span><span class="p">(</span><span class="nx">math</span><span class="p">.</span><span class="nx">MaxInt32</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">f</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="k">defer</span> <span class="nx">f</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 接收者的视角下发送者可以继续发送的最大字节数
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">estSenderQuota</span> <span class="o">:=</span> <span class="nb">int32</span><span class="p">(</span><span class="nx">f</span><span class="p">.</span><span class="nx">limit</span> <span class="o">-</span> <span class="p">(</span><span class="nx">f</span><span class="p">.</span><span class="nx">pendingData</span> <span class="o">+</span> <span class="nx">f</span><span class="p">.</span><span class="nx">pendingUpdate</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 假设要读取n字节长度的grpc message，estUntransmittedData表示发送者可能还没有发送的最大字节数
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">estUntransmittedData</span> <span class="o">:=</span> <span class="nb">int32</span><span class="p">(</span><span class="nx">n</span> <span class="o">-</span> <span class="nx">f</span><span class="p">.</span><span class="nx">pendingData</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 这意味着除非我们发送一个window update frame，否则发送者可能无法发送message的所有字节
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// 由于有来自应用的活跃读请求，因此我们需要发送window update frame，允许超过原先的limit
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">estUntransmittedData</span> <span class="p">&gt;</span> <span class="nx">estSenderQuota</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">f</span><span class="p">.</span><span class="nx">limit</span><span class="o">+</span><span class="nx">n</span> <span class="p">&gt;</span> <span class="nx">maxWindowSize</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">f</span><span class="p">.</span><span class="nx">delta</span> <span class="p">=</span> <span class="nx">maxWindowSize</span> <span class="o">-</span> <span class="nx">f</span><span class="p">.</span><span class="nx">limit</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">      <span class="c1">// 这里更新窗口到可以接受message，主要考虑到message可能存在padding
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">f</span><span class="p">.</span><span class="nx">delta</span> <span class="p">=</span> <span class="nx">n</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">f</span><span class="p">.</span><span class="nx">delta</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p><code>maybeAdjust</code>的核心逻辑是保证grpc message一定有足够的窗口能够被发送，避免陷入停滞，如果由于message需要临时增加窗口大小，则增加delta，而不是limit。最终向对端发送window update frame，提示对端可以继续发送数据。</p>
 <h3 id="grpc流量控制小结">grpc流量控制小结</h3>
 <p>流量控制，一般是指在网络传输过程中，发送者主动限制自身发送数据的速率或者发送的数据量，以适应接收者处理数据的速度，当接收者的处理速度较慢是，来不及处理的数据会被存放在内存中，而当内存中的数据缓存区被填满后，新收到的数据就会被扔掉，导致发送者不得不重新发送，造成网络带宽的浪费。</p>
 <p>流量控制是一个网络组件的基本功能，我们熟知的TCP协议就规定了流量控制算法，grpc建立在TCP之上，也依赖于http2 WindowUupdate Frame实现了自己在应用层的流量控制。</p>
@@ -1969,8 +2151,15 @@
 <li>stream level流量控制：和connection level的流量控制类似，只不过connection level管理的是一个连接的所有流量，而stream level管理的是connection中诸多stream中的一个。</li>
 </ol>
 <p>grpc中的流量控制仅针对HTTP2 data frame。</p>
+<h2 id="grpc-timeout实现">grpc timeout实现</h2>
+<p><a href="https://grpc.io/docs/guides/deadlines/" target="_blank" rel="noopener noreffer ">Deadline</a>对于一个网络服务来说很重要，client可以指定一个deadline，从而当时间超过后，可以及时放弃请求，当前grpc请求结果为<code>DEADLINE_EXCEEDED</code>。</p>
+<h2 id="grpc-keepalive实现">grpc keepalive实现</h2>
+<p>[grpc Keepalive是一种在http2连接空闲（没有数据传输）是保持连接活动状态的技术，通过定期发送ping帧来实现。http2保活机制能够提升http2连接的性能和可靠性，但需要仔细配置保活间隔时间。</p>
 <h2 id="参考文献">参考文献</h2>
-<p>[^1] <a href="https://juejin.cn/post/7089739785035579429" target="_blank" rel="noopener noreffer ">gprc源码分析 zhengxinzx</a> 一系列grpc源码分析，主要介绍了grpc的原理和流量控制</p>
+<ol>
+<li><a href="https://juejin.cn/post/7089739785035579429" target="_blank" rel="noopener noreffer ">gprc源码分析 zhengxinzx</a> 一系列grpc源码分析，主要介绍了grpc的原理和流量控制，强烈推荐</li>
+<li><a href="https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md" target="_blank" rel="noopener noreffer ">grpc over http2</a> 基于http2实现grpc协议规范</li>
+</ol>
 </div><div class="post-footer" id="post-footer">
     <div class="post-info">
         <div class="post-info-line">

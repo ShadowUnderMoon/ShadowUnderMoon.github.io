@@ -11,7 +11,7 @@
     <guid>http://example.org/posts/grpc-in-practice/</guid>
     <description><![CDATA[<h2 id="gprc流程概括">gprc流程概括</h2>
 <p></p>
-<p>grpc的流程可以大致分成两个阶段，分别为grpc连接阶段和grpc交互阶段，如图[^1]所示。</p>
+<p>grpc的流程可以大致分成两个阶段，分别为grpc连接阶段和grpc交互阶段，如图所示（此图来自后面的参考文献）。</p>
 <p>在RPC连接阶段，client和server之间建立起TCP连接，grpc底层依赖于HTTP2，因此client和server还需要协调frame的相关设置，例如frame的大小，滑动窗口的大小等。</p>]]></description>
 </item>
 </channel>
