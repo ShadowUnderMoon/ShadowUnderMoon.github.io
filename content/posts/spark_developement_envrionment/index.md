@@ -1,5 +1,5 @@
 ---
-title: "Spark_optimizer"
+title: "Spark开发环境搭建"
 author: "爱吃芒果"
 description: 
 date: 2025-04-05T22:05:09+08:00
@@ -11,11 +11,26 @@ comments: true
 draft: false
 tags:
   - "Spark"
-  - "优化器"
 categories:
   - "Spark"
-  - "优化器"
 ---
+
+通过如下的方法在idea中配置spark开发环境，最后和一般的java项目一样，使用maven面板的 clean和package进行编译。
+
+我实际使用的编译器为java17，idea会提示配置scala编译器。
+
+> The Maven-based build is the build of reference for Apache Spark. Building Spark using Maven requires Maven 3.9.6 and Java 8/11/17. Spark requires Scala 2.12/2.13; support for Scala 2.11 was removed in Spark 3.0.0.
+>
+> While many of the Spark developers use SBT or Maven on the command line, the most common IDE we use is IntelliJ IDEA. You can get the community edition for free (Apache committers can get free IntelliJ Ultimate Edition licenses) and install the JetBrains Scala plugin from `Preferences > Plugins`.
+>
+> To create a Spark project for IntelliJ:
+>
+> - Download IntelliJ and install the [Scala plug-in for IntelliJ](https://confluence.jetbrains.com/display/SCA/Scala+Plugin+for+IntelliJ+IDEA).
+> - Go to `File -> Import Project`, locate the spark source directory, and select “Maven Project”.
+> - In the Import wizard, it’s fine to leave settings at their default. However it is usually useful to enable “Import Maven projects automatically”, since changes to the project structure will automatically update the IntelliJ project.
+> - As documented in [Building Spark](https://spark.apache.org/docs/latest/building-spark.html), some build configurations require specific profiles to be enabled. The same profiles that are enabled with `-P[profile name]` above may be enabled on the Profiles screen in the Import wizard. For example, if developing for Hadoop 2.7 with YARN support, enable profiles `yarn` and `hadoop-2.7`. These selections can be changed later by accessing the “Maven Projects” tool window from the View menu, and expanding the Profiles section.
+
+
 
 ## 遇到的问题
 

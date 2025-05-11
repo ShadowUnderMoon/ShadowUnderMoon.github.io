@@ -1991,7 +1991,568 @@ grpc中的流量控制仅针对HTTP2 data frame。
 
 ## grpc timeout实现
 
-[Deadline](https://grpc.io/docs/guides/deadlines/)对于一个网络服务来说很重要，client可以指定一个deadline，从而当时间超过后，可以及时放弃请求，当前grpc请求结果为`DEADLINE_EXCEEDED`。
+[Deadline](https://grpc.io/docs/guides/deadlines/)对于一个网络服务来说很重要，client可以指定一个deadline，从而当时间超过后，可以及时放弃请求，返回`DEADLINE_EXCEEDED`。可以解决类似于
+
+- 尾部延迟，某些请求相比于其他请求花费太多时间才返回
+- 避免客户端无意义阻塞等待，比如服务器已经挂掉了，等待已经没有意义了
+- 避免资源的不合理占用，rpc请求可能会持有一些资源，通过及时中断，可以释放这些资源
+
+怎么得到一个合理的[deadlines](https://grpc.io/blog/deadlines/)，需要考虑多方面因素，包括整个系统的端到端延迟，哪些RPC是串行的，哪些是并行的，然后尝试估算每一阶段的耗时，最终得到一个粗略的估计。
+
+在grpc中，client和server会分别独立和局地的判断rpc调用是否成功，这意味着client和server得到的结论可能不一致，一个在server端成功的rpc调用可能在client端被认为是失败的，比如服务器可以发送响应，但响应达到是client的超时已经触发，client最终会终止当前rpc调用调用并返回`DEADLINE_EXCEEDED`。
+
+```go
+clientDeadline := time.Now().Add(time.Duration(*deadlineMs) * time.Millisecond)
+ctx, cancel := context.WithDeadline(ctx, clientDeadline)
+```
+
+在go中通过对`ctx`指定超时时间来设置grpc超时。
+
+```java
+response = blockingStub.withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS).sayHello(request);
+```
+
+在java中通过调用client stub的方法`withDeadLineAfter`来设置超时时间。
+
+在服务端，server可以查询某个rpc是否已经超时，在server可以处理rpc请求时，检查是否client还在等待非常重要，特别是在做一些很费时间的处理时。
+
+```go
+if ctx.Err() == context.Canceled {
+	return status.New(codes.Canceled, "Client cancelled, abandoning.")
+}
+```
+
+```java
+if (Context.current().isCancelled()) {
+  responseObserver.onError(Status.CANCELLED.withDescription("Cancelled by client").asRuntimeException());
+  return;
+}
+```
+
+
+
+[grpc over http2](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md)规定了deadline是通过在请求的Headers frame中指定`grpc-timeout`字段实现的，其值的格式包含两部分：
+
+1. TimeoutValue ascii形式的正整数字符串，最多8位
+2. TimeoutUnit 可以为Hour -> H / Minute -> M / Second -> S / Millisecond -> m / Microsecond -> u / Nanosecond -> n
+
+
+
+```go
+func (t *http2Server) operateHeaders(ctx context.Context, frame *http2.MetaHeadersFrame, handle func(*ServerStream)) error {
+	streamID := frame.Header().StreamID
+	s := &ServerStream{
+		Stream: &Stream{
+			id:  streamID,
+			buf: buf,
+			fc:  &inFlow{limit: uint32(t.initialWindowSize)},
+		},
+		st:               t,
+		headerWireLength: int(frame.Header().Length),
+	}
+  // 找到grpc-timeout字段
+	for _, hf := range frame.Fields {
+  		case "grpc-timeout":
+			timeoutSet = true
+			var err error
+			if timeout, err = decodeTimeout(hf.Value); err != nil {
+				headerError = status.Newf(codes.Internal, "malformed grpc-timeout: %v", err)
+			}
+  // 为stream设置deadline
+ 	if timeoutSet {
+		s.ctx, s.cancel = context.WithTimeout(ctx, timeout)
+	} else {
+		s.ctx, s.cancel = context.WithCancel(ctx)
+	}
+	// 启动一个timer在超时的情况下关闭stream
+	if timeoutSet {
+		// We need to wait for s.cancel to be updated before calling
+		// t.closeStream to avoid data races.
+		cancelUpdated := make(chan struct{})
+		timer := internal.TimeAfterFunc(timeout, func() {
+			<-cancelUpdated
+      // 最终会发送http2 RST frame关闭stream
+			t.closeStream(s, true, http2.ErrCodeCancel, false)
+		})
+		oldCancel := s.cancel
+		s.cancel = func() {
+			oldCancel()
+			timer.Stop()
+		}
+		close(cancelUpdated)
+	}
+```
+
+server端获得headers frame后，在`operateHeaders`中进行处理。
+
+### grpc deadline在java中的实现
+
+```java
+private static <V> V getUnchecked(Future<V> future) {
+  try {
+    return future.get();
+  } catch (InterruptedException e) {
+    // 恢复中断
+    Thread.currentThread().interrupt();
+    // 抛出StatusRuntimeException
+    throw Status.CANCELLED
+        .withDescription("Thread interrupted")
+        .withCause(e)
+        .asRuntimeException();
+  } catch (ExecutionException e) {
+    throw toStatusRuntimeException(e.getCause());
+  }
+}
+```
+
+返回`future.get()`的结果，而且是可中断的，适用于不会抛出受检异常的任务，如果发生中断，线程在抛出异常前会先恢复中断。
+
+- 如果get抛出`CancellationException`，原样抛出异常
+- 如果get抛出`ExecutionException`或者`InterruptedException`，则抛出`StatusRuntimeException`
+
+```java
+public class StatusRuntimeException extends RuntimeException {
+    private static final long serialVersionUID = 1950934672280720624L;
+    private final Status status;
+    private final Metadata trailers;
+
+    public StatusRuntimeException(Status status) {
+        this(status, (Metadata)null);
+    }
+
+    public StatusRuntimeException(Status status, @Nullable Metadata trailers) {
+        super(Status.formatThrowableMessage(status), status.getCause());
+        this.status = status;
+        this.trailers = trailers;
+    }
+
+    public final Status getStatus() {
+        return this.status;
+    }
+
+    @Nullable
+    public final Metadata getTrailers() {
+        return this.trailers;
+    }
+}
+```
+
+`StatusRuntimeExceptioni`是`Status`的RuntimeException形式，为了能够通过异常传播Status。
+
+```java
+public final class Status {
+  private final Code code;
+  private final String description;
+  private final Throwable cause;
+```
+
+Status定义了操作的状态通过提供标准的`Code`和可选的描述。对于客户端，每个远程调用调用都会在完成时返回一个status，如果发生错误status会被传播到blocking stub作为StatusRuntimeExcpetion，或者作为listener的显式参数，类似的，服务端可以抛出StatusRuntimeException或者将status传递给callback函数。
+
+Code是一个enum类型，这里列出一些值得更多关注的code：
+
+- OK 操作成功结束
+- CALCELLED 操作被取消，一般是被调用者取消
+- UNKNOWN 未知错误
+- INVALID_ARGUMENT 客户单提供了无效的参数
+- DEADLINE_EXCEEDED 在操作完成前超时
+- UNIMPLEMENTED 服务中的的操作未实现
+- INTERNAL 内部错误，表示底层系统所期望的一些不变量遭到了破坏
+- UNAVAILABLE 服务当前不可用，可能是瞬时错误，可以通过backoff重试纠正，然后对于非幂等操作重试不一定安全
+
+#### ListenableFuture
+
+```java
+public interface ListenableFuture<V extends @Nullable Object> extends Future<V> {
+  void addListener(Runnable listener, Executor executor);
+}
+```
+
+google在[ListenableFutureExplained](https://github.com/google/guava/wiki/ListenableFutureExplained)文章中推荐总是使用`ListenableFuture`而不是`Future`，并给出了以下原因：
+
+- 大多数`Futures`方法需要`ListenableFutures`
+- 省去后续更改为`ListenableFuture`的麻烦
+- 提供工具方法时不再需要提供`Future`和`ListenableFuture`两种变体
+
+传统的`Future`表示异步计算的结果，一个计算可能也可能还没有产生结果，`Future`可以作为正在进行中的计算的句柄，服务承诺未来提供结果给我们。
+
+`ListenableFuture`允许注册回调函数，一旦计算完成，这些回调函数将被执行，或者如果注册回调函数时计算已经开始，则立即开始执行。
+
+`addListenr`方法表示当`future`完成时，注册的回调函数将在提供的线程池中被执行。
+
+推荐通过`Futures.addCallback(ListenableFuture<V>, FutureCallback<V>, Executor)`添加回调函数，`FutureCallback<V>`实现了两个方法
+
+- `onSuccess(V)` 当future成功后基于执行结果执行行动
+- `onFailure(Throwable)` 在future失败时基于失败原因执行行动
+
+对应于JDK通过`ExecutorService.submit(Callable)`初始化一个异步计算，guava提供了`ListerningExecutorService`接口，在任何`ExecutorService`返回`Future`的地方都改成返回`ListenableFuture`。可以通过使用`MoreExecutors.listerningDecorator(ExecutorSerivce)`将`ExecutorService`转换成`ListerningExecutorService`。
+
+如果你打算转换`FutureTask`，guava提供了`ListenableFutureTask.create(Callable<V>)`和`ListenableFutureTask.create(Runnable, V)`，不同于jdk，`ListenableFutureTask`不希望被直接继承。
+
+如果你需要的future抽象希望直接设置future的值而不是实现一个方法去计算这个值，可以考虑拓展`AbstractFuture<V>`或者直接使用`SettableFuture`。
+
+如果你必须将其他API提供的future转换成ListenableFuture，那么你可能别无选择，只能使用较为重量级的`JdkFutureAdapters.listenInPoolThread(Future)` 方法来完成转换。但在可能的情况下，建议你修改原始代码，使其直接返回 ListenableFuture。
+
+推荐使用`ListenableFuture`的最重要原因为它使得构建复杂的异步操作链变得可行，类似于JDK中提供了`CompletableFuture`。
+
+#### GrpcFuture
+
+```java
+  private static final class GrpcFuture<RespT> extends AbstractFuture<RespT> {
+    private final ClientCall<?, RespT> call;
+
+    // Non private to avoid synthetic class
+    GrpcFuture(ClientCall<?, RespT> call) {
+      this.call = call;
+    }
+
+    @Override
+    protected void interruptTask() {
+      call.cancel("GrpcFuture was cancelled", null);
+    }
+
+    @Override
+    protected boolean set(@Nullable RespT resp) {
+      return super.set(resp);
+    }
+
+    @Override
+    protected boolean setException(Throwable throwable) {
+      return super.setException(throwable);
+    }
+
+    @SuppressWarnings("MissingOverride") // Add @Override once Java 6 support is dropped
+    protected String pendingToString() {
+      return MoreObjects.toStringHelper(this).add("clientCall", call).toString();
+    }
+  }
+```
+
+`GrpcFuture`继承了`AbstractFuture`，可以通过`interruptTask`取消grpc调用，通过`set`或者`setException`方法直接设置future的结果。
+
+```java
+private static final class UnaryStreamToFuture<RespT> extends StartableListener<RespT> {
+  private final GrpcFuture<RespT> responseFuture;
+  private RespT value;
+  private boolean isValueReceived = false;
+
+  // Non private to avoid synthetic class
+  UnaryStreamToFuture(GrpcFuture<RespT> responseFuture) {
+    this.responseFuture = responseFuture;
+  }
+
+  @Override
+  public void onHeaders(Metadata headers) {
+  }
+
+  // 当收到server返回的信息后，保存相关信息
+  @Override
+  public void onMessage(RespT value) {
+    if (this.isValueReceived) {
+      throw Status.INTERNAL.withDescription("More than one value received for unary call")
+          .asRuntimeException();
+    }
+    this.value = value;
+    this.isValueReceived = true;
+  }
+
+  // clientcall关闭时设置future的值
+  @Override
+  public void onClose(Status status, Metadata trailers) {
+    if (status.isOk()) {
+      if (!isValueReceived) {
+        // No value received so mark the future as an error
+        responseFuture.setException(
+            Status.INTERNAL.withDescription("No value received for unary call")
+                .asRuntimeException(trailers));
+      }
+      responseFuture.set(value);
+    } else {
+      responseFuture.setException(status.asRuntimeException(trailers));
+    }
+  }
+
+  // clientcall start后调用onstart
+  @Override
+  void onStart() {
+    responseFuture.call.request(2);
+  }
+}
+```
+
+
+
+```java
+public static <ReqT, RespT> RespT blockingUnaryCall(
+    Channel channel, MethodDescriptor<ReqT, RespT> method, CallOptions callOptions, ReqT req) {
+  ThreadlessExecutor executor = new ThreadlessExecutor();
+  boolean interrupt = false;
+  ClientCall<ReqT, RespT> call = channel.newCall(method,
+      callOptions.withOption(ClientCalls.STUB_TYPE_OPTION, StubType.BLOCKING)
+          .withExecutor(executor));
+  try {
+    ListenableFuture<RespT> responseFuture = futureUnaryCall(call, req);
+    while (!responseFuture.isDone()) {
+      try {
+        executor.waitAndDrain();
+      } catch (InterruptedException e) {
+        interrupt = true;
+        call.cancel("Thread interrupted", e);
+        // Now wait for onClose() to be called, so interceptors can clean up
+      }
+    }
+    executor.shutdown();
+    return getUnchecked(responseFuture);
+  } catch (RuntimeException | Error e) {
+    // Something very bad happened. All bets are off; it may be dangerous to wait for onClose().
+    throw cancelThrow(call, e);
+  } finally {
+    if (interrupt) {
+      Thread.currentThread().interrupt();
+    }
+  }
+}
+```
+
+`blockingUnaryCall`执行unary call并且阻塞等待结果，`call`不应该已经启动，在调用完这个函数后`call`不应该再被使用。
+
+```java
+public static <ReqT, RespT> ListenableFuture<RespT> futureUnaryCall(
+    ClientCall<ReqT, RespT> call, ReqT req) {
+  GrpcFuture<RespT> responseFuture = new GrpcFuture<>(call);
+  asyncUnaryRequestCall(call, req, new UnaryStreamToFuture<>(responseFuture));
+  return responseFuture;
+}
+```
+
+`futureUnaryCall`负责执行unary call并返回响应的`ListenableFuture`。
+
+```java
+private static <ReqT, RespT> void asyncUnaryRequestCall(
+    ClientCall<ReqT, RespT> call,
+    ReqT req,
+    StartableListener<RespT> responseListener) {
+  startCall(call, responseListener);
+  try {
+    call.sendMessage(req);
+    call.halfClose();
+  } catch (RuntimeException | Error e) {
+    throw cancelThrow(call, e);
+  }
+}
+```
+
+
+
+`ClientCall`是grpc中的一个核心类，表示客户端和服务器之间的一次rpc调用，`DelayedClientCall`在真实调用未准备好之前先将请求排队起来，等真正的调用准备好之后一并转发。`asyncUnaryRequestCall`中实际调用均没有发生，而是加入了队列等待执行。
+
+在`ClientCallImpl#start`方法中，客户端构造headers frame，
+
+```java
+  private void startInternal(Listener<RespT> observer, Metadata headers) {
+    // 判断context deadline和callOptions deadline哪个更早生效
+    // 我们每次调用时通过stub设置超时时间对应 callOptions deadline
+    Deadline effectiveDeadline = effectiveDeadline();
+    boolean contextIsDeadlineSource = effectiveDeadline != null
+        && effectiveDeadline.equals(context.getDeadline());
+    cancellationHandler = new CancellationHandler(effectiveDeadline, contextIsDeadlineSource);
+    boolean deadlineExceeded = effectiveDeadline != null && cancellationHandler.remainingNanos <= 0;
+    // 如果在实际发送请求前已经超时，就不用返回实际发送请求，直接返回
+    // 这个一般是由于复用了之前请求的超时时间导致的
+    if (!deadlineExceeded) {
+      stream = clientStreamProvider.newStream(method, callOptions, headers, context);
+    } else {
+      ClientStreamTracer[] tracers =
+          GrpcUtil.getClientStreamTracers(callOptions, headers, 0, false);
+      String deadlineName = contextIsDeadlineSource ? "Context" : "CallOptions";
+      Long nameResolutionDelay = callOptions.getOption(NAME_RESOLUTION_DELAYED);
+      String description = String.format(
+          "ClientCall started after %s deadline was exceeded %.9f seconds ago. "
+              + "Name resolution delay %.9f seconds.", deadlineName,
+          cancellationHandler.remainingNanos / NANO_TO_SECS,
+          nameResolutionDelay == null ? 0 : nameResolutionDelay / NANO_TO_SECS);
+      stream = new FailingClientStream(DEADLINE_EXCEEDED.withDescription(description), tracers);
+    }
+    if (effectiveDeadline != null) {
+      stream.setDeadline(effectiveDeadline);
+    }
+    stream.start(new ClientStreamListenerImpl(observer));
+
+    // Delay any sources of cancellation after start(), because most of the transports are broken if
+    // they receive cancel before start. Issue #1343 has more details
+
+    // Propagate later Context cancellation to the remote side.
+    // context cancel后调用stream.cancel通知server
+    cancellationHandler.setUp();
+```
+
+```java
+    void setUp() {
+      if (tearDownCalled) {
+        return;
+      }
+      if (hasDeadline
+          // If the context has the effective deadline, we don't need to schedule an extra task.
+          && !contextIsDeadlineSource
+          // If the channel has been terminated, we don't need to schedule an extra task.
+          && deadlineCancellationExecutor != null) {
+        // 添加超时取消rpc任务到线程池
+        deadlineCancellationFuture = deadlineCancellationExecutor.schedule(
+            new LogExceptionRunnable(this), remainingNanos, TimeUnit.NANOSECONDS);
+      }
+      context.addListener(this, directExecutor());
+      if (tearDownCalled) {
+        // Race detected! Re-run to make sure the future is cancelled and context listener removed
+        tearDown();
+      }
+    }
+```
+
+
+
+```java
+  private class RealChannel extends Channel {
+    // Reference to null if no config selector is available from resolution result
+    // Reference must be set() from syncContext
+    private final AtomicReference<InternalConfigSelector> configSelector =
+        new AtomicReference<>(INITIAL_PENDING_SELECTOR);
+    // Set when the NameResolver is initially created. When we create a new NameResolver for the
+    // same target, the new instance must have the same value.
+    private final String authority;
+    
+		private final Channel clientCallImplChannel = new Channel() {
+      @Override
+      public <RequestT, ResponseT> ClientCall<RequestT, ResponseT> newCall(
+          MethodDescriptor<RequestT, ResponseT> method, CallOptions callOptions) {
+        return new ClientCallImpl<>(
+            method,
+          	// 使用 callOptions executor
+            getCallExecutor(callOptions),
+            callOptions,
+          	// tansportProvider由外部提供
+            transportProvider,
+          	// grpc底层传输层提供的调度任务的线程池，用于deadline超时取消任务
+            terminated ? null : transportFactory.getScheduledExecutorService(),
+            channelCallTracer,
+            null)
+            .setFullStreamDecompression(fullStreamDecompression)
+            .setDecompressorRegistry(decompressorRegistry)
+            .setCompressorRegistry(compressorRegistry);
+      }
+
+      @Override
+      public String authority() {
+        return authority;
+      }
+    };
+```
+
+
+
+blockingUnaryCall ->  channel.newCall -> RealChannel#newCall
+
+·grpc-nio-woarker-elg-1-3` 构造deadline消息，CancellationHandler
+
+![ChatGPT Image 2025年5月7日 21_48_33](ChatGPT Image 2025年5月7日 21_48_33.png)
+
+```java
+// ClientCallImpl的子类
+private final class CancellationHandler implements Runnable, CancellationListener {
+  private final boolean contextIsDeadlineSource;
+  private final boolean hasDeadline;
+  private final long remainingNanos;
+  private volatile ScheduledFuture<?> deadlineCancellationFuture;
+  private volatile boolean tearDownCalled;
+
+  CancellationHandler(Deadline deadline, boolean contextIsDeadlineSource) {
+    this.contextIsDeadlineSource = contextIsDeadlineSource;
+    if (deadline == null) {
+      hasDeadline = false;
+      remainingNanos = 0;
+    } else {
+      hasDeadline = true;
+      remainingNanos = deadline.timeRemaining(TimeUnit.NANOSECONDS);
+    }
+  }
+
+  void setUp() {
+    if (tearDownCalled) {
+      return;
+    }
+    if (hasDeadline
+        // If the context has the effective deadline, we don't need to schedule an extra task.
+        && !contextIsDeadlineSource
+        // If the channel has been terminated, we don't need to schedule an extra task.
+        && deadlineCancellationExecutor != null) {
+      deadlineCancellationFuture = deadlineCancellationExecutor.schedule(
+          new LogExceptionRunnable(this), remainingNanos, TimeUnit.NANOSECONDS);
+    }
+    context.addListener(this, directExecutor());
+    if (tearDownCalled) {
+      // Race detected! Re-run to make sure the future is cancelled and context listener removed
+      tearDown();
+    }
+  }
+
+  // May be called multiple times, and race with setUp()
+  void tearDown() {
+    tearDownCalled = true;
+    ScheduledFuture<?> deadlineCancellationFuture = this.deadlineCancellationFuture;
+    if (deadlineCancellationFuture != null) {
+      deadlineCancellationFuture.cancel(false);
+    }
+    context.removeListener(this);
+  }
+
+  @Override
+  public void cancelled(Context context) {
+    if (hasDeadline && contextIsDeadlineSource
+        && context.cancellationCause() instanceof TimeoutException) {
+      stream.cancel(formatDeadlineExceededStatus());
+      return;
+    }
+    stream.cancel(statusFromCancelled(context));
+  }
+
+  @Override
+  public void run() {
+    // 超时时调用
+    stream.cancel(formatDeadlineExceededStatus());
+  }
+
+  Status formatDeadlineExceededStatus() {
+    // DelayedStream.cancel() is safe to call from a thread that is different from where the
+    // stream is created.
+    long seconds = Math.abs(remainingNanos) / TimeUnit.SECONDS.toNanos(1);
+    long nanos = Math.abs(remainingNanos) % TimeUnit.SECONDS.toNanos(1);
+
+    StringBuilder buf = new StringBuilder();
+    buf.append(contextIsDeadlineSource ? "Context" : "CallOptions");
+    buf.append(" deadline exceeded after ");
+    if (remainingNanos < 0) {
+      buf.append('-');
+    }
+    buf.append(seconds);
+    buf.append(String.format(Locale.US, ".%09d", nanos));
+    buf.append("s. ");
+    Long nsDelay = callOptions.getOption(NAME_RESOLUTION_DELAYED);
+    buf.append(String.format(Locale.US, "Name resolution delay %.9f seconds.",
+        nsDelay == null ? 0 : nsDelay / NANO_TO_SECS));
+    if (stream != null) {
+      InsightBuilder insight = new InsightBuilder();
+      stream.appendTimeoutInsight(insight);
+      buf.append(" ");
+      buf.append(insight);
+    }
+    return DEADLINE_EXCEEDED.withDescription(buf.toString());
+  }
+}
+```
+
+
+
+```java
+
+```
 
 
 
