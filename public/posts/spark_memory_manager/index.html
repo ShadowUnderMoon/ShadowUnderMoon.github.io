@@ -40,7 +40,7 @@
         "mainEntityOfPage": {
             "@type": "WebPage",
             "@id": "http:\/\/example.org\/posts\/spark_memory_manager\/"
-        },"genre": "posts","keywords": "Spark, 内存管理","wordcount":  5637 ,
+        },"genre": "posts","keywords": "Spark, 内存管理","wordcount":  5630 ,
         "url": "http:\/\/example.org\/posts\/spark_memory_manager\/","datePublished": "2025-03-09T22:32:09+08:00","dateModified": "2025-03-09T22:32:09+08:00","publisher": {
             "@type": "Organization",
             "name": ""},"author": {
@@ -114,7 +114,7 @@
             <div class="toc-content" id="toc-content-auto"></div>
         </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Spark内存管理</h1><div class="post-meta">
             <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/spark/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Spark</a>&nbsp;<a href="/categories/%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>内存管理</a></span></div>
-            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-03-09">2025-03-09</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;5637 words&nbsp;
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-03-09">2025-03-09</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;5630 words&nbsp;
                 <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;12 minutes&nbsp;</div>
         </div><div class="details toc" id="toc-static"  data-kept="">
                 <div class="details-summary toc-title">
@@ -239,7 +239,7 @@
 <p>MemoryManager抽象类负责管理内存，在计算和存储之间共享内存，计算内存指在shuffles, joins, sorts and aggregations 中计算过程所使用的内存，而存储内存指被用于缓存或者在集群中传播内部数据所占用的内存，每个JVM只有一个MemoryManager。</p>
 <h4 id="spark内存参数">Spark内存参数</h4>
 <p><code>spark.memory.offHeap.enabled</code> 如果开启，某些计算将使用堆外内存，要求<code>spark.memory.offHeap.size</code>必须为正数，默认关闭</p>
-<p><code>spark.memory.fraction</code> (堆内存 - 300MB)被用于计算和存储的比例，这个值越低，吐磁盘以及缓存驱逐发生的越频繁，这个设置的主要目的是留出空间给内部晕啊数据，用户数据结构以及比如稀疏、不寻常的大内存记录导致的内存估算不准确。默认值为0.6</p>
+<p><code>spark.memory.fraction</code> (堆内存 - 300MB)被用于计算和存储的比例，这个值越低，吐磁盘以及缓存驱逐发生的越频繁，这个设置的主要目的是留出空间给用户数据结构以及比如稀疏、不寻常的大内存记录导致的内存估算不准确。默认值为0.6</p>
 <p><code>spark.memory.offHeap.size</code>指定了spark堆外使用的内存大小</p>
 <p><code>saprk.memory.storageFraction</code>免于驱逐的存储内存占用内存大小，这里表示为<code>spark.memory.fraction</code>留出的内存的百分比。默认为0.5</p>
 <p>堆外内存由<code>spark.memory.offHeap.size</code>规定，堆外存储内存为$spark.memory.offHeap.size * spark.memory.storageFractioin$，剩余的内存为堆外计算内存。</p>

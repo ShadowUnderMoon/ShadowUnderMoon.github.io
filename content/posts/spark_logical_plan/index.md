@@ -328,7 +328,7 @@ private[spark] class PruneDependency[T](rdd: RDD[T], partitionFilterFunc: Int =>
 
 ## 常用transformation数据操作
 
-### map操作
+### map
 
 ```scala
 
@@ -696,4 +696,128 @@ class ShuffledRDD[K: ClassTag, V: ClassTag, C: ClassTag](
 ```
 
 `ShuffledRDD`表示shuffle后的RDD，即重新分区后的数据。
+
+### groupByKey
+
+```scala
+def groupByKey(numPartitions: Int): RDD[(K, Iterable[V])] = self.withScope {
+  groupByKey(new HashPartitioner(numPartitions))
+}
+def groupByKey(partitioner: Partitioner): RDD[(K, Iterable[V])] = self.withScope {
+  // groupByKey shouldn't use map side combine because map side combine does not
+  // reduce the amount of data shuffled and requires all map side data be inserted
+  // into a hash table, leading to more objects in the old gen.
+  val createCombiner = (v: V) => CompactBuffer(v)
+  val mergeValue = (buf: CompactBuffer[V], v: V) => buf += v
+  val mergeCombiners = (c1: CompactBuffer[V], c2: CompactBuffer[V]) => c1 ++= c2
+  val bufs = combineByKeyWithClassTag[CompactBuffer[V]](
+    createCombiner, mergeValue, mergeCombiners, partitioner, mapSideCombine = false)
+  bufs.asInstanceOf[RDD[(K, Iterable[V])]]
+}
+```
+
+将RDD1中的<K, V> record按照key聚合在一起，形成`K, List<V>`，numPartitions表示生成的rdd2的分区个数。`groupByKey`的行为和父RDD的partitioner有关，如果父RDD和生成的子RDD的partitioiner相同，则不需要shuffle，否则需要进行shuffle。假如在这里指定分区数为`3`，子RDD的paritioner为`HashPartitioner(3)`，如果父RDD的partitioner相同，显然没有必要再进行一次shuffle。
+
+```java
+def combineByKeyWithClassTag[C](
+    createCombiner: V => C,
+    mergeValue: (C, V) => C,
+    mergeCombiners: (C, C) => C,
+    partitioner: Partitioner,
+    mapSideCombine: Boolean = true,
+    serializer: Serializer = null)(implicit ct: ClassTag[C]): RDD[(K, C)] = self.withScope {
+  require(mergeCombiners != null, "mergeCombiners must be defined") // required as of Spark 0.9.0
+  // 如果key的类型为数组，则不支持map端聚合以及hash分区
+  if (keyClass.isArray) {
+    if (mapSideCombine) {
+      throw SparkCoreErrors.cannotUseMapSideCombiningWithArrayKeyError()
+    }
+    if (partitioner.isInstanceOf[HashPartitioner]) {
+      throw SparkCoreErrors.hashPartitionerCannotPartitionArrayKeyError()
+    }
+  }
+  val aggregator = new Aggregator[K, V, C](
+    self.context.clean(createCombiner),
+    self.context.clean(mergeValue),
+    self.context.clean(mergeCombiners))
+  // 如果partitioner相同
+  if (self.partitioner == Some(partitioner)) {
+    self.mapPartitions(iter => {
+      // 访问ThreadLocal变量，获取当前的taskContext
+      val context = TaskContext.get()
+      // aggregator创建ExternalAppendOnlyMap，用于实现combiner
+      new InterruptibleIterator(context, aggregator.combineValuesByKey(iter, context))
+    }, preservesPartitioning = true)
+  } else {
+    // parttioner不相同，进行一次shuffle
+    new ShuffledRDD[K, V, C](self, partitioner)
+      .setSerializer(serializer)
+      .setAggregator(aggregator)
+      .setMapSideCombine(mapSideCombine)
+  }
+}
+```
+
+在paritioner相同的情况下，调用了`mapPartitions`方法，实际的操作由`aggregator.combineValuesByKey`实现。
+
+```scala
+@DeveloperApi
+case class Aggregator[K, V, C] (
+    createCombiner: V => C,
+    mergeValue: (C, V) => C,
+    mergeCombiners: (C, C) => C) {
+
+  def combineValuesByKey(
+      iter: Iterator[_ <: Product2[K, V]],
+      context: TaskContext): Iterator[(K, C)] = {
+    val combiners = new ExternalAppendOnlyMap[K, V, C](createCombiner, mergeValue, mergeCombiners)
+    combiners.insertAll(iter)
+    updateMetrics(context, combiners)
+    combiners.iterator
+  }
+
+  def combineCombinersByKey(
+      iter: Iterator[_ <: Product2[K, C]],
+      context: TaskContext): Iterator[(K, C)] = {
+    val combiners = new ExternalAppendOnlyMap[K, C, C](identity, mergeCombiners, mergeCombiners)
+    combiners.insertAll(iter)
+    updateMetrics(context, combiners)
+    combiners.iterator
+  }
+
+  /** Update task metrics after populating the external map. */
+  private def updateMetrics(context: TaskContext, map: ExternalAppendOnlyMap[_, _, _]): Unit = {
+    Option(context).foreach { c =>
+      c.taskMetrics().incMemoryBytesSpilled(map.memoryBytesSpilled)
+      c.taskMetrics().incDiskBytesSpilled(map.diskBytesSpilled)
+      c.taskMetrics().incPeakExecutionMemory(map.peakMemoryUsedBytes)
+    }
+  }
+}
+```
+
+`Aggregator`这个类有三个参数：
+
+- createCombiner 用于从初值创建聚合结果，比如 a -> list[a]
+- mergeValue 将新的值加入聚合结果，比如 b -> list[a, b]
+- mergeCombiners 将两个聚合结果再聚合，比如 [c, d] -> list[a, b, c, d]
+
+可以看到`combineValuesByKey`操作创建了`ExternalAppendOnlyMap`，功能类似于hashmap，聚合操作使用传入的聚合函数，将分区中的所有数据插入map中聚合，`ExternalAppendOnlyMap`实现了吐磁盘，在完成插入后会更新内存的信息，并返回map的迭代器。
+
+### reduceByKey
+
+```scala
+def reduceByKey(func: (V, V) => V, numPartitions: Int): RDD[(K, V)] = self.withScope {
+  reduceByKey(new HashPartitioner(numPartitions), func)
+}
+def reduceByKey(partitioner: Partitioner, func: (V, V) => V): RDD[(K, V)] = self.withScope {
+  combineByKeyWithClassTag[V]((v: V) => v, func, func, partitioner)
+}
+```
+
+`reduceByKey`使用reduce函数按key聚合，在map端先局地combine然后再在reduce端聚合。
+
+`groupByKey`没有map端聚合的原因是即使聚合也不能减少传输的数据量和内存用量。
+
+### aggregateByKey
 
