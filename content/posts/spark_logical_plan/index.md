@@ -821,3 +821,561 @@ def reduceByKey(partitioner: Partitioner, func: (V, V) => V): RDD[(K, V)] = self
 
 ### aggregateByKey
 
+```scala
+def aggregateByKey[U: ClassTag](zeroValue: U, numPartitions: Int)(seqOp: (U, V) => U,
+    combOp: (U, U) => U): RDD[(K, U)] = self.withScope {
+  aggregateByKey(zeroValue, new HashPartitioner(numPartitions))(seqOp, combOp)
+}
+def aggregateByKey[U: ClassTag](zeroValue: U, partitioner: Partitioner)(seqOp: (U, V) => U,
+    combOp: (U, U) => U): RDD[(K, U)] = self.withScope {
+  // Serialize the zero value to a byte array so that we can get a new clone of it on each key
+  val zeroBuffer = SparkEnv.get.serializer.newInstance().serialize(zeroValue)
+  val zeroArray = new Array[Byte](zeroBuffer.limit)
+  zeroBuffer.get(zeroArray)
+
+  lazy val cachedSerializer = SparkEnv.get.serializer.newInstance()
+  val createZero = () => cachedSerializer.deserialize[U](ByteBuffer.wrap(zeroArray))
+
+  // We will clean the combiner closure later in `combineByKey`
+  val cleanedSeqOp = self.context.clean(seqOp)
+  combineByKeyWithClassTag[U]((v: V) => cleanedSeqOp(createZero(), v),
+    cleanedSeqOp, combOp, partitioner)
+}
+```
+
+`aggregateByKey`底层也是调用了`combineByKey`，可以看做是一个更加通用的`reduceByKey`，支持返回类型和value类型不一致，支持map端聚合函数和reduce聚合函数不相同。
+
+### combineByKey
+
+```scala
+def combineByKeyWithClassTag[C](
+    createCombiner: V => C,
+    mergeValue: (C, V) => C,
+    mergeCombiners: (C, C) => C,
+    partitioner: Partitioner,
+    mapSideCombine: Boolean = true,
+    serializer: Serializer = null)(implicit ct: ClassTag[C]): RDD[(K, C)] = self.withScope {
+```
+
+
+
+前述的聚合函数都是基于combineByKey实现的，所以combineByKey也提供了最大的灵活性，比如`aggregateByKey`只能指定初始值，然而`combineByKey`可以通过函数为不同Key指定不同的初始值。
+
+### foldByKey
+
+```scala
+def foldByKey(zeroValue: V, numPartitions: Int)(func: (V, V) => V): RDD[(K, V)] = self.withScope {
+  foldByKey(zeroValue, new HashPartitioner(numPartitions))(func)
+}
+def foldByKey(
+    zeroValue: V,
+    partitioner: Partitioner)(func: (V, V) => V): RDD[(K, V)] = self.withScope {
+  // Serialize the zero value to a byte array so that we can get a new clone of it on each key
+  val zeroBuffer = SparkEnv.get.serializer.newInstance().serialize(zeroValue)
+  val zeroArray = new Array[Byte](zeroBuffer.limit)
+  zeroBuffer.get(zeroArray)
+
+  // When deserializing, use a lazy val to create just one instance of the serializer per task
+  lazy val cachedSerializer = SparkEnv.get.serializer.newInstance()
+  val createZero = () => cachedSerializer.deserialize[V](ByteBuffer.wrap(zeroArray))
+
+  val cleanedFunc = self.context.clean(func)
+  combineByKeyWithClassTag[V]((v: V) => cleanedFunc(createZero(), v),
+    cleanedFunc, cleanedFunc, partitioner)
+}
+```
+
+foldByKey是一个简化的aggregateByKey，seqOp和combineOp共用一个func。
+
+### cogroup/groupWith
+
+```scala
+def cogroup[W](other: RDD[(K, W)]): RDD[(K, (Iterable[V], Iterable[W]))] = self.withScope {
+  cogroup(other, defaultPartitioner(self, other))
+}
+def cogroup[W](other: RDD[(K, W)], partitioner: Partitioner)
+    : RDD[(K, (Iterable[V], Iterable[W]))] = self.withScope {
+  if (partitioner.isInstanceOf[HashPartitioner] && keyClass.isArray) {
+    throw SparkCoreErrors.hashPartitionerCannotPartitionArrayKeyError()
+  }
+  val cg = new CoGroupedRDD[K](Seq(self, other), partitioner)
+  cg.mapValues { case Array(vs, w1s) =>
+    (vs.asInstanceOf[Iterable[V]], w1s.asInstanceOf[Iterable[W]])
+  }
+}
+```
+
+cogroup中文翻译成联合分组，将多个RDD中具有相同Key的Value聚合在一起，假设rdd1包含<K, V> record，rdd2包含<K, W> record，则两者聚合结果为`<K, (List<V>, List<W>)`。这个操作还有另一个名字groupwith。
+
+cogroup操作实际生成了两个RDD，CoGroupedRDD将数据聚合在一起，MapPartitionsRDD仅对结果的数据类型进行转换。
+
+### join
+
+```scala
+def join[W](other: RDD[(K, W)]): RDD[(K, (V, W))] = self.withScope {
+  join(other, defaultPartitioner(self, other))
+}
+def join[W](other: RDD[(K, W)], partitioner: Partitioner): RDD[(K, (V, W))] = self.withScope {
+  this.cogroup(other, partitioner).flatMapValues( pair =>
+    for (v <- pair._1.iterator; w <- pair._2.iterator) yield (v, w)
+  )
+}
+```
+
+join和SQL中的join类似，将两个RDD中相同key的value联接起来，假设rdd1中的数据为<K, V>，rdd2中的数据为<K, W>，那么join之后的结果为<K, (V, W)>。在实现中，join首先调用了`cogroup`生成CoGroupedRDD和MapPartitionedRDD，然后使用flatMapValues计算相同key下value的笛卡尔积。
+
+### cartesian
+
+```scala
+def cartesian[U: ClassTag](other: RDD[U]): RDD[(T, U)] = withScope {
+  new CartesianRDD(sc, this, other)
+}
+```
+
+cartesian操作生成两个RDD的笛卡尔积，假设RDD1中的分区个数为m，rdd2中的分区个数为n，cartesian操作会生成m * n个分区，rdd1和rdd2中的分区两两组合，组合后形成CartesianRDD中的一个分区，该分区中的数据是rdd1和rdd2相应的两个分区中数据的笛卡尔积。
+
+### sortByKey
+
+```scala
+def sortByKey(ascending: Boolean = true, numPartitions: Int = self.partitions.length)
+    : RDD[(K, V)] = self.withScope
+{
+  val part = new RangePartitioner(numPartitions, self, ascending)
+  new ShuffledRDD[K, V, V](self, part)
+    .setKeyOrdering(if (ascending) ordering else ordering.reverse)
+}
+```
+
+sortByKey对rdd1中<K, V> record进行排序，注意只对key进行排序，在相同Key的情况相爱，并不对value进行排序。sortByKey首先通过range划分将数据分布到shuffledRDD的不同分区中，可以保证在生成的RDD中，partition1中的所有record的key小于（或大于）partition2中所有record的key。
+
+### coalesce
+
+```scala
+def coalesce(numPartitions: Int, shuffle: Boolean = false,
+             partitionCoalescer: Option[PartitionCoalescer] = Option.empty)
+            (implicit ord: Ordering[T] = null)
+    : RDD[T] = withScope {
+  require(numPartitions > 0, s"Number of partitions ($numPartitions) must be positive.")
+  if (shuffle) {
+    /** Distributes elements evenly across output partitions, starting from a random partition. */
+    val distributePartition = (index: Int, items: Iterator[T]) => {
+      var position = new XORShiftRandom(index).nextInt(numPartitions)
+      items.map { t =>
+        // Note that the hash code of the key will just be the key itself. The HashPartitioner
+        // will mod it with the number of total partitions.
+        position = position + 1
+        (position, t)
+      }
+    } : Iterator[(Int, T)]
+
+    // include a shuffle step so that our upstream tasks are still distributed
+    new CoalescedRDD(
+      new ShuffledRDD[Int, T, T](
+        mapPartitionsWithIndexInternal(distributePartition, isOrderSensitive = true),
+        new HashPartitioner(numPartitions)),
+      numPartitions,
+      partitionCoalescer).values
+  } else {
+    new CoalescedRDD(this, numPartitions, partitionCoalescer)
+  }
+}
+private[spark] def mapPartitionsWithIndexInternal[U: ClassTag](
+    f: (Int, Iterator[T]) => Iterator[U],
+    preservesPartitioning: Boolean = false,
+    isOrderSensitive: Boolean = false): RDD[U] = withScope {
+  new MapPartitionsRDD(
+    this,
+    (_: TaskContext, index: Int, iter: Iterator[T]) => f(index, iter),
+    preservesPartitioning = preservesPartitioning,
+    isOrderSensitive = isOrderSensitive)
+}
+```
+
+coalesce用于将rdd的分区个数降低或者升高，在不使用shuffle的情况下，会直接生成CoalescedRDD，直接将相邻的分区合并，分区个数只能降低不能升高，当rdd中不同分区中的数据量差别较大时，直接合并容易造成数据倾斜（元素集中于少数分区中）。使用shffule直接解决数据倾斜问题，通过mapPartitionsWithIndex对输出RDD的每个分区进行操作，为原来的记录增加Key，Key是一个Int，对每个分区得到一个随机的起始位置，后续记录的Key是前一条记录的Key + 1，最后使用hash分组时相邻的记录会被分到不同的组。最终生成CoalescedRDD，并丢弃新生成的Key，通过map操作获取原来的记录。
+
+### repartition
+
+```scala
+def repartition(numPartitions: Int)(implicit ord: Ordering[T] = null): RDD[T] = withScope {
+  coalesce(numPartitions, shuffle = true)
+}
+```
+
+repartition操作底层使用了coalesce的shuffle版本。
+
+### repartitionAndSortWithinPartitions
+
+```scala
+def repartitionAndSortWithinPartitions(partitioner: Partitioner): RDD[(K, V)] = self.withScope {
+  if (self.partitioner == Some(partitioner)) {
+    self.mapPartitions(iter => {
+      val context = TaskContext.get()
+      val sorter = new ExternalSorter[K, V, V](context, None, None, Some(ordering))
+      new InterruptibleIterator(context,
+        sorter.insertAllAndUpdateMetrics(iter).asInstanceOf[Iterator[(K, V)]])
+    }, preservesPartitioning = true)
+  } else {
+    new ShuffledRDD[K, V, V](self, partitioner).setKeyOrdering(ordering)
+  }
+}
+```
+
+repartitionAndSortWithinPartitions可以灵活使用各种partitioner对数据进行分区，并且可以对输出RDD中的每个分区中的Key进行排序。这样相比于调用`repartition`然后在每个分区内排序效率更高，因为repartitionAndSortWithinPartitions可以将排序下推到shuffle机制中，注意结果只能保证是分区内有序，不能保证全局有序。
+
+### intersection
+
+```scala
+def intersection(other: RDD[T]): RDD[T] = withScope {
+  this.map(v => (v, null)).cogroup(other.map(v => (v, null)))
+      .filter { case (_, (leftGroup, rightGroup)) => leftGroup.nonEmpty && rightGroup.nonEmpty }
+      .keys
+}
+```
+
+intersection求rdd1和rdd2的交集，输出RDD不包含任何重复的元素。从实现中可以看到，首先通过map函数将record转化为<K, V>类型，V为固定值null，然后通过cogroup将rdd1和rdd2中的record聚合在一起，过滤掉为空的record，最后只保留key，得到交集元素。
+
+### distinct
+
+```java
+def distinct(numPartitions: Int)(implicit ord: Ordering[T] = null): RDD[T] = withScope {
+  def removeDuplicatesInPartition(partition: Iterator[T]): Iterator[T] = {
+    // Create an instance of external append only map which ignores values.
+    val map = new ExternalAppendOnlyMap[T, Null, Null](
+      createCombiner = _ => null,
+      mergeValue = (a, b) => a,
+      mergeCombiners = (a, b) => a)
+    map.insertAll(partition.map(_ -> null))
+    map.iterator.map(_._1)
+  }
+  partitioner match {
+    case Some(_) if numPartitions == partitions.length =>
+      mapPartitions(removeDuplicatesInPartition, preservesPartitioning = true)
+    case _ => map(x => (x, null)).reduceByKey((x, _) => x, numPartitions).map(_._1)
+  }
+}
+```
+
+distinct是去重操作，对rdd中的数据进行去重，如果rdd已经有partitioner并且分区个数和预期分区个数相同，直接走分区内去重的逻辑，通过创建一个ExternalAppendOnlyMap，得到去重后的数据。其他情况下需要走shuffle逻辑，首先将record映射为<K, V>，V为固定值null，然后调用reduceByKey进行聚合，最终只保留key。
+
+### union
+
+```scala
+def union(other: RDD[T]): RDD[T] = withScope {
+  sc.union(this, other)
+}
+def union[T: ClassTag](first: RDD[T], rest: RDD[T]*): RDD[T] = withScope {
+  union(Seq(first) ++ rest)
+}
+def union[T: ClassTag](rdds: Seq[RDD[T]]): RDD[T] = withScope {
+  // 过滤空的RDD
+  val nonEmptyRdds = rdds.filter(!_.partitions.isEmpty)
+  val partitioners = nonEmptyRdds.flatMap(_.partitioner).toSet
+  if (nonEmptyRdds.forall(_.partitioner.isDefined) && partitioners.size == 1) {
+    new PartitionerAwareUnionRDD(this, nonEmptyRdds)
+  } else {
+    new UnionRDD(this, nonEmptyRdds)
+  }
+}
+```
+
+union表示将rdd1和rdd2中的元素合并到一起。如果所有RDD的partitioner都相同，则构造PartitionerAwareUnionRDD，分区个数与rdd1和rdd2的分区个数相同，且输出RDD中每个分区中的数据都是rdd1和rdd2对应分区合并的结果。如果rdd1和rdd2的partitioner不同，合并后的RDD为UnionRDD，分区个数是rdd1和rdd2的分区个数之和，输出RDD中的每个分区也一一对应rdd1或者rdd2中的相应的分区。
+
+### zip
+
+```scala
+def zip[U: ClassTag](other: RDD[U]): RDD[(T, U)] = withScope {
+  zipPartitions(other, preservesPartitioning = false) { (thisIter, otherIter) =>
+    new Iterator[(T, U)] {
+      def hasNext: Boolean = (thisIter.hasNext, otherIter.hasNext) match {
+        case (true, true) => true
+        case (false, false) => false
+        case _ => throw SparkCoreErrors.canOnlyZipRDDsWithSamePartitionSizeError()
+      }
+      def next(): (T, U) = (thisIter.next(), otherIter.next())
+    }
+  }
+}
+```
+
+将rdd1和rdd2中的元素按照一一对应关系连接在一起，构成<K, V> record。该操作要求rdd1和rdd2的分区个数相同，而且每个分区包含的元素个数相同。
+
+### zipParitions
+
+```scala
+def zipPartitions[B: ClassTag, V: ClassTag]
+    (rdd2: RDD[B], preservesPartitioning: Boolean)
+    (f: (Iterator[T], Iterator[B]) => Iterator[V]): RDD[V] = withScope {
+  new ZippedPartitionsRDD2(sc, sc.clean(f), this, rdd2, preservesPartitioning)
+}
+```
+
+zipPartitions将rdd1和rdd2中的分区按照一一对应关系连接在一起，形成新的rdd。新的rdd中的每个分区的数据都通过对rdd1和rdd2中对应分区执行func函数得到，该操作要求rdd1和rdd2的分区个数相同，但不要求每个分区包含相同的元素个数。
+
+### zipWithIndex
+
+```scala
+def zipWithIndex(): RDD[(T, Long)] = withScope {
+  new ZippedWithIndexRDD(this)
+}
+```
+
+对rdd1中的数据进行编号，编号方式是从0开始按序递增，直接返回`ZippedWithIndexRDD`
+
+### zipWtihUniqueId
+
+```scala
+def zipWithUniqueId(): RDD[(T, Long)] = withScope {
+  val n = this.partitions.length.toLong
+  this.mapPartitionsWithIndex { case (k, iter) =>
+    Utils.getIteratorZipWithIndex(iter, 0L).map { case (item, i) =>
+      (item, i * n + k)
+    }
+  }
+}
+def getIteratorZipWithIndex[T](iter: Iterator[T], startIndex: Long): Iterator[(T, Long)] = {
+  new Iterator[(T, Long)] {
+    require(startIndex >= 0, "startIndex should be >= 0.")
+    var index: Long = startIndex - 1L
+    def hasNext: Boolean = iter.hasNext
+    def next(): (T, Long) = {
+      index += 1L
+      (iter.next(), index)
+    }
+  }
+}
+```
+
+对rdd1中的数据进行编号，编号方式为round-robin，就像给每个人轮流发扑克牌，如果某些分区比较小，原本应该分给这个分区的编号会轮空，而不是分配给另一个分区。zipWithUniqueId通过mapPartitionsWithIndex实现，返回MapPartitionsRDD
+
+### subtractByKey
+
+```scala
+def subtractByKey[W: ClassTag](other: RDD[(K, W)]): RDD[(K, V)] = self.withScope {
+  subtractByKey(other, self.partitioner.getOrElse(new HashPartitioner(self.partitions.length)))
+}
+def subtractByKey[W: ClassTag](other: RDD[(K, W)], p: Partitioner): RDD[(K, V)] = self.withScope {
+  new SubtractedRDD[K, V, W](self, other, p)
+}
+```
+
+subtractByKey计算出key在rdd1中而不在rdd2中的record，逻辑类似于cogroup，但实现比CoGroupedRDD更加高效，生成SubtractedRDD。
+
+使用rdd1的paritioner或者分区个数，因为结果集不会大于rdd1
+
+### subtract
+
+```scala
+def subtract(other: RDD[T]): RDD[T] = withScope {
+  subtract(other, partitioner.getOrElse(new HashPartitioner(partitions.length)))
+}
+def subtract(
+    other: RDD[T],
+    p: Partitioner)(implicit ord: Ordering[T] = null): RDD[T] = withScope {
+  if (partitioner == Some(p)) {
+    // Our partitioner knows how to handle T (which, since we have a partitioner, is
+    // really (K, V)) so make a new Partitioner that will de-tuple our fake tuples
+    val p2 = new Partitioner() {
+      override def numPartitions: Int = p.numPartitions
+      override def getPartition(k: Any): Int = p.getPartition(k.asInstanceOf[(Any, _)]._1)
+    }
+    // Unfortunately, since we're making a new p2, we'll get ShuffleDependencies
+    // anyway, and when calling .keys, will not have a partitioner set, even though
+    // the SubtractedRDD will, thanks to p2's de-tupled partitioning, already be
+    // partitioned by the right/real keys (e.g. p).
+    this.map(x => (x, null)).subtractByKey(other.map((_, null)), p2).keys
+  } else {
+    this.map(x => (x, null)).subtractByKey(other.map((_, null)), p).keys
+  }
+}
+```
+
+将record映射为<K, V> record，V为null，是一个比较常见的思路，这样可以复用代码。
+
+### sortBy
+
+```scala
+def sortBy[K](
+    f: (T) => K,
+    ascending: Boolean = true,
+    numPartitions: Int = this.partitions.length)
+    (implicit ord: Ordering[K], ctag: ClassTag[K]): RDD[T] = withScope {
+  this.keyBy[K](f)
+      .sortByKey(ascending, numPartitions)
+      .values
+}
+def keyBy[K](f: T => K): RDD[(K, T)] = withScope {
+  val cleanedF = sc.clean(f)
+  map(x => (cleanedF(x), x))
+}
+```
+
+sortBy基于func的计算结果对rdd1中的recorc进行排序，底层使用sortByKey实现。
+
+### glom
+
+```scala
+def glom(): RDD[Array[T]] = withScope {
+  new MapPartitionsRDD[Array[T], T](this, (_, _, iter) => Iterator(iter.toArray))
+}
+```
+
+将rdd1中的每个分区的record合并到一个list中，底层通过MapPartitionsRDD实现。
+
+## 常用action数据操作
+
+action数据操作是用来对计算结果进行后处理，同时提交计算job。可以通过返回值区分一个操作是action还是transformation，transformation操作一般返回RDD类型，而action操作一般返回数值、数据结果（如Map）或者不返回任何值（比如写磁盘）。
+
+### count
+
+```scala
+def count(): Long = sc.runJob(this, Utils.getIteratorSize _).sum
+def getIteratorSize(iterator: Iterator[_]): Long = {
+  if (iterator.knownSize >= 0) iterator.knownSize.toLong
+  else {
+    var count = 0L
+    while (iterator.hasNext) {
+      count += 1L
+      iterator.next()
+    }
+    count
+  }
+}
+```
+
+count操作首先计算每个分区中record的数目，然后在Driver端进行累加操作，返回rdd中包含的record个数。
+
+### countByKey
+
+```scala
+def countByKey(): Map[K, Long] = self.withScope {
+  self.mapValues(_ => 1L).reduceByKey(_ + _).collect().toMap
+}
+```
+
+countByKey统计rdd中每个key出现的次数，返回一个map，要求rdd是<K, V>类型。countByKey首先通过mapValues将<K, V> record中的Value设置为1，然后利用reduceByKey统计每个key出现的次数，最后使用`collect`方法将结果收集到Driver端。
+
+### countByValue
+
+```scala
+def countByValue()(implicit ord: Ordering[T] = null): Map[T, Long] = withScope {
+  map(value => (value, null)).countByKey()
+}
+```
+
+countByValue并不是统计<K, V> record中每个Value出现的次数，而是统计每个record出现的次数。底层首先通过map函数将record转成<K, V> record，Value为null，然后调用countByKey统计Key的次数。
+
+### collect
+
+```scala
+def collect(): Array[T] = withScope {
+  val results = sc.runJob(this, (iter: Iterator[T]) => iter.toArray)
+  import org.apache.spark.util.ArrayImplicits._
+  Array.concat(results.toImmutableArraySeq: _*)
+}
+```
+
+collect操作将rdd中的record收集到Driver端，返回类型为`Array[T]`
+
+### collectAsMap
+
+```scala
+def collectAsMap(): Map[K, V] = self.withScope {
+  val data = self.collect()
+  val map = new mutable.HashMap[K, V]
+  map.sizeHint(data.length)
+  data.foreach { pair => map.put(pair._1, pair._2) }
+  map
+}
+```
+
+collectAsMap通过collect调用将<K, V> record收集到Driver端。
+
+### foreach
+
+```scala
+def foreach(f: T => Unit): Unit = withScope {
+  val cleanF = sc.clean(f)
+  sc.runJob(this, (iter: Iterator[T]) => iter.foreach(cleanF))
+}
+```
+
+将rdd中的每个record按照func进行处理，底层调用runJob。
+
+### foreachPartitions
+
+```scala
+def foreachPartition(f: Iterator[T] => Unit): Unit = withScope {
+  val cleanF = sc.clean(f)
+  sc.runJob(this, (iter: Iterator[T]) => cleanF(iter))
+}
+```
+
+将rdd中的每个分区中的数据按照func进行处理，底层调用runJob。
+
+### fold
+
+```scala
+def fold(zeroValue: T)(op: (T, T) => T): T = withScope {
+  // Clone the zero value since we will also be serializing it as part of tasks
+  var jobResult = Utils.clone(zeroValue, sc.env.closureSerializer.newInstance())
+  val cleanOp = sc.clean(op)
+  val foldPartition = (iter: Iterator[T]) => iter.fold(zeroValue)(cleanOp)
+  val mergeResult = (_: Int, taskResult: T) => jobResult = op(jobResult, taskResult)
+  sc.runJob(this, foldPartition, mergeResult)
+  jobResult
+}
+```
+
+fold将rdd中的record按照func进行聚合，首先在rdd的每个分区中计算出局部结果即函数`foldPartition`，然后在Driver段将局部结果聚合成最终结果即函数`mergeResult`。需要注意的是，fold每次聚合是初始值zeroValue都会参与计算。
+
+### reduce
+
+```scala
+def reduce(f: (T, T) => T): T = withScope {
+  val cleanF = sc.clean(f)
+  val reducePartition: Iterator[T] => Option[T] = iter => {
+    if (iter.hasNext) {
+      Some(iter.reduceLeft(cleanF))
+    } else {
+      None
+    }
+  }
+  var jobResult: Option[T] = None
+  val mergeResult = (_: Int, taskResult: Option[T]) => {
+    if (taskResult.isDefined) {
+      jobResult = jobResult match {
+        case Some(value) => Some(f(value, taskResult.get))
+        case None => taskResult
+      }
+    }
+  }
+  sc.runJob(this, reducePartition, mergeResult)
+  // Get the final result out of our Option, or throw an exception if the RDD was empty
+  jobResult.getOrElse(throw SparkCoreErrors.emptyCollectionError())
+}
+```
+
+将rdd中的record按照func进行聚合，这里没有提供初始值，所以需要处理空值的情况。
+
+### aggregate
+
+```scala
+def aggregate[U: ClassTag](zeroValue: U)(seqOp: (U, T) => U, combOp: (U, U) => U): U = withScope {
+  // Clone the zero value since we will also be serializing it as part of tasks
+  var jobResult = Utils.clone(zeroValue, sc.env.serializer.newInstance())
+  val cleanSeqOp = sc.clean(seqOp)
+  val aggregatePartition = (it: Iterator[T]) => it.foldLeft(zeroValue)(cleanSeqOp)
+  val mergeResult = (_: Int, taskResult: U) => jobResult = combOp(jobResult, taskResult)
+  sc.runJob(this, aggregatePartition, mergeResult)
+  jobResult
+}
+```
+
+将rdd中的record按照func进行聚合，这里提供了初始值，分区聚合和Driver端聚合都会使用初始值。
+
+为什么已经有了reduceByKey、aggregateByKey等操作，还要定义aggreagte和reduce等操作呢？虽然reduceByKey、aggregateByKey等操作可以对每个分区中的record，以及跨分区且具有相同Key的record进行聚合，但这些聚合都是在部分数据上，类似于`<K, func(list(V))`，而不是针对所有record进行全局聚合，即`func(<K, list(V))`。
+
+然而aggregate、reduce等操作存在相同的问题，当需要merge的部分结果很大时，数据传输量很大，而且Driver是单点merge，存在效率和内存空间限制的问题，为了解决这个问题，Spark对这些聚合操作进行了优化，提出了treeAggregate和treeReduce操作。
+
+### treeAggregate
+
