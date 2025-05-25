@@ -3,7 +3,16 @@
         <title>All Posts - 爱吃芒果</title>
         <link>http://example.org/posts/</link>
         <description>All Posts | 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Tue, 13 May 2025 22:33:46 &#43;0800</lastBuildDate><atom:link href="http://example.org/posts/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 25 May 2025 11:16:21 &#43;0800</lastBuildDate><atom:link href="http://example.org/posts/" rel="self" type="application/rss+xml" /><item>
+    <title>Spark物理执行计划</title>
+    <link>http://example.org/posts/spark_physical_plan/</link>
+    <pubDate>Sun, 25 May 2025 11:16:21 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://example.org/posts/spark_physical_plan/</guid>
+    <description><![CDATA[<h2 id="spark物理执行计划生成方法">Spark物理执行计划生成方法</h2>
+<p>Spark具体采用3个步骤来生成物理执行计划，首先根据action操作顺序将应用划分为作业（job），然后根据每个job的逻辑处理流程中的ShuffleDependency依赖关系，将job划分为执行阶段（stage）。最后在每个stage中，根据最后生成的RDD的分区个数生成多个计算任务（task）。</p>]]></description>
+</item>
+<item>
     <title>Grpc Metric</title>
     <link>http://example.org/posts/grpc-metric/</link>
     <pubDate>Tue, 13 May 2025 22:33:46 &#43;0800</pubDate>
@@ -116,25 +125,6 @@
     <description><![CDATA[<h2 id="pods">Pods</h2>
 <p>Pod 是 Kubernetes 中最小的可部署计算单元，你可以创建和管理它们。</p>
 <p><strong>Pod（类似于一群鲸鱼的“pod”或豌豆荚“pea pod”）</strong> 是一组一个或多个容器，这些容器共享存储和网络资源，并且有一个规范来定义如何运行它们。Pod 内部的内容始终是 <strong>共同调度（co-scheduled）并在相同的上下文中运行</strong> 的。Pod 充当一个特定应用的“<strong>逻辑主机</strong>”（logical host）：它包含一个或多个 <strong>相对紧密耦合的应用容器</strong>。在非云环境下，运行在同一台物理机或虚拟机上的应用程序，可以类比于在 Kubernetes 中运行在同一逻辑主机上的应用。</p>]]></description>
-</item>
-<item>
-    <title>Prometheus_and_grafana</title>
-    <link>http://example.org/posts/prometheus_and_grafana/</link>
-    <pubDate>Sat, 01 Feb 2025 19:42:56 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/prometheus_and_grafana/</guid>
-    <description><![CDATA[<h2 id="prometheus">Prometheus</h2>
-<p><a href="https://www.youtube.com/watch?v=h4Sl21AKiDg" target="_blank" rel="noopener noreffer ">https://www.youtube.com/watch?v=h4Sl21AKiDg</a></p>
-<p></p>
-<p></p>
-<p></p>
-<p></p>
-<p></p>
-<p></p>
-<p>Prometheus Server, Pushgateway, Alertmanager</p>
-<p><a href="https://prometheus.io/docs/concepts/metric_types/" target="_blank" rel="noopener noreffer ">https://prometheus.io/docs/concepts/metric_types/</a></p>
-<p><a href="https://itnext.io/prometheus-for-beginners-5f20c2e89b6c" target="_blank" rel="noopener noreffer ">https://itnext.io/prometheus-for-beginners-5f20c2e89b6c</a></p>
-<p><strong>Prometheus is essentially just another metrics collection and analysis tool,</strong> and at its core it is made up of 3 components:</p>]]></description>
 </item>
 </channel>
 </rss>

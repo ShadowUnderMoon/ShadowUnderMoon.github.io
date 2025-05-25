@@ -3,20 +3,20 @@
         <title>Categories - Category - 爱吃芒果</title>
         <link>http://example.org/categories/</link>
         <description>Categories - Category - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Tue, 13 May 2025 22:33:46 &#43;0800</lastBuildDate><atom:link href="http://example.org/categories/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 25 May 2025 11:16:21 &#43;0800</lastBuildDate><atom:link href="http://example.org/categories/" rel="self" type="application/rss+xml" /><item>
+    <title>Spark</title>
+    <link>http://example.org/categories/spark/</link>
+    <pubDate>Sun, 25 May 2025 11:16:21 &#43;0800</pubDate>
+    <author>xxxx</author>
+    <guid>http://example.org/categories/spark/</guid>
+    <description><![CDATA[]]></description>
+</item>
+<item>
     <title>Grpc</title>
     <link>http://example.org/categories/grpc/</link>
     <pubDate>Tue, 13 May 2025 22:33:46 &#43;0800</pubDate>
     <author>xxxx</author>
     <guid>http://example.org/categories/grpc/</guid>
-    <description><![CDATA[]]></description>
-</item>
-<item>
-    <title>Spark</title>
-    <link>http://example.org/categories/spark/</link>
-    <pubDate>Sun, 11 May 2025 15:20:27 &#43;0800</pubDate>
-    <author>xxxx</author>
-    <guid>http://example.org/categories/spark/</guid>
     <description><![CDATA[]]></description>
 </item>
 <item>

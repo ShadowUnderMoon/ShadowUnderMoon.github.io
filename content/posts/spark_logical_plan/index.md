@@ -1379,3 +1379,393 @@ def aggregate[U: ClassTag](zeroValue: U)(seqOp: (U, T) => U, combOp: (U, U) => U
 
 ### treeAggregate
 
+```scala
+def treeAggregate[U: ClassTag](zeroValue: U)(
+    seqOp: (U, T) => U,
+    combOp: (U, U) => U,
+    depth: Int = 2): U = withScope {
+    treeAggregate(zeroValue, seqOp, combOp, depth, finalAggregateOnExecutor = false)
+}
+def treeAggregate[U: ClassTag](
+    zeroValue: U,
+    seqOp: (U, T) => U,
+    combOp: (U, U) => U,
+    depth: Int,
+    finalAggregateOnExecutor: Boolean): U = withScope {
+    require(depth >= 1, s"Depth must be greater than or equal to 1 but got $depth.")
+  if (partitions.length == 0) {
+    Utils.clone(zeroValue, context.env.closureSerializer.newInstance())
+  } else {
+    val cleanSeqOp = context.clean(seqOp)
+    val cleanCombOp = context.clean(combOp)
+    val aggregatePartition =
+      (it: Iterator[T]) => it.foldLeft(zeroValue)(cleanSeqOp)
+    var partiallyAggregated: RDD[U] = mapPartitions(it => Iterator(aggregatePartition(it)))
+    var numPartitions = partiallyAggregated.partitions.length
+    val scale = math.max(math.ceil(math.pow(numPartitions, 1.0 / depth)).toInt, 2)
+    // If creating an extra level doesn't help reduce
+    // the wall-clock time, we stop tree aggregation.
+
+    // Don't trigger TreeAggregation when it doesn't save wall-clock time
+    while (numPartitions > scale + math.ceil(numPartitions.toDouble / scale)) {
+      numPartitions /= scale
+      val curNumPartitions = numPartitions
+      partiallyAggregated = partiallyAggregated.mapPartitionsWithIndex {
+        (i, iter) => iter.map((i % curNumPartitions, _))
+      }.foldByKey(zeroValue, new HashPartitioner(curNumPartitions))(cleanCombOp).values
+    }
+    if (finalAggregateOnExecutor && partiallyAggregated.partitions.length > 1) {
+      // map the partially aggregated rdd into a key-value rdd
+      // do the computation in the single executor with one partition
+      // get the new RDD[U]
+      partiallyAggregated = partiallyAggregated
+        .map(v => (0.toByte, v))
+        .foldByKey(zeroValue, new ConstantPartitioner)(cleanCombOp)
+        .values
+    }
+    val copiedZeroValue = Utils.clone(zeroValue, sc.env.closureSerializer.newInstance())
+    partiallyAggregated.fold(copiedZeroValue)(cleanCombOp)
+  }
+}
+
+```
+
+treeAggreagte是为了解决aggregate在Driver端聚合导致的数据传输量大、单点merge、内存空间限制等问题，思路类似于归并排序的层次归并，每层都将分区数目降低为原来的`1/scale`，也就是一颗近似完美的平衡树，让每层每个节点的负载都相对合理。我们可以在参数中指定depth，假设分区数量为N，则近似有`N / (scale^depth) = 1`。当然Spark在何时停止局部聚合做了优化，平衡效率和开销，选择在`numPartitions > scale + math.ceil(numPartitions.toDouble / scale`时停止局部聚合，`numPartitions`表示当前分区数，`numParttions/scale`表示如果继续局部聚合下一层的分区数，为什么会有一个额外的`scale`，我认为应该是为了避免极端情况，比如分区数为2，scale为2， 那么如果没有额外的scale作为成本，这里会继续局部聚合，然后有了额外的scale。
+
+实现上局部聚合使用了foldByKey，尽管形式上使用了ShuffleDependency，但是由于每个分区中只有一条记录，实际数据传输时类似于多对一的NarrowDependency。
+
+### treeReduce
+
+treeReduce是reduce的优化版本。底层实际上调用了treeAggregate。
+
+```scala
+def treeReduce(f: (T, T) => T, depth: Int = 2): T = withScope {
+  require(depth >= 1, s"Depth must be greater than or equal to 1 but got $depth.")
+  val cleanF = context.clean(f)
+  val reducePartition: Iterator[T] => Option[T] = iter => {
+    if (iter.hasNext) {
+      Some(iter.reduceLeft(cleanF))
+    } else {
+      None
+    }
+  }
+  val partiallyReduced = mapPartitions(it => Iterator(reducePartition(it)))
+  val op: (Option[T], Option[T]) => Option[T] = (c, x) => {
+    if (c.isDefined && x.isDefined) {
+      Some(cleanF(c.get, x.get))
+    } else if (c.isDefined) {
+      c
+    } else if (x.isDefined) {
+      x
+    } else {
+      None
+    }
+  }
+  partiallyReduced.treeAggregate(Option.empty[T])(op, op, depth)
+    .getOrElse(throw SparkCoreErrors.emptyCollectionError())
+}
+```
+
+### reduceByKeyLocally
+
+```scala
+def reduceByKeyLocally(func: (V, V) => V): Map[K, V] = self.withScope {
+  val cleanedF = self.sparkContext.clean(func)
+
+  if (keyClass.isArray) {
+    throw SparkCoreErrors.reduceByKeyLocallyNotSupportArrayKeysError()
+  }
+
+  val reducePartition = (iter: Iterator[(K, V)]) => {
+    val map = new JHashMap[K, V]
+    iter.foreach { pair =>
+      val old = map.get(pair._1)
+      map.put(pair._1, if (old == null) pair._2 else cleanedF(old, pair._2))
+    }
+    Iterator(map)
+  } : Iterator[JHashMap[K, V]]
+
+  val mergeMaps = (m1: JHashMap[K, V], m2: JHashMap[K, V]) => {
+    m2.asScala.foreach { pair =>
+      val old = m1.get(pair._1)
+      m1.put(pair._1, if (old == null) pair._2 else cleanedF(old, pair._2))
+    }
+    m1
+  } : JHashMap[K, V]
+
+  self.mapPartitions(reducePartition).reduce(mergeMaps).asScala
+}
+```
+
+reduceByKeyLocally首先在rdd的各个分区中进行聚合，并使用HashMap来存储聚合结果，然后将数据汇总到Driver端进行全局聚合，仍然是将聚合结果存在到HashMap。
+
+### take
+
+```scala
+def take(num: Int): Array[T] = withScope {
+  val scaleUpFactor = Math.max(conf.get(RDD_LIMIT_SCALE_UP_FACTOR), 2)
+  if (num == 0) {
+    new Array[T](0)
+  } else {
+    val buf = new ArrayBuffer[T]
+    val totalParts = this.partitions.length
+    var partsScanned = 0
+    while (buf.size < num && partsScanned < totalParts) {
+      // The number of partitions to try in this iteration. It is ok for this number to be
+      // greater than totalParts because we actually cap it at totalParts in runJob.
+      var numPartsToTry = conf.get(RDD_LIMIT_INITIAL_NUM_PARTITIONS)
+      val left = num - buf.size
+      if (partsScanned > 0) {
+        // If we didn't find any rows after the previous iteration, multiply by
+        // limitScaleUpFactor and retry. Otherwise, interpolate the number of partitions we need
+        // to try, but overestimate it by 50%. We also cap the estimation in the end.
+        if (buf.isEmpty) {
+          numPartsToTry = partsScanned * scaleUpFactor
+        } else {
+          // As left > 0, numPartsToTry is always >= 1
+          numPartsToTry = Math.ceil(1.5 * left * partsScanned / buf.size).toInt
+          numPartsToTry = Math.min(numPartsToTry, partsScanned * scaleUpFactor)
+        }
+      }
+
+      val p = partsScanned.until(math.min(partsScanned + numPartsToTry, totalParts))
+      val res = sc.runJob(this, (it: Iterator[T]) => it.take(left).toArray, p)
+
+      res.foreach(buf ++= _.take(num - buf.size))
+      partsScanned += p.size
+    }
+
+    buf.toArray
+  }
+}
+```
+
+take表示从rdd中取出前num个record。take操作首先取出rdd中第一个分区的前num个record，如果num大于partition1中record的总数，则take会继续从后续的分区中取出record，为了提高效率，spark会根据前面分区分区的平均大小估计后续需要取几个分区来满足take的需求。
+
+### first
+
+```scala
+def first(): T = withScope {
+  take(1) match {
+    case Array(t) => t
+    case _ => throw SparkCoreErrors.emptyCollectionError()
+  }
+}
+```
+
+只取出rdd中的第一个record。底层通过take(1)实现。
+
+### takeOrdered
+
+```scala
+def takeOrdered(num: Int)(implicit ord: Ordering[T]): Array[T] = withScope {
+  if (num == 0 || this.getNumPartitions == 0) {
+    Array.empty
+  } else {
+    this.mapPartitionsWithIndex { case (pid, iter) =>
+      if (iter.nonEmpty) {
+        // Priority keeps the largest elements, so let's reverse the ordering.
+        Iterator.single(collectionUtils.takeOrdered(iter, num)(ord).toArray)
+      } else if (pid == 0) {
+        // make sure partition 0 always returns an array to avoid reduce on empty RDD
+        Iterator.single(Array.empty[T])
+      } else {
+        Iterator.empty
+      }
+    }.reduce { (array1, array2) =>
+      val size = math.min(num, array1.length + array2.length)
+      val array = Array.ofDim[T](size)
+      collectionUtils.mergeOrdered[T](Seq(array1, array2))(ord).copyToArray(array, 0, size)
+      array
+    }
+  }
+}
+```
+
+取出rdd中最小的num个record。首先使用mapPartitionsWithIndex在每个分区中找出最小的num个record，因为全局最小的n个元素一定是每个分区中最小的n个元素的子集，然后通过reduce操作将这些record收集到Driver段，进行排序，然后取出前num个record。
+
+### top
+
+```scala
+def top(num: Int)(implicit ord: Ordering[T]): Array[T] = withScope {
+  takeOrdered(num)(ord.reverse)
+}
+```
+
+取出rdd中最大的num个record。底层通过takeOrdered实现。
+
+### max/min
+
+```scala
+def max()(implicit ord: Ordering[T]): T = withScope {
+  this.reduce(ord.max)
+}
+def min()(implicit ord: Ordering[T]): T = withScope {
+  this.reduce(ord.min)
+}
+```
+
+返回rdd中的最大、最小值。底层基于reduce实现。
+
+### isEmpty
+
+```scala
+def isEmpty(): Boolean = withScope {
+  partitions.length == 0 || take(1).length == 0
+}
+```
+
+判断rdd是否为空，如果rdd不包含任何record，则返回true。如果分区数为0，则rdd一定为空，分区数大于0并不意味着rdd一定不为空，需要通过`take(1)`判断是否有数据。如果对rdd执行一些数据操作，比如过滤、求交集等，rdd为空的话，那么执行其他操作也一定为空，因此，提前判断rdd是否为空，可以避免提交冗余的job。
+
+### lookup
+
+```scala
+def lookup(key: K): Seq[V] = self.withScope {
+  self.partitioner match {
+    case Some(p) =>
+      val index = p.getPartition(key)
+      val process = (it: Iterator[(K, V)]) => {
+        val buf = new ArrayBuffer[V]
+        for (pair <- it if pair._1 == key) {
+          buf += pair._2
+        }
+        buf.toSeq
+      } : Seq[V]
+      val res = self.context.runJob(self, process, Array(index).toImmutableArraySeq)
+      res(0)
+    case None =>
+      self.filter(_._1 == key).map(_._2).collect().toImmutableArraySeq
+  }
+}
+```
+
+loopup函数找出rdd中包含特定key的value，将这些value形成List。loopup首先过滤出给定key的record，然后使用map得到相应的value，最后使用collect将这些value收集到Driver端形成list。如果rdd的partitioner已经确定，那么在过滤前，通过getPartition确定key所在的分区，减少操作的数据量。
+
+### saveAsTextFile
+
+```scala
+def saveAsTextFile(path: String): Unit = withScope {
+  saveAsTextFile(path, null)
+}
+def saveAsTextFile(path: String, codec: Class[_ <: CompressionCodec]): Unit = withScope {
+  this.mapPartitions { iter =>
+    val text = new Text()
+    iter.map { x =>
+      require(x != null, "text files do not allow null rows")
+      text.set(x.toString)
+      (NullWritable.get(), text)
+    }
+  }.saveAsHadoopFile[TextOutputFormat[NullWritable, Text]](path, codec)
+}
+```
+
+saveAsTextFile将rdd保存成文本文件，通过toString操作获取record的字符串形式，然后将record转化为<NullWriter, Text>类型，NullWriter的意思是控血，也就是每条输出数据只包含类似为文本的Value。底层调用saveAsHadoopFile。
+
+### saveAsObjectFile
+
+```scala
+def saveAsObjectFile(path: String): Unit = withScope {
+  this.mapPartitions(iter => iter.grouped(10).map(_.toArray))
+    .map(x => (NullWritable.get(), new BytesWritable(Utils.serialize(x))))
+    .saveAsSequenceFile(path)
+}
+```
+
+saveAsObjectFile将rdd保存为序列化对象形式的SequenceFile，针对普通对象类型，将record惊醒序列化，并且以每10个record为1组转化为`SequenceFile<NullableWritable, Array[Object]>`，调用saveAsSequenceFile将文件写入HDFS中。
+
+### saveAsSequenceFile
+
+```scala
+def saveAsSequenceFile(
+    path: String,
+    codec: Option[Class[_ <: CompressionCodec]] = None): Unit = self.withScope {
+  def anyToWritable[U: IsWritable](u: U): Writable = u
+
+  // TODO We cannot force the return type of `anyToWritable` be same as keyWritableClass and
+  // valueWritableClass at the compile time. To implement that, we need to add type parameters to
+  // SequenceFileRDDFunctions. however, SequenceFileRDDFunctions is a public class so it will be a
+  // breaking change.
+  val convertKey = self.keyClass != _keyWritableClass
+  val convertValue = self.valueClass != _valueWritableClass
+
+  logInfo(log"Saving as sequence file of type " +
+    log"(${MDC(LogKeys.KEY, _keyWritableClass.getSimpleName)}," +
+    log"${MDC(LogKeys.VALUE, _valueWritableClass.getSimpleName)})")
+  val format = classOf[SequenceFileOutputFormat[Writable, Writable]]
+  val jobConf = new JobConf(self.context.hadoopConfiguration)
+  if (!convertKey && !convertValue) {
+    self.saveAsHadoopFile(path, _keyWritableClass, _valueWritableClass, format, jobConf, codec)
+  } else if (!convertKey && convertValue) {
+    self.map(x => (x._1, anyToWritable(x._2))).saveAsHadoopFile(
+      path, _keyWritableClass, _valueWritableClass, format, jobConf, codec)
+  } else if (convertKey && !convertValue) {
+    self.map(x => (anyToWritable(x._1), x._2)).saveAsHadoopFile(
+      path, _keyWritableClass, _valueWritableClass, format, jobConf, codec)
+  } else if (convertKey && convertValue) {
+    self.map(x => (anyToWritable(x._1), anyToWritable(x._2))).saveAsHadoopFile(
+      path, _keyWritableClass, _valueWritableClass, format, jobConf, codec)
+  }
+}
+```
+
+saveAsSequenceFile将rdd保存为SequenceFile形式的文件，针对<K, V> 类型的record，将record进行序列化后，以SequenceFile形式写入分布式文件系统中，底层调用saveAsHadoopFile实现。
+
+### saveAsHadoopFile
+
+```scala
+def saveAsHadoopFile(
+    path: String,
+    keyClass: Class[_],
+    valueClass: Class[_],
+    outputFormatClass: Class[_ <: OutputFormat[_, _]],
+    conf: JobConf = new JobConf(self.context.hadoopConfiguration),
+    codec: Option[Class[_ <: CompressionCodec]] = None): Unit = self.withScope {
+  // Rename this as hadoopConf internally to avoid shadowing (see SPARK-2038).
+  val hadoopConf = conf
+  hadoopConf.setOutputKeyClass(keyClass)
+  hadoopConf.setOutputValueClass(valueClass)
+  conf.setOutputFormat(outputFormatClass)
+  for (c <- codec) {
+    hadoopConf.setCompressMapOutput(true)
+    hadoopConf.set("mapreduce.output.fileoutputformat.compress", "true")
+    hadoopConf.setMapOutputCompressorClass(c)
+    hadoopConf.set("mapreduce.output.fileoutputformat.compress.codec", c.getCanonicalName)
+    hadoopConf.set("mapreduce.output.fileoutputformat.compress.type",
+      CompressionType.BLOCK.toString)
+  }
+
+  // Use configured output committer if already set
+  if (conf.getOutputCommitter == null) {
+    hadoopConf.setOutputCommitter(classOf[FileOutputCommitter])
+  }
+
+  // When speculation is on and output committer class name contains "Direct", we should warn
+  // users that they may loss data if they are using a direct output committer.
+  val speculationEnabled = self.conf.get(SPECULATION_ENABLED)
+  val outputCommitterClass = hadoopConf.get("mapred.output.committer.class", "")
+  if (speculationEnabled && outputCommitterClass.contains("Direct")) {
+    val warningMessage =
+      log"${MDC(CLASS_NAME, outputCommitterClass)} " +
+        log"may be an output committer that writes data directly to " +
+        log"the final location. Because speculation is enabled, this output committer may " +
+        log"cause data loss (see the case in SPARK-10063). If possible, please use an output " +
+        log"committer that does not have this behavior (e.g. FileOutputCommitter)."
+    logWarning(warningMessage)
+  }
+
+  FileOutputFormat.setOutputPath(hadoopConf,
+    SparkHadoopWriterUtils.createPathFromString(path, hadoopConf))
+  saveAsHadoopDataset(hadoopConf)
+}
+def saveAsHadoopDataset(conf: JobConf): Unit = self.withScope {
+  val config = new HadoopMapRedWriteConfigUtil[K, V](new SerializableJobConf(conf))
+  SparkHadoopWriter.write(
+    rdd = self,
+    config = config)
+}
+```
+
+saveAsHadoopFile将rdd保存为Haddop HDFS文件系统支持的文件，进行必要的初始化和配置后，通过`SparkHadoopWriter`将rdd写入hadoop中。
+
+
+

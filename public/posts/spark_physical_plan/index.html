@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noodp" />
+        <title>Spark物理执行计划 - 爱吃芒果</title><meta name="Description" content="This is my cool site"><meta property="og:url" content="http://example.org/posts/spark_physical_plan/">
+  <meta property="og:site_name" content="爱吃芒果">
+  <meta property="og:title" content="Spark物理执行计划">
+  <meta property="og:description" content="Spark物理执行计划生成方法 Spark具体采用3个步骤来生成物理执行计划，首先根据action操作顺序将应用划分为作业（job），然后根据每个job的逻辑处理流程中的ShuffleDependency依赖关系，将job划分为执行阶段（stage）。最后在每个stage中，根据最后生成的RDD的分区个数生成多个计算任务（task）。">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-05-25T11:16:21+08:00">
+    <meta property="article:modified_time" content="2025-05-25T11:16:21+08:00">
+    <meta property="article:tag" content="Spark">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Spark物理执行计划">
+  <meta name="twitter:description" content="Spark物理执行计划生成方法 Spark具体采用3个步骤来生成物理执行计划，首先根据action操作顺序将应用划分为作业（job），然后根据每个job的逻辑处理流程中的ShuffleDependency依赖关系，将job划分为执行阶段（stage）。最后在每个stage中，根据最后生成的RDD的分区个数生成多个计算任务（task）。">
+<meta name="application-name" content="My cool site">
+<meta name="apple-mobile-web-app-title" content="My cool site">
+<meta name="referrer" content="no-referrer" /><meta name="theme-color" content="#ffffff"><meta name="msapplication-TileColor" content="#da532c"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/spark_physical_plan/" /><link rel="prev" href="http://example.org/posts/grpc-metric/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css"></noscript><link rel="preload" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css"></noscript><script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "headline": "Spark物理执行计划",
+        "inLanguage": "zh-CN",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "http:\/\/example.org\/posts\/spark_physical_plan\/"
+        },"genre": "posts","keywords": "Spark","wordcount":  3962 ,
+        "url": "http:\/\/example.org\/posts\/spark_physical_plan\/","datePublished": "2025-05-25T11:16:21+08:00","dateModified": "2025-05-25T11:16:21+08:00","publisher": {
+            "@type": "Organization",
+            "name": ""},"author": {
+                "@type": "Person",
+                "name": "爱吃芒果"
+            },"description": ""
+    }
+    </script></head>
+    <body data-header-desktop="fixed" data-header-mobile="auto"><script>(window.localStorage && localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : ('auto' === 'auto' ? window.matchMedia('(prefers-color-scheme: dark)').matches : 'auto' === 'dark')) && document.body.setAttribute('theme', 'dark');</script>
+
+        <div id="mask"></div><div class="wrapper"><header class="desktop" id="header-desktop">
+    <div class="header-wrapper">
+        <div class="header-title">
+            <a href="/" title="爱吃芒果">My cool site</a>
+        </div>
+        <div class="menu">
+            <div class="menu-inner"><a class="menu-item" href="/posts/"> 文章 </a><a class="menu-item" href="/page/archives/" title="Archives"> Archives </a><a class="menu-item" href="/tags/"> 标签 </a><a class="menu-item" href="/page/search/" title="Search"> Search </a><a class="menu-item" href="/categories/"> 分类 </a><span class="menu-item delimiter"></span><span class="menu-item search" id="search-desktop">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-desktop">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-desktop" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-desktop" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-desktop">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </span><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                    <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+                </a></div>
+        </div>
+    </div>
+</header><header class="mobile" id="header-mobile">
+    <div class="header-container">
+        <div class="header-wrapper">
+            <div class="header-title">
+                <a href="/" title="爱吃芒果">My cool site</a>
+            </div>
+            <div class="menu-toggle" id="menu-toggle-mobile">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div class="menu" id="menu-mobile"><div class="search-wrapper">
+                    <div class="search mobile" id="search-mobile">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-mobile">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-mobile" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-mobile" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-mobile">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </div>
+                    <a href="javascript:void(0);" class="search-cancel" id="search-cancel-mobile">
+                        Cancel
+                    </a>
+                </div><a class="menu-item" href="/posts/" title="">文章</a><a class="menu-item" href="/page/archives/" title="Archives">Archives</a><a class="menu-item" href="/tags/" title="">标签</a><a class="menu-item" href="/page/search/" title="Search">Search</a><a class="menu-item" href="/categories/" title="">分类</a><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+            </a></div>
+    </div>
+</header><div class="search-dropdown desktop">
+        <div id="search-dropdown-desktop"></div>
+    </div>
+    <div class="search-dropdown mobile">
+        <div id="search-dropdown-mobile"></div>
+    </div><main class="main">
+                <div class="container"><div class="toc" id="toc-auto">
+            <h2 class="toc-title">Contents</h2>
+            <div class="toc-content" id="toc-content-auto"></div>
+        </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Spark物理执行计划</h1><div class="post-meta">
+            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/spark/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Spark</a></span></div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-25">2025-05-25</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;3962 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;8 minutes&nbsp;</div>
+        </div><div class="details toc" id="toc-static"  data-kept="">
+                <div class="details-summary toc-title">
+                    <span>Contents</span>
+                    <span><i class="details-icon fas fa-angle-right" aria-hidden="true"></i></span>
+                </div>
+                <div class="details-content toc-content" id="toc-content-static"><nav id="TableOfContents">
+  <ul>
+    <li><a href="#spark物理执行计划生成方法">Spark物理执行计划生成方法</a>
+      <ul>
+        <li><a href="#根据action操作将应用划分为作业job">根据action操作将应用划分为作业（job）</a></li>
+        <li><a href="#根据shuffledependency依赖关系将job划分成执行阶段stage">根据ShuffleDependency依赖关系将job划分成执行阶段（stage）</a></li>
+        <li><a href="#根据分区计算将各个stage划分成计算任务task">根据分区计算将各个stage划分成计算任务（task）</a></li>
+        <li><a href="#jobstage和task的计算顺序">job、stage和task的计算顺序</a></li>
+        <li><a href="#task内部数据的存储的计算问题流水线计算">task内部数据的存储的计算问题（流水线计算）</a></li>
+        <li><a href="#task间的数据传递和计算问题">task间的数据传递和计算问题</a></li>
+        <li><a href="#stage和task的命名方式">stage和task的命名方式</a></li>
+      </ul>
+    </li>
+    <li><a href="#生成物理执行计划的源码分析">生成物理执行计划的源码分析</a>
+      <ul>
+        <li><a href="#demo程序">demo程序</a></li>
+        <li><a href="#count操作">count操作</a></li>
+        <li><a href="#getpartitions">getPartitions</a></li>
+        <li><a href="#stage">Stage</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav></div>
+            </div><div class="content" id="content"><h2 id="spark物理执行计划生成方法">Spark物理执行计划生成方法</h2>
+<p>Spark具体采用3个步骤来生成物理执行计划，首先根据action操作顺序将应用划分为作业（job），然后根据每个job的逻辑处理流程中的ShuffleDependency依赖关系，将job划分为执行阶段（stage）。最后在每个stage中，根据最后生成的RDD的分区个数生成多个计算任务（task）。</p>
+<h3 id="根据action操作将应用划分为作业job">根据action操作将应用划分为作业（job）</h3>
+<p>当应用程序出现action操作时，如resultRDD.action()，表示应用会生成一个job，该job的逻辑处理流程为从输出数据到resultRDD的逻辑处理流程。</p>
+<h3 id="根据shuffledependency依赖关系将job划分成执行阶段stage">根据ShuffleDependency依赖关系将job划分成执行阶段（stage）</h3>
+<p>对于每个job，从其最后的RDD往前回溯整个逻辑处理流程，如果遇到NarrowDependency，则将当前RDD的parent RDD纳入，并继续向前追溯，当遇到ShuffleDependency时，停止回溯，将当前已经纳入的所有RDD按照其依赖关系建立一个执行阶段，命名为stage i。</p>
+<p>如果将存在ShuffleDependency依赖的RDD也纳入同一个stage，计算每个分区时都需要重复计算ShuffleDependency上游的RDD，这显然没有必要。</p>
+<h3 id="根据分区计算将各个stage划分成计算任务task">根据分区计算将各个stage划分成计算任务（task）</h3>
+<p>每个分区上的计算逻辑相同，而且是独立的，因此每个分区上的计算可以独立成为一个task。同一个stage中的task可以同时分发到不同的机器并行执行。</p>
+<h3 id="jobstage和task的计算顺序">job、stage和task的计算顺序</h3>
+<p>job的提交时间和action被调用的时间有关，当应用程序执行到rdd.action()时，就会立即将rdd.actioin()形成的job提交给spark。job的逻辑处理流程实际上是一个DAG图，经过stage划分后，仍然是DAG图形状。每个stage的输出数据要不是job的输入数据，要不是上游stage的输出结果。因此，计算顺序从包含输入数据的stage开始，从前往后依次执行，仅当上游stage都执行完成后，再执行下游的stage。stage中的每个task因为是独立而且同构的，可以并行执行没有先后之分。</p>
+<h3 id="task内部数据的存储的计算问题流水线计算">task内部数据的存储的计算问题（流水线计算）</h3>
+<p>假设一个分区中有三条记录，分别为record1, record2, record3，需要对分区先执行f()操作，再执行g()操作，假设f()操作和g()操作都只依赖于上游分区中的单条记录，则可以采用流水线计算。类似于<code>record1 -&gt; f(record1) -&gt; record1' -&gt; g(record') -&gt; record''</code>，在task计算时只需要再内存中保留当前被处理的单个record即可，没有必要在执行f(record1)之前将record2和record3提前计算出来放入内存中。当然，如果f()操作和g()操作都依赖于上游分区中的多条记录，则流水线计算退化到计算-回收模式，需要一次读取上游分区中的所有数据，每执行完一个操作，回收之前的中间计算结果。</p>
+<p>Spark采用流水线式计算来提高task的执行效率，减少内存使用量。这也是Spark可以在有限内存中处理大量大规模数据的原因。然而对于某些需要聚合中间计算结果的操作，还是需要占用一定的内存空间，也会在一定程度上影响流水线计算的效率。</p>
+<h3 id="task间的数据传递和计算问题">task间的数据传递和计算问题</h3>
+<p>stage之间存在的依赖关系是ShuffleDependency，而ShuffleDependency是部分依赖的，也就是下游stage中的每个task需要从parent RDD的每个分区中获取部分数据。ShuffleDependency的数据划分方式包括Hash划分、Range划分等，也就是要求上游stage预先将输出数据进行划分，按照分区存在，分区个数和下游task的个数一致，这个过程被称为Shuffle Write。按照分区存放完成后，下游的task将属于自己分区的数据通过网络传输获取，然后将来自上游不同分区的数据聚合在一起进行处理，这个过程被称为Shuffle Read。</p>
+<h3 id="stage和task的命名方式">stage和task的命名方式</h3>
+<p>在Spark中，stage也可以有多个，有些stage既包含类似reduce的聚合操作有包含map操作，所以一般不区分是map stage还是reduce stage，而直接使用stage i来命名。</p>
+<p>如果task的输出结果需要进行ShuffleWrite，以便传输给下一个stage，那么这些task被称为ShuffleMapTasks，而如果task的输出结果会汇总到Driver端或者直接写入分布式文件系统，那么这些task被称为ResultTasks。</p>
+<h2 id="生成物理执行计划的源码分析">生成物理执行计划的源码分析</h2>
+<h3 id="demo程序">demo程序</h3>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// scalastyle:off println
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">package</span> <span class="nn">org.apache.spark.examples</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">import</span> <span class="nn">java.util.concurrent.TimeUnit</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">import</span> <span class="nn">scala.collection.compat.immutable.ArraySeq</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">import</span> <span class="nn">org.apache.spark.</span><span class="o">{</span><span class="nc">HashPartitioner</span><span class="o">,</span> <span class="nc">SparkContext</span><span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="k">import</span> <span class="nn">org.apache.spark.sql.SparkSession</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">object</span> <span class="nc">FilterDemo</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">main</span><span class="o">(</span><span class="n">args</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">String</span><span class="o">])</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">spark</span> <span class="k">=</span> <span class="nc">SparkSession</span>
+</span></span><span class="line"><span class="cl">      <span class="o">.</span><span class="n">builder</span><span class="o">()</span>
+</span></span><span class="line"><span class="cl">      <span class="o">.</span><span class="n">appName</span><span class="o">(</span><span class="s">&#34;MapDemo&#34;</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="o">.</span><span class="n">master</span><span class="o">(</span><span class="s">&#34;local&#34;</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="o">.</span><span class="n">getOrCreate</span><span class="o">()</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">sc</span> <span class="k">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">sparkContext</span><span class="o">.</span><span class="n">asInstanceOf</span><span class="o">[</span><span class="kt">SparkContext</span><span class="o">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">data1</span> <span class="k">=</span> <span class="nc">Array</span><span class="o">[(</span><span class="kt">Int</span>, <span class="kt">Char</span><span class="o">)]((</span><span class="mi">1</span><span class="o">,</span> <span class="sc">&#39;a&#39;</span><span class="o">),</span> <span class="o">(</span><span class="mi">2</span><span class="o">,</span> <span class="sc">&#39;b&#39;</span><span class="o">),</span> <span class="o">(</span><span class="mi">3</span><span class="o">,</span> <span class="sc">&#39;c&#39;</span><span class="o">),</span>
+</span></span><span class="line"><span class="cl">      <span class="o">(</span><span class="mi">4</span><span class="o">,</span> <span class="sc">&#39;d&#39;</span><span class="o">),</span> <span class="o">(</span><span class="mi">5</span><span class="o">,</span> <span class="sc">&#39;e&#39;</span><span class="o">),</span> <span class="o">(</span><span class="mi">3</span><span class="o">,</span> <span class="sc">&#39;f&#39;</span><span class="o">),</span> <span class="o">(</span><span class="mi">2</span><span class="o">,</span> <span class="sc">&#39;g&#39;</span><span class="o">),</span> <span class="o">(</span><span class="mi">1</span><span class="o">,</span> <span class="sc">&#39;h&#39;</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">rdd1</span> <span class="k">=</span> <span class="n">sc</span><span class="o">.</span><span class="n">parallelize</span><span class="o">(</span><span class="nc">ArraySeq</span><span class="o">.</span><span class="n">unsafeWrapArray</span><span class="o">(</span><span class="n">data1</span><span class="o">),</span> <span class="mi">3</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">partitionedRDD</span> <span class="k">=</span> <span class="n">rdd1</span><span class="o">.</span><span class="n">partitionBy</span><span class="o">(</span><span class="k">new</span> <span class="nc">HashPartitioner</span><span class="o">(</span><span class="mi">3</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">data2</span> <span class="k">=</span> <span class="nc">Array</span><span class="o">[(</span><span class="kt">Int</span>, <span class="kt">String</span><span class="o">)]((</span><span class="mi">1</span><span class="o">,</span> <span class="s">&#34;A&#34;</span><span class="o">),</span> <span class="o">(</span><span class="mi">2</span><span class="o">,</span> <span class="s">&#34;B&#34;</span><span class="o">),</span>
+</span></span><span class="line"><span class="cl">      <span class="o">(</span><span class="mi">3</span><span class="o">,</span> <span class="s">&#34;C&#34;</span><span class="o">),</span> <span class="o">(</span><span class="mi">4</span><span class="o">,</span> <span class="s">&#34;D&#34;</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">rdd2</span> <span class="k">=</span> <span class="n">sc</span><span class="o">.</span><span class="n">parallelize</span><span class="o">(</span><span class="nc">ArraySeq</span><span class="o">.</span><span class="n">unsafeWrapArray</span><span class="o">(</span><span class="n">data2</span><span class="o">),</span> <span class="mi">2</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">x</span> <span class="k">=&gt;</span> <span class="o">(</span><span class="n">x</span><span class="o">.</span><span class="n">_1</span><span class="o">,</span> <span class="n">x</span><span class="o">.</span><span class="n">_2</span> <span class="o">+</span> <span class="s">&#34;&#34;</span> <span class="o">+</span> <span class="n">x</span><span class="o">.</span><span class="n">_2</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">data3</span> <span class="k">=</span> <span class="nc">Array</span><span class="o">[(</span><span class="kt">Int</span>, <span class="kt">String</span><span class="o">)]((</span><span class="mi">3</span><span class="o">,</span> <span class="s">&#34;X&#34;</span><span class="o">),</span> <span class="o">(</span><span class="mi">5</span><span class="o">,</span> <span class="s">&#34;Y&#34;</span><span class="o">),</span>
+</span></span><span class="line"><span class="cl">      <span class="o">(</span><span class="mi">3</span><span class="o">,</span> <span class="s">&#34;Z&#34;</span><span class="o">),</span> <span class="o">(</span><span class="mi">4</span><span class="o">,</span> <span class="s">&#34;Y&#34;</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">rdd3</span> <span class="k">=</span> <span class="n">sc</span><span class="o">.</span><span class="n">parallelize</span><span class="o">(</span><span class="nc">ArraySeq</span><span class="o">.</span><span class="n">unsafeWrapArray</span><span class="o">(</span><span class="n">data3</span><span class="o">),</span> <span class="mi">2</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">unionedRDD</span> <span class="k">=</span> <span class="n">rdd2</span><span class="o">.</span><span class="n">union</span><span class="o">(</span><span class="n">rdd3</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">resultRDD</span> <span class="k">=</span> <span class="n">partitionedRDD</span><span class="o">.</span><span class="n">join</span><span class="o">(</span><span class="n">unionedRDD</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="n">resultRDD</span><span class="o">.</span><span class="n">count</span><span class="o">()</span>
+</span></span><span class="line"><span class="cl">    <span class="n">spark</span><span class="o">.</span><span class="n">stop</span><span class="o">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/spark_physical_plan/SPARK_UI_DAG.png"
+        data-srcset="/posts/spark_physical_plan/SPARK_UI_DAG.png, /posts/spark_physical_plan/SPARK_UI_DAG.png 1.5x, /posts/spark_physical_plan/SPARK_UI_DAG.png 2x"
+        data-sizes="auto"
+        alt="/posts/spark_physical_plan/SPARK_UI_DAG.png"
+        title="image-20250525163523755" width="1426" height="748" /></p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/spark_physical_plan/SPARK_UI_RDD.png"
+        data-srcset="/posts/spark_physical_plan/SPARK_UI_RDD.png, /posts/spark_physical_plan/SPARK_UI_RDD.png 1.5x, /posts/spark_physical_plan/SPARK_UI_RDD.png 2x"
+        data-sizes="auto"
+        alt="/posts/spark_physical_plan/SPARK_UI_RDD.png"
+        title="image-20250525163739208" width="864" height="1042" /></p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/spark_physical_plan/SPARK_UI_RDD2.png"
+        data-srcset="/posts/spark_physical_plan/SPARK_UI_RDD2.png, /posts/spark_physical_plan/SPARK_UI_RDD2.png 1.5x, /posts/spark_physical_plan/SPARK_UI_RDD2.png 2x"
+        data-sizes="auto"
+        alt="/posts/spark_physical_plan/SPARK_UI_RDD2.png"
+        title="image-20250525163906199" width="1258" height="914" /></p>
+<p>涉及到以下RDD类别</p>
+<ul>
+<li>ParallelCollectionRDD</li>
+<li>ShuffledRDD</li>
+<li>CoGroupedRDD</li>
+<li>MapPartitionsRDD</li>
+<li>UnionRDD</li>
+</ul>
+<h3 id="count操作">count操作</h3>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">def</span> <span class="n">count</span><span class="o">()</span><span class="k">:</span> <span class="kt">Long</span> <span class="o">=</span> <span class="n">sc</span><span class="o">.</span><span class="n">runJob</span><span class="o">(</span><span class="k">this</span><span class="o">,</span> <span class="nc">Utils</span><span class="o">.</span><span class="n">getIteratorSize</span> <span class="k">_</span><span class="o">).</span><span class="n">sum</span>
+</span></span><span class="line"><span class="cl"><span class="k">def</span> <span class="n">runJob</span><span class="o">[</span><span class="kt">T</span>, <span class="kt">U:</span> <span class="kt">ClassTag</span><span class="o">](</span><span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">],</span> <span class="n">func</span><span class="k">:</span> <span class="kt">Iterator</span><span class="o">[</span><span class="kt">T</span><span class="o">]</span> <span class="k">=&gt;</span> <span class="n">U</span><span class="o">)</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">U</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="n">runJob</span><span class="o">(</span><span class="n">rdd</span><span class="o">,</span> <span class="n">func</span><span class="o">,</span> <span class="n">rdd</span><span class="o">.</span><span class="n">partitions</span><span class="o">.</span><span class="n">indices</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="k">def</span> <span class="n">runJob</span><span class="o">[</span><span class="kt">T</span>, <span class="kt">U:</span> <span class="kt">ClassTag</span><span class="o">](</span>
+</span></span><span class="line"><span class="cl">    <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">func</span><span class="k">:</span> <span class="kt">Iterator</span><span class="o">[</span><span class="kt">T</span><span class="o">]</span> <span class="k">=&gt;</span> <span class="n">U</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">partitions</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">Int</span><span class="o">])</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">U</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">cleanedFunc</span> <span class="k">=</span> <span class="n">clean</span><span class="o">(</span><span class="n">func</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="n">runJob</span><span class="o">(</span><span class="n">rdd</span><span class="o">,</span> <span class="o">(</span><span class="n">ctx</span><span class="k">:</span> <span class="kt">TaskContext</span><span class="o">,</span> <span class="n">it</span><span class="k">:</span> <span class="kt">Iterator</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=&gt;</span> <span class="n">cleanedFunc</span><span class="o">(</span><span class="n">it</span><span class="o">),</span> <span class="n">partitions</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="k">def</span> <span class="n">runJob</span><span class="o">[</span><span class="kt">T</span>, <span class="kt">U:</span> <span class="kt">ClassTag</span><span class="o">](</span>
+</span></span><span class="line"><span class="cl">    <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">func</span><span class="k">:</span> <span class="o">(</span><span class="kt">TaskContext</span><span class="o">,</span> <span class="kt">Iterator</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=&gt;</span> <span class="n">U</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">partitions</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">Int</span><span class="o">])</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">U</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">results</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">Array</span><span class="o">[</span><span class="kt">U</span><span class="o">](</span><span class="n">partitions</span><span class="o">.</span><span class="n">size</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="n">runJob</span><span class="o">[</span><span class="kt">T</span>, <span class="kt">U</span><span class="o">](</span><span class="n">rdd</span><span class="o">,</span> <span class="n">func</span><span class="o">,</span> <span class="n">partitions</span><span class="o">,</span> <span class="o">(</span><span class="n">index</span><span class="o">,</span> <span class="n">res</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">results</span><span class="o">(</span><span class="n">index</span><span class="o">)</span> <span class="k">=</span> <span class="n">res</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="n">results</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="k">def</span> <span class="n">runJob</span><span class="o">[</span><span class="kt">T</span>, <span class="kt">U:</span> <span class="kt">ClassTag</span><span class="o">](</span>
+</span></span><span class="line"><span class="cl">    <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">func</span><span class="k">:</span> <span class="o">(</span><span class="kt">TaskContext</span><span class="o">,</span> <span class="kt">Iterator</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=&gt;</span> <span class="n">U</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">partitions</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">Int</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">resultHandler</span><span class="k">:</span> <span class="o">(</span><span class="kt">Int</span><span class="o">,</span> <span class="kt">U</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="nc">Unit</span><span class="o">)</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="o">(</span><span class="n">stopped</span><span class="o">.</span><span class="n">get</span><span class="o">())</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">throw</span> <span class="k">new</span> <span class="nc">IllegalStateException</span><span class="o">(</span><span class="s">&#34;SparkContext has been shutdown&#34;</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">callSite</span> <span class="k">=</span> <span class="n">getCallSite</span><span class="o">()</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">cleanedFunc</span> <span class="k">=</span> <span class="n">clean</span><span class="o">(</span><span class="n">func</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="n">logInfo</span><span class="o">(</span><span class="n">log</span><span class="s">&#34;Starting job: ${MDC(LogKeys.CALL_SITE_SHORT_FORM, callSite.shortForm)}&#34;</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="o">(</span><span class="n">conf</span><span class="o">.</span><span class="n">getBoolean</span><span class="o">(</span><span class="s">&#34;spark.logLineage&#34;</span><span class="o">,</span> <span class="kc">false</span><span class="o">))</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">logInfo</span><span class="o">(</span><span class="n">log</span><span class="s">&#34;RDD&#39;s recursive dependencies:\n&#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">      <span class="n">log</span><span class="s">&#34;${MDC(LogKeys.RDD_DEBUG_STRING, rdd.toDebugString)}&#34;</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="n">dagScheduler</span><span class="o">.</span><span class="n">runJob</span><span class="o">(</span><span class="n">rdd</span><span class="o">,</span> <span class="n">cleanedFunc</span><span class="o">,</span> <span class="n">partitions</span><span class="o">,</span> <span class="n">callSite</span><span class="o">,</span> <span class="n">resultHandler</span><span class="o">,</span> <span class="n">localProperties</span><span class="o">.</span><span class="n">get</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="n">progressBar</span><span class="o">.</span><span class="n">foreach</span><span class="o">(</span><span class="k">_</span><span class="o">.</span><span class="n">finishAll</span><span class="o">())</span>
+</span></span><span class="line"><span class="cl">  <span class="n">rdd</span><span class="o">.</span><span class="n">doCheckpoint</span><span class="o">()</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p>count操作会调用runJob创建并执行新的job，<code>getCallSite</code>通过堆栈找到用户调用代码的位置以及调用的spark方法，类似于<code>union at FilterDemo.scala:35</code>。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">def</span> <span class="n">runJob</span><span class="o">[</span><span class="kt">T</span>, <span class="kt">U</span><span class="o">](</span>
+</span></span><span class="line"><span class="cl">    <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">func</span><span class="k">:</span> <span class="o">(</span><span class="kt">TaskContext</span><span class="o">,</span> <span class="kt">Iterator</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=&gt;</span> <span class="n">U</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">partitions</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">Int</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">callSite</span><span class="k">:</span> <span class="kt">CallSite</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">resultHandler</span><span class="k">:</span> <span class="o">(</span><span class="kt">Int</span><span class="o">,</span> <span class="kt">U</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="nc">Unit</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">properties</span><span class="k">:</span> <span class="kt">Properties</span><span class="o">)</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">start</span> <span class="k">=</span> <span class="nc">System</span><span class="o">.</span><span class="n">nanoTime</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">waiter</span> <span class="k">=</span> <span class="n">submitJob</span><span class="o">(</span><span class="n">rdd</span><span class="o">,</span> <span class="n">func</span><span class="o">,</span> <span class="n">partitions</span><span class="o">,</span> <span class="n">callSite</span><span class="o">,</span> <span class="n">resultHandler</span><span class="o">,</span> <span class="n">properties</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="nc">ThreadUtils</span><span class="o">.</span><span class="n">awaitReady</span><span class="o">(</span><span class="n">waiter</span><span class="o">.</span><span class="n">completionFuture</span><span class="o">,</span> <span class="nc">Duration</span><span class="o">.</span><span class="nc">Inf</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="n">waiter</span><span class="o">.</span><span class="n">completionFuture</span><span class="o">.</span><span class="n">value</span><span class="o">.</span><span class="n">get</span> <span class="k">match</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="n">scala</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="nc">Success</span><span class="o">(</span><span class="k">_</span><span class="o">)</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">      <span class="n">logInfo</span><span class="o">(</span><span class="n">log</span><span class="s">&#34;Job ${MDC(LogKeys.JOB_ID, waiter.jobId)} finished: &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">        <span class="n">log</span><span class="s">&#34;${MDC(LogKeys.CALL_SITE_SHORT_FORM, callSite.shortForm)}, took &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">        <span class="n">log</span><span class="s">&#34;${MDC(LogKeys.TIME, (System.nanoTime - start) / 1e6)} ms&#34;</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="n">scala</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="nc">Failure</span><span class="o">(</span><span class="n">exception</span><span class="o">)</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">      <span class="n">logInfo</span><span class="o">(</span><span class="n">log</span><span class="s">&#34;Job ${MDC(LogKeys.JOB_ID, waiter.jobId)} failed: &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">        <span class="n">log</span><span class="s">&#34;${MDC(LogKeys.CALL_SITE_SHORT_FORM, callSite.shortForm)}, took &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">        <span class="n">log</span><span class="s">&#34;${MDC(LogKeys.TIME, (System.nanoTime - start) / 1e6)} ms&#34;</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="c1">// SPARK-8644: Include user stack trace in exceptions coming from DAGScheduler.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="k">val</span> <span class="n">callerStackTrace</span> <span class="k">=</span> <span class="nc">Thread</span><span class="o">.</span><span class="n">currentThread</span><span class="o">().</span><span class="n">getStackTrace</span><span class="o">.</span><span class="n">tail</span>
+</span></span><span class="line"><span class="cl">      <span class="n">exception</span><span class="o">.</span><span class="n">setStackTrace</span><span class="o">(</span><span class="n">exception</span><span class="o">.</span><span class="n">getStackTrace</span> <span class="o">++</span> <span class="n">callerStackTrace</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="k">throw</span> <span class="n">exception</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p>DAGScheduler负责提交job，并等待job结束，判断job是否成功。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">def</span> <span class="n">submitJob</span><span class="o">[</span><span class="kt">T</span>, <span class="kt">U</span><span class="o">](</span>
+</span></span><span class="line"><span class="cl">    <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">func</span><span class="k">:</span> <span class="o">(</span><span class="kt">TaskContext</span><span class="o">,</span> <span class="kt">Iterator</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=&gt;</span> <span class="n">U</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">partitions</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">Int</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">callSite</span><span class="k">:</span> <span class="kt">CallSite</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">resultHandler</span><span class="k">:</span> <span class="o">(</span><span class="kt">Int</span><span class="o">,</span> <span class="kt">U</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="nc">Unit</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">properties</span><span class="k">:</span> <span class="kt">Properties</span><span class="o">)</span><span class="k">:</span> <span class="kt">JobWaiter</span><span class="o">[</span><span class="kt">U</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// Check to make sure we are not launching a task on a partition that does not exist.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">maxPartitions</span> <span class="k">=</span> <span class="n">rdd</span><span class="o">.</span><span class="n">partitions</span><span class="o">.</span><span class="n">length</span>
+</span></span><span class="line"><span class="cl">  <span class="n">partitions</span><span class="o">.</span><span class="n">find</span><span class="o">(</span><span class="n">p</span> <span class="k">=&gt;</span> <span class="n">p</span> <span class="o">&gt;=</span> <span class="n">maxPartitions</span> <span class="o">||</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="o">).</span><span class="n">foreach</span> <span class="o">{</span> <span class="n">p</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="k">throw</span> <span class="k">new</span> <span class="nc">IllegalArgumentException</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">      <span class="s">&#34;Attempting to access a non-existent partition: &#34;</span> <span class="o">+</span> <span class="n">p</span> <span class="o">+</span> <span class="s">&#34;. &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">        <span class="s">&#34;Total number of partitions: &#34;</span> <span class="o">+</span> <span class="n">maxPartitions</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="c1">// SPARK-23626: `RDD.getPartitions()` can be slow, so we eagerly compute
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// `.partitions` on every RDD in the DAG to ensure that `getPartitions()`
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// is evaluated outside of the DAGScheduler&#39;s single-threaded event loop:
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="n">eagerlyComputePartitionsForRddAndAncestors</span><span class="o">(</span><span class="n">rdd</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">jobId</span> <span class="k">=</span> <span class="n">nextJobId</span><span class="o">.</span><span class="n">getAndIncrement</span><span class="o">()</span>
+</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="o">(</span><span class="n">partitions</span><span class="o">.</span><span class="n">isEmpty</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">clonedProperties</span> <span class="k">=</span> <span class="nc">Utils</span><span class="o">.</span><span class="n">cloneProperties</span><span class="o">(</span><span class="n">properties</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="o">(</span><span class="n">sc</span><span class="o">.</span><span class="n">getLocalProperty</span><span class="o">(</span><span class="nc">SparkContext</span><span class="o">.</span><span class="nc">SPARK_JOB_DESCRIPTION</span><span class="o">)</span> <span class="o">==</span> <span class="kc">null</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="n">clonedProperties</span><span class="o">.</span><span class="n">setProperty</span><span class="o">(</span><span class="nc">SparkContext</span><span class="o">.</span><span class="nc">SPARK_JOB_DESCRIPTION</span><span class="o">,</span> <span class="n">callSite</span><span class="o">.</span><span class="n">shortForm</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">time</span> <span class="k">=</span> <span class="n">clock</span><span class="o">.</span><span class="n">getTimeMillis</span><span class="o">()</span>
+</span></span><span class="line"><span class="cl">    <span class="n">listenerBus</span><span class="o">.</span><span class="n">post</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">      <span class="nc">SparkListenerJobStart</span><span class="o">(</span><span class="n">jobId</span><span class="o">,</span> <span class="n">time</span><span class="o">,</span> <span class="nc">Seq</span><span class="o">.</span><span class="n">empty</span><span class="o">,</span> <span class="n">clonedProperties</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">    <span class="n">listenerBus</span><span class="o">.</span><span class="n">post</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">      <span class="nc">SparkListenerJobEnd</span><span class="o">(</span><span class="n">jobId</span><span class="o">,</span> <span class="n">time</span><span class="o">,</span> <span class="nc">JobSucceeded</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// Return immediately if the job is running 0 tasks
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">return</span> <span class="k">new</span> <span class="nc">JobWaiter</span><span class="o">[</span><span class="kt">U</span><span class="o">](</span><span class="k">this</span><span class="o">,</span> <span class="n">jobId</span><span class="o">,</span> <span class="mi">0</span><span class="o">,</span> <span class="n">resultHandler</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="n">assert</span><span class="o">(</span><span class="n">partitions</span><span class="o">.</span><span class="n">nonEmpty</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">func2</span> <span class="k">=</span> <span class="n">func</span><span class="o">.</span><span class="n">asInstanceOf</span><span class="o">[(</span><span class="kt">TaskContext</span>, <span class="kt">Iterator</span><span class="o">[</span><span class="k">_</span><span class="o">])</span> <span class="k">=&gt;</span> <span class="k">_</span><span class="o">]</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">waiter</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">JobWaiter</span><span class="o">[</span><span class="kt">U</span><span class="o">](</span><span class="k">this</span><span class="o">,</span> <span class="n">jobId</span><span class="o">,</span> <span class="n">partitions</span><span class="o">.</span><span class="n">size</span><span class="o">,</span> <span class="n">resultHandler</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="n">eventProcessLoop</span><span class="o">.</span><span class="n">post</span><span class="o">(</span><span class="nc">JobSubmitted</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">jobId</span><span class="o">,</span> <span class="n">rdd</span><span class="o">,</span> <span class="n">func2</span><span class="o">,</span> <span class="n">partitions</span><span class="o">.</span><span class="n">toArray</span><span class="o">,</span> <span class="n">callSite</span><span class="o">,</span> <span class="n">waiter</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nc">JobArtifactSet</span><span class="o">.</span><span class="n">getActiveOrDefault</span><span class="o">(</span><span class="n">sc</span><span class="o">),</span>
+</span></span><span class="line"><span class="cl">    <span class="nc">Utils</span><span class="o">.</span><span class="n">cloneProperties</span><span class="o">(</span><span class="n">properties</span><span class="o">)))</span>
+</span></span><span class="line"><span class="cl">  <span class="n">waiter</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p>submitJob会计算DAG中每个RDD的<code>.partitions</code>，确保<code>getPartitinos</code>在<code>DAGScheduler</code>单线程事件循环外计算，避免<code>RDD.getPartitions</code>的计算影响调度效率。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">private</span> <span class="k">def</span> <span class="n">eagerlyComputePartitionsForRddAndAncestors</span><span class="o">(</span><span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">])</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">startTime</span> <span class="k">=</span> <span class="nc">System</span><span class="o">.</span><span class="n">nanoTime</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">visitedRdds</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">HashSet</span><span class="o">[</span><span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">]]</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// We are manually maintaining a stack here to prevent StackOverflowError
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// caused by recursively visiting
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">waitingForVisit</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ListBuffer</span><span class="o">[</span><span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">]]</span>
+</span></span><span class="line"><span class="cl">  <span class="n">waitingForVisit</span> <span class="o">+=</span> <span class="n">rdd</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">visit</span><span class="o">(</span><span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">])</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="o">(!</span><span class="n">visitedRdds</span><span class="o">(</span><span class="n">rdd</span><span class="o">))</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="n">visitedRdds</span> <span class="o">+=</span> <span class="n">rdd</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">      <span class="c1">// Eagerly compute:
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="n">rdd</span><span class="o">.</span><span class="n">partitions</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">      <span class="k">for</span> <span class="o">(</span><span class="n">dep</span> <span class="k">&lt;-</span> <span class="n">rdd</span><span class="o">.</span><span class="n">dependencies</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">        <span class="n">waitingForVisit</span><span class="o">.</span><span class="n">prepend</span><span class="o">(</span><span class="n">dep</span><span class="o">.</span><span class="n">rdd</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="o">}</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">while</span> <span class="o">(</span><span class="n">waitingForVisit</span><span class="o">.</span><span class="n">nonEmpty</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">visit</span><span class="o">(</span><span class="n">waitingForVisit</span><span class="o">.</span><span class="n">remove</span><span class="o">(</span><span class="mi">0</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="n">logDebug</span><span class="o">(</span><span class="s">&#34;eagerlyComputePartitionsForRddAndAncestors for RDD %d took %f seconds&#34;</span>
+</span></span><span class="line"><span class="cl">    <span class="o">.</span><span class="n">format</span><span class="o">(</span><span class="n">rdd</span><span class="o">.</span><span class="n">id</span><span class="o">,</span> <span class="o">(</span><span class="nc">System</span><span class="o">.</span><span class="n">nanoTime</span> <span class="o">-</span> <span class="n">startTime</span><span class="o">)</span> <span class="o">/</span> <span class="mi">1</span><span class="n">e9</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p><code>eagerlyComputePartitionsForRddAndAncestors</code>函数对DAG中每个RDD调用<code>partitions</code>生成分区。为了避免StackOverFlowError，没有直接采用递归的方式遍历DAG，而是采用手动维护栈的方式遍历DAG。维护已经遍历的RDD的Set和还没有遍历过的RDD的列表，每次从列表中取出一个RDD，判断是否已经遍历过，如果已经遍历过，则忽略，否则计算<code>partitions</code>，并且将它依赖的RDD也加入到列表中，直到列表为空，所有RDD都已经遍历结束。</p>
+<h3 id="getpartitions">getPartitions</h3>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">final</span> <span class="k">def</span> <span class="n">partitions</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">Partition</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="n">checkpointRDD</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="k">_</span><span class="o">.</span><span class="n">partitions</span><span class="o">).</span><span class="n">getOrElse</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="o">(</span><span class="n">partitions_</span> <span class="o">==</span> <span class="kc">null</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="n">stateLock</span><span class="o">.</span><span class="n">synchronized</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">if</span> <span class="o">(</span><span class="n">partitions_</span> <span class="o">==</span> <span class="kc">null</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">          <span class="n">partitions_</span> <span class="k">=</span> <span class="n">getPartitions</span>
+</span></span><span class="line"><span class="cl">          <span class="n">partitions_</span><span class="o">.</span><span class="n">zipWithIndex</span><span class="o">.</span><span class="n">foreach</span> <span class="o">{</span> <span class="k">case</span> <span class="o">(</span><span class="n">partition</span><span class="o">,</span> <span class="n">index</span><span class="o">)</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">            <span class="n">require</span><span class="o">(</span><span class="n">partition</span><span class="o">.</span><span class="n">index</span> <span class="o">==</span> <span class="n">index</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">              <span class="s">s&#34;partitions(</span><span class="si">$index</span><span class="s">).partition == </span><span class="si">${</span><span class="n">partition</span><span class="o">.</span><span class="n">index</span><span class="si">}</span><span class="s">, but it should equal </span><span class="si">$index</span><span class="s">&#34;</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">          <span class="o">}</span>
+</span></span><span class="line"><span class="cl">        <span class="o">}</span>
+</span></span><span class="line"><span class="cl">      <span class="o">}</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">    <span class="n">partitions_</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p><code>getPartitions</code>是RDD中的虚方法，由RDD子类负责实现。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="cm">/**
+</span></span></span><span class="line"><span class="cl"><span class="cm"> * An identifier for a partition in an RDD.
+</span></span></span><span class="line"><span class="cl"><span class="cm"> */</span>
+</span></span><span class="line"><span class="cl"><span class="k">trait</span> <span class="nc">Partition</span> <span class="k">extends</span> <span class="nc">Serializable</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="cm">/**
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * Get the partition&#39;s index within its parent RDD
+</span></span></span><span class="line"><span class="cl"><span class="cm">   */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">index</span><span class="k">:</span> <span class="kt">Int</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="c1">// A better default implementation of HashCode
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">override</span> <span class="k">def</span> <span class="n">hashCode</span><span class="o">()</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=</span> <span class="n">index</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">equals</span><span class="o">(</span><span class="n">other</span><span class="k">:</span> <span class="kt">Any</span><span class="o">)</span><span class="k">:</span> <span class="kt">Boolean</span> <span class="o">=</span> <span class="k">super</span><span class="o">.</span><span class="n">equals</span><span class="o">(</span><span class="n">other</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">private</span><span class="o">[</span><span class="kt">spark</span><span class="o">]</span> <span class="k">class</span> <span class="nc">ParallelCollectionRDD</span><span class="o">[</span><span class="kt">T:</span> <span class="kt">ClassTag</span><span class="o">](</span>
+</span></span><span class="line"><span class="cl">  <span class="n">sc</span><span class="k">:</span> <span class="kt">SparkContext</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nd">@transient</span> <span class="k">private</span> <span class="k">val</span> <span class="n">data</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">T</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">  <span class="n">numSlices</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">  <span class="n">locationPrefs</span><span class="k">:</span> <span class="kt">Map</span><span class="o">[</span><span class="kt">Int</span>, <span class="kt">Seq</span><span class="o">[</span><span class="kt">String</span><span class="o">]])</span>
+</span></span><span class="line"><span class="cl">  <span class="k">extends</span> <span class="nc">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">](</span><span class="n">sc</span><span class="o">,</span> <span class="nc">Nil</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// TODO: Right now, each split sends along its full data, even if later down the RDD chain it gets
+</span></span></span><span class="line"><span class="cl"><span class="c1">// cached. It might be worthwhile to write the data to a file in the DFS and read it in the split
+</span></span></span><span class="line"><span class="cl"><span class="c1">// instead.
+</span></span></span><span class="line"><span class="cl"><span class="c1">// UPDATE: A parallel collection can be checkpointed to HDFS, which achieves this goal.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl"><span class="k">override</span> <span class="k">def</span> <span class="n">getPartitions</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">Partition</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">slices</span> <span class="k">=</span> <span class="nc">ParallelCollectionRDD</span><span class="o">.</span><span class="n">slice</span><span class="o">(</span><span class="n">data</span><span class="o">,</span> <span class="n">numSlices</span><span class="o">).</span><span class="n">toArray</span>
+</span></span><span class="line"><span class="cl">  <span class="n">slices</span><span class="o">.</span><span class="n">indices</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">i</span> <span class="k">=&gt;</span> <span class="k">new</span> <span class="nc">ParallelCollectionPartition</span><span class="o">(</span><span class="n">id</span><span class="o">,</span> <span class="n">i</span><span class="o">,</span> <span class="n">slices</span><span class="o">(</span><span class="n">i</span><span class="o">))).</span><span class="n">toArray</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p>ParallelCollectionRDD的getPartitions函数首先将输入的数据分成numSlices份，然后生成对应的分区。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">private</span><span class="o">[</span><span class="kt">spark</span><span class="o">]</span> <span class="k">class</span> <span class="nc">MapPartitionsRDD</span><span class="o">[</span><span class="kt">U:</span> <span class="kt">ClassTag</span>, <span class="kt">T:</span> <span class="kt">ClassTag</span><span class="o">](</span>
+</span></span><span class="line"><span class="cl">    <span class="k">var</span> <span class="n">prev</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">f</span><span class="k">:</span> <span class="o">(</span><span class="kt">TaskContext</span><span class="o">,</span> <span class="kt">Int</span><span class="o">,</span> <span class="nc">Iterator</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=&gt;</span> <span class="nc">Iterator</span><span class="o">[</span><span class="kt">U</span><span class="o">],</span>  <span class="c1">// (TaskContext, partition index, iterator)
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">preservesPartitioning</span><span class="k">:</span> <span class="kt">Boolean</span> <span class="o">=</span> <span class="kc">false</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">isFromBarrier</span><span class="k">:</span> <span class="kt">Boolean</span> <span class="o">=</span> <span class="kc">false</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">isOrderSensitive</span><span class="k">:</span> <span class="kt">Boolean</span> <span class="o">=</span> <span class="kc">false</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">extends</span> <span class="nc">RDD</span><span class="o">[</span><span class="kt">U</span><span class="o">](</span><span class="n">prev</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">getPartitions</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">Partition</span><span class="o">]</span> <span class="k">=</span> <span class="n">firstParent</span><span class="o">[</span><span class="kt">T</span><span class="o">].</span><span class="n">partitions</span></span></span></code></pre></div></div>
+<p>MapPartitionsRDD直接继承父RDD的分区。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="nd">@DeveloperApi</span>
+</span></span><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">UnionRDD</span><span class="o">[</span><span class="kt">T:</span> <span class="kt">ClassTag</span><span class="o">](</span>
+</span></span><span class="line"><span class="cl">    <span class="n">sc</span><span class="k">:</span> <span class="kt">SparkContext</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="k">var</span> <span class="n">rdds</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">]])</span>
+</span></span><span class="line"><span class="cl">  <span class="k">extends</span> <span class="nc">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">](</span><span class="n">sc</span><span class="o">,</span> <span class="nc">Nil</span><span class="o">)</span> <span class="o">{</span>  <span class="c1">// Nil since we implement getDependencies
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// visible for testing
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">private</span><span class="o">[</span><span class="kt">spark</span><span class="o">]</span> <span class="k">val</span> <span class="n">isPartitionListingParallel</span><span class="k">:</span> <span class="kt">Boolean</span> <span class="o">=</span>
+</span></span><span class="line"><span class="cl">    <span class="n">rdds</span><span class="o">.</span><span class="n">length</span> <span class="o">&gt;</span> <span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="o">(</span><span class="nc">RDD_PARALLEL_LISTING_THRESHOLD</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">getPartitions</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">Partition</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">parRDDs</span> <span class="k">=</span> <span class="k">if</span> <span class="o">(</span><span class="n">isPartitionListingParallel</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="c1">// scalastyle:off parvector
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="k">val</span> <span class="n">parArray</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ParVector</span><span class="o">(</span><span class="n">rdds</span><span class="o">.</span><span class="n">toVector</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="n">parArray</span><span class="o">.</span><span class="n">tasksupport</span> <span class="k">=</span> <span class="nc">UnionRDD</span><span class="o">.</span><span class="n">partitionEvalTaskSupport</span>
+</span></span><span class="line"><span class="cl">      <span class="c1">// scalastyle:on parvector
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="n">parArray</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="n">rdds</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">array</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">Array</span><span class="o">[</span><span class="kt">Partition</span><span class="o">](</span><span class="n">parRDDs</span><span class="o">.</span><span class="n">iterator</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="k">_</span><span class="o">.</span><span class="n">partitions</span><span class="o">.</span><span class="n">length</span><span class="o">).</span><span class="n">sum</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="k">var</span> <span class="n">pos</span> <span class="k">=</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl">    <span class="k">for</span> <span class="o">((</span><span class="n">rdd</span><span class="o">,</span> <span class="n">rddIndex</span><span class="o">)</span> <span class="k">&lt;-</span> <span class="n">rdds</span><span class="o">.</span><span class="n">zipWithIndex</span><span class="o">;</span> <span class="n">split</span> <span class="k">&lt;-</span> <span class="n">rdd</span><span class="o">.</span><span class="n">partitions</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="n">array</span><span class="o">(</span><span class="n">pos</span><span class="o">)</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">UnionPartition</span><span class="o">(</span><span class="n">pos</span><span class="o">,</span> <span class="n">rdd</span><span class="o">,</span> <span class="n">rddIndex</span><span class="o">,</span> <span class="n">split</span><span class="o">.</span><span class="n">index</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="n">pos</span> <span class="o">+=</span> <span class="mi">1</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">    <span class="n">array</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span></span></span></code></pre></div></div>
+<p>UnionRDD类似于MapPartitionsRDD，分区依据父RDD的分区生成。依次遍历每个父RDD的每个分区，生成对应的UnionRDD的分区。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="nd">@DeveloperApi</span>
+</span></span><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">ShuffledRDD</span><span class="o">[</span><span class="kt">K:</span> <span class="kt">ClassTag</span>, <span class="kt">V:</span> <span class="kt">ClassTag</span>, <span class="kt">C:</span> <span class="kt">ClassTag</span><span class="o">](</span>
+</span></span><span class="line"><span class="cl">    <span class="nd">@transient</span> <span class="k">var</span> <span class="n">prev</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="k">_</span> <span class="k">&lt;:</span> <span class="kt">Product2</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">part</span><span class="k">:</span> <span class="kt">Partitioner</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">extends</span> <span class="nc">RDD</span><span class="o">[(</span><span class="kt">K</span>, <span class="kt">C</span><span class="o">)](</span><span class="n">prev</span><span class="o">.</span><span class="n">context</span><span class="o">,</span> <span class="nc">Nil</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">getPartitions</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">Partition</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nc">Array</span><span class="o">.</span><span class="n">tabulate</span><span class="o">[</span><span class="kt">Partition</span><span class="o">](</span><span class="n">part</span><span class="o">.</span><span class="n">numPartitions</span><span class="o">)(</span><span class="n">i</span> <span class="k">=&gt;</span> <span class="k">new</span> <span class="nc">ShuffledRDDPartition</span><span class="o">(</span><span class="n">i</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="k">private</span><span class="o">[</span><span class="kt">spark</span><span class="o">]</span> <span class="k">class</span> <span class="nc">ShuffledRDDPartition</span><span class="o">(</span><span class="k">val</span> <span class="n">idx</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">extends</span> <span class="nc">Partition</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">val</span> <span class="n">index</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=</span> <span class="n">idx</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p>ShuffledRDD的分区总数通过<code>partitioner.numPartitions</code>得到，生成的分区为ShuffledRDDPartition。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="nd">@DeveloperApi</span>
+</span></span><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">CoGroupedRDD</span><span class="o">[</span><span class="kt">K:</span> <span class="kt">ClassTag</span><span class="o">](</span>
+</span></span><span class="line"><span class="cl">    <span class="nd">@transient</span> <span class="k">var</span> <span class="n">rdds</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">RDD</span><span class="o">[</span><span class="k">_</span> <span class="k">&lt;:</span> <span class="kt">Product2</span><span class="o">[</span><span class="kt">K</span>, <span class="k">_</span><span class="o">]]],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">part</span><span class="k">:</span> <span class="kt">Partitioner</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">extends</span> <span class="nc">RDD</span><span class="o">[(</span><span class="kt">K</span>, <span class="kt">Array</span><span class="o">[</span><span class="kt">Iterable</span><span class="o">[</span><span class="k">_</span><span class="o">]])](</span><span class="n">rdds</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">context</span><span class="o">,</span> <span class="nc">Nil</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    
+</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">getPartitions</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">Partition</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">array</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">Array</span><span class="o">[</span><span class="kt">Partition</span><span class="o">](</span><span class="n">part</span><span class="o">.</span><span class="n">numPartitions</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="k">for</span> <span class="o">(</span><span class="n">i</span> <span class="k">&lt;-</span> <span class="n">array</span><span class="o">.</span><span class="n">indices</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="c1">// Each CoGroupPartition will have a dependency per contributing RDD
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="n">array</span><span class="o">(</span><span class="n">i</span><span class="o">)</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">CoGroupPartition</span><span class="o">(</span><span class="n">i</span><span class="o">,</span> <span class="n">rdds</span><span class="o">.</span><span class="n">zipWithIndex</span><span class="o">.</span><span class="n">map</span> <span class="o">{</span> <span class="k">case</span> <span class="o">(</span><span class="n">rdd</span><span class="o">,</span> <span class="n">j</span><span class="o">)</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">        <span class="c1">// Assume each RDD contributed a single dependency, and get it
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="n">dependencies</span><span class="o">(</span><span class="n">j</span><span class="o">)</span> <span class="k">match</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">          <span class="k">case</span> <span class="n">s</span><span class="k">:</span> <span class="kt">ShuffleDependency</span><span class="o">[</span><span class="k">_</span>, <span class="k">_</span>, <span class="k">_</span><span class="o">]</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">            <span class="nc">None</span>
+</span></span><span class="line"><span class="cl">          <span class="k">case</span> <span class="k">_</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">            <span class="nc">Some</span><span class="o">(</span><span class="k">new</span> <span class="nc">NarrowCoGroupSplitDep</span><span class="o">(</span><span class="n">rdd</span><span class="o">,</span> <span class="n">i</span><span class="o">,</span> <span class="n">rdd</span><span class="o">.</span><span class="n">partitions</span><span class="o">(</span><span class="n">i</span><span class="o">)))</span>
+</span></span><span class="line"><span class="cl">        <span class="o">}</span>
+</span></span><span class="line"><span class="cl">      <span class="o">}.</span><span class="n">toArray</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">    <span class="n">array</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span></span></span></code></pre></div></div>
+<p>CoGroupedRDD通过<code>numPartitions</code>获取到当前rdd的分区个数，生成CoGroupPartition分区。当前RDD可能有很多父RDD，如果RDD之间的依赖关系为窄依赖，则记录依赖的父RDD中的对应分区信息，如果是宽依赖，则忽略。每个分区都保存自己依赖的父RDD的对应窄依赖分区。</p>
+<h3 id="stage">Stage</h3>
+</div><div class="post-footer" id="post-footer">
+    <div class="post-info">
+        <div class="post-info-line">
+            <div class="post-info-mod">
+                <span>Updated on 2025-05-25</span>
+            </div></div>
+        <div class="post-info-line">
+            <div class="post-info-md"><span>
+                            <a class="link-to-markdown" href="/posts/spark_physical_plan/index.md" target="_blank">Read Markdown</a>
+                        </span></div>
+            <div class="post-info-share">
+                <span><a href="javascript:void(0);" title="Share on X" data-sharer="x" data-url="http://example.org/posts/spark_physical_plan/" data-title="Spark物理执行计划" data-hashtags="Spark"><i class="fab fa-x-twitter fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Threads" data-sharer="threads" data-url="http://example.org/posts/spark_physical_plan/" data-title="Spark物理执行计划"><i class="fab fa-threads fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Facebook" data-sharer="facebook" data-url="http://example.org/posts/spark_physical_plan/" data-hashtag="Spark"><i class="fab fa-facebook-square fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Hacker News" data-sharer="hackernews" data-url="http://example.org/posts/spark_physical_plan/" data-title="Spark物理执行计划"><i class="fab fa-hacker-news fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Line" data-sharer="line" data-url="http://example.org/posts/spark_physical_plan/" data-title="Spark物理执行计划"><i data-svg-src="https://cdn.jsdelivr.net/npm/simple-icons@14.9.0/icons/line.svg" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on 微博" data-sharer="weibo" data-url="http://example.org/posts/spark_physical_plan/" data-title="Spark物理执行计划"><i class="fab fa-weibo fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Diaspora" data-sharer="diaspora" data-url="http://example.org/posts/spark_physical_plan/" data-title="Spark物理执行计划" data-description=""><i class="fab fa-diaspora fa-fw" aria-hidden="true"></i></a><a href="https://t.me/share/url?url=http%3a%2f%2fexample.org%2fposts%2fspark_physical_plan%2f&amp;text=Spark%e7%89%a9%e7%90%86%e6%89%a7%e8%a1%8c%e8%ae%a1%e5%88%92" target="_blank" title="Share on Telegram"><i class="fab fa-telegram fa-fw" aria-hidden="true"></i></a></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="post-info-more">
+        <section class="post-tags"><i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/spark/">Spark</a></section>
+        <section>
+            <span><a href="javascript:void(0);" onclick="window.history.back();">Back</a></span>&nbsp;|&nbsp;<span><a href="/">Home</a></span>
+        </section>
+    </div>
+
+    <div class="post-nav"><a href="/posts/grpc-metric/" class="prev" rel="prev" title="Grpc Metric"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>Grpc Metric</a></div>
+</div>
+<div id="comments"><div id="utterances" class="comment"></div><noscript>
+                Please enable JavaScript to view the comments powered by <a href="https://utteranc.es/">utterances</a>.
+            </noscript></div></article></div>
+            </main><footer class="footer">
+        <div class="footer-container"><div class="footer-line">Powered by <a href="https://gohugo.io/" target="_blank" rel="noopener noreffer" title="Hugo 0.140.2">Hugo</a> | Theme - <a href="https://github.com/dillonzq/LoveIt" target="_blank" rel="noopener noreffer" title="LoveIt 0.3.1-DEV"><i class="far fa-kiss-wink-heart fa-fw" aria-hidden="true"></i> LoveIt</a>
+                </div><div class="footer-line" itemscope itemtype="http://schema.org/CreativeWork"><i class="far fa-copyright fa-fw" aria-hidden="true"></i><span itemprop="copyrightYear">2022 - 2025</span><span class="author" itemprop="copyrightHolder">&nbsp;<a href="/" target="_blank">xxxx</a></span></div>
+        </div>
+    </footer></div>
+
+        <div id="fixed-buttons"><a href="#" id="back-to-top" class="fixed-button" title="Back to Top">
+                <i class="fas fa-arrow-up fa-fw" aria-hidden="true"></i>
+            </a>
+        </div>
+
+        <div id="fixed-buttons-hidden"><a href="#" id="view-comments" class="fixed-button" title="View Comments">
+                <i class="fas fa-comment fa-fw" aria-hidden="true"></i>
+            </a>
+        </div><script src="https://cdn.jsdelivr.net/npm/autocomplete.js@0.38.1/dist/autocomplete.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lunr@2.3.9/lunr.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lazysizes@5.3.2/lazysizes.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js"></script><script src="https://cdn.jsdelivr.net/npm/sharer.js@0.5.2/sharer.min.js"></script><script>window.config={"comment":{"utterances":{"darkTheme":"github-dark","issueTerm":"pathname","label":"","lightTheme":"github-light","repo":"ShadowUnderMoon/ShadowUnderMoon.github.io"}},"search":{"highlightTag":"em","lunrIndexURL":"/index.json","maxResultLength":10,"noResultsFound":"No results found","snippetLength":50,"type":"lunr"}};</script><script src="/js/theme.min.js"></script></body>
+</html>
