@@ -37,7 +37,7 @@ MinIO 提供了命令行工具xl-meta用来查看xl.meta文件
         "mainEntityOfPage": {
             "@type": "WebPage",
             "@id": "http:\/\/example.org\/posts\/minio-get-started\/"
-        },"genre": "posts","keywords": "MinIO","wordcount":  9579 ,
+        },"genre": "posts","keywords": "MinIO","wordcount":  11805 ,
         "url": "http:\/\/example.org\/posts\/minio-get-started\/","datePublished": "2025-01-22T19:03:56+08:00","dateModified": "2025-01-22T19:03:56+08:00","publisher": {
             "@type": "Organization",
             "name": ""},"author": {
@@ -111,8 +111,8 @@ MinIO 提供了命令行工具xl-meta用来查看xl.meta文件
             <div class="toc-content" id="toc-content-auto"></div>
         </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">MinIO大杂烩</h1><div class="post-meta">
             <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/minio/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>MinIO</a></span></div>
-            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-01-22">2025-01-22</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;9579 words&nbsp;
-                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;20 minutes&nbsp;</div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-01-22">2025-01-22</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;11805 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;24 minutes&nbsp;</div>
         </div><div class="details toc" id="toc-static"  data-kept="">
                 <div class="details-summary toc-title">
                     <span>Contents</span>
@@ -145,6 +145,7 @@ MinIO 提供了命令行工具xl-meta用来查看xl.meta文件
       <ul>
         <li><a href="#block-和-shard">block 和 shard</a></li>
         <li><a href="#putobject-的主要流程">putObject 的主要流程</a></li>
+        <li><a href="#putobject选择serverpool">putObject选择serverPool</a></li>
       </ul>
     </li>
     <li><a href="#名字空间锁的实现原理-todo">名字空间锁的实现原理 （TODO)</a>
@@ -1189,6 +1190,184 @@ MinIO 提供了命令行工具xl-meta用来查看xl.meta文件
 <li>rename 操作，包含将分片移动到目标目录以及写入 <code>xl.meta</code>元数据</li>
 <li>最后好像有提交操作，没有看懂</li>
 </ol>
+<h3 id="putobject选择serverpool">putObject选择serverPool</h3>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// PutObject - writes an object to least used erasure pool.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">z</span> <span class="o">*</span><span class="nx">erasureServerPools</span><span class="p">)</span> <span class="nf">PutObject</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">bucket</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">object</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">data</span> <span class="o">*</span><span class="nx">PutObjReader</span><span class="p">,</span> <span class="nx">opts</span> <span class="nx">ObjectOptions</span><span class="p">)</span> <span class="p">(</span><span class="nx">ObjectInfo</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// Validate put object input args.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nf">checkPutObjectArgs</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">ObjectInfo</span><span class="p">{},</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">object</span> <span class="p">=</span> <span class="nf">encodeDirObject</span><span class="p">(</span><span class="nx">object</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">z</span><span class="p">.</span><span class="nf">SinglePool</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">z</span><span class="p">.</span><span class="nx">serverPools</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nf">PutObject</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">,</span> <span class="nx">data</span><span class="p">,</span> <span class="nx">opts</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">idx</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">z</span><span class="p">.</span><span class="nf">getPoolIdx</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">,</span> <span class="nx">data</span><span class="p">.</span><span class="nf">Size</span><span class="p">())</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">ObjectInfo</span><span class="p">{},</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">opts</span><span class="p">.</span><span class="nx">DataMovement</span> <span class="o">&amp;&amp;</span> <span class="nx">idx</span> <span class="o">==</span> <span class="nx">opts</span><span class="p">.</span><span class="nx">SrcPoolIdx</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">ObjectInfo</span><span class="p">{},</span> <span class="nx">DataMovementOverwriteErr</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Bucket</span><span class="p">:</span>    <span class="nx">bucket</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Object</span><span class="p">:</span>    <span class="nx">object</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">VersionID</span><span class="p">:</span> <span class="nx">opts</span><span class="p">.</span><span class="nx">VersionID</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Err</span><span class="p">:</span>       <span class="nx">errDataMovementSrcDstPoolSame</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">z</span><span class="p">.</span><span class="nx">serverPools</span><span class="p">[</span><span class="nx">idx</span><span class="p">].</span><span class="nf">PutObject</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">,</span> <span class="nx">data</span><span class="p">,</span> <span class="nx">opts</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>如果只有一个server pool，那只能使用当前的server pool。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// getPoolIdx returns the found previous object and its corresponding pool idx,
+</span></span></span><span class="line"><span class="cl"><span class="c1">// if none are found falls back to most available space pool, this function is
+</span></span></span><span class="line"><span class="cl"><span class="c1">// designed to be only used by PutObject, CopyObject (newObject creation) and NewMultipartUpload.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">z</span> <span class="o">*</span><span class="nx">erasureServerPools</span><span class="p">)</span> <span class="nf">getPoolIdx</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">size</span> <span class="kt">int64</span><span class="p">)</span> <span class="p">(</span><span class="nx">idx</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">err</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">idx</span><span class="p">,</span> <span class="nx">err</span> <span class="p">=</span> <span class="nx">z</span><span class="p">.</span><span class="nf">getPoolIdxExistingWithOpts</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">,</span> <span class="nx">ObjectOptions</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">SkipDecommissioned</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">SkipRebalancing</span><span class="p">:</span>    <span class="kc">true</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="p">!</span><span class="nf">isErrObjectNotFound</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">idx</span><span class="p">,</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nf">isErrObjectNotFound</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">idx</span> <span class="p">=</span> <span class="nx">z</span><span class="p">.</span><span class="nf">getAvailablePoolIdx</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">,</span> <span class="nx">size</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">idx</span> <span class="p">&lt;</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nf">toObjectErr</span><span class="p">(</span><span class="nx">errDiskFull</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">idx</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>如果对象在某个server pool中已经存在，则返回对应的server pool，否则选择空闲容量最多的server pool。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">z</span> <span class="o">*</span><span class="nx">erasureServerPools</span><span class="p">)</span> <span class="nf">getPoolInfoExistingWithOpts</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">opts</span> <span class="nx">ObjectOptions</span><span class="p">)</span> <span class="p">(</span><span class="nx">PoolObjInfo</span><span class="p">,</span> <span class="p">[]</span><span class="nx">poolErrs</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">noReadQuorumPools</span> <span class="p">[]</span><span class="nx">poolErrs</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">poolObjInfos</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="nx">PoolObjInfo</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">z</span><span class="p">.</span><span class="nx">serverPools</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">poolOpts</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="nx">ObjectOptions</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">z</span><span class="p">.</span><span class="nx">serverPools</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">z</span><span class="p">.</span><span class="nx">serverPools</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">poolOpts</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">=</span> <span class="nx">opts</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">wg</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">WaitGroup</span>
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">i</span><span class="p">,</span> <span class="nx">pool</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">z</span><span class="p">.</span><span class="nx">serverPools</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">wg</span><span class="p">.</span><span class="nf">Add</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">go</span> <span class="kd">func</span><span class="p">(</span><span class="nx">i</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">pool</span> <span class="o">*</span><span class="nx">erasureSets</span><span class="p">,</span> <span class="nx">opts</span> <span class="nx">ObjectOptions</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">defer</span> <span class="nx">wg</span><span class="p">.</span><span class="nf">Done</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// remember the pool index, we may sort the slice original index might be lost.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">pinfo</span> <span class="o">:=</span> <span class="nx">PoolObjInfo</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Index</span><span class="p">:</span> <span class="nx">i</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">			<span class="p">}</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// do not remove this check as it can lead to inconsistencies
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="c1">// for all callers of bucket replication.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="k">if</span> <span class="p">!</span><span class="nx">opts</span><span class="p">.</span><span class="nx">MetadataChg</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">opts</span><span class="p">.</span><span class="nx">VersionID</span> <span class="p">=</span> <span class="s">&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">			<span class="p">}</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">pinfo</span><span class="p">.</span><span class="nx">ObjInfo</span><span class="p">,</span> <span class="nx">pinfo</span><span class="p">.</span><span class="nx">Err</span> <span class="p">=</span> <span class="nx">pool</span><span class="p">.</span><span class="nf">GetObjectInfo</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">,</span> <span class="nx">opts</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">poolObjInfos</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">=</span> <span class="nx">pinfo</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}(</span><span class="nx">i</span><span class="p">,</span> <span class="nx">pool</span><span class="p">,</span> <span class="nx">poolOpts</span><span class="p">[</span><span class="nx">i</span><span class="p">])</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">wg</span><span class="p">.</span><span class="nf">Wait</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// Sort the objInfos such that we always serve latest
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// this is a defensive change to handle any duplicate
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// content that may have been created, we always serve
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// the latest object.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">sort</span><span class="p">.</span><span class="nf">Slice</span><span class="p">(</span><span class="nx">poolObjInfos</span><span class="p">,</span> <span class="kd">func</span><span class="p">(</span><span class="nx">i</span><span class="p">,</span> <span class="nx">j</span> <span class="kt">int</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">mtime1</span> <span class="o">:=</span> <span class="nx">poolObjInfos</span><span class="p">[</span><span class="nx">i</span><span class="p">].</span><span class="nx">ObjInfo</span><span class="p">.</span><span class="nx">ModTime</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">mtime2</span> <span class="o">:=</span> <span class="nx">poolObjInfos</span><span class="p">[</span><span class="nx">j</span><span class="p">].</span><span class="nx">ObjInfo</span><span class="p">.</span><span class="nx">ModTime</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">mtime1</span><span class="p">.</span><span class="nf">After</span><span class="p">(</span><span class="nx">mtime2</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">defPool</span> <span class="o">:=</span> <span class="nx">PoolObjInfo</span><span class="p">{</span><span class="nx">Index</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">pinfo</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">poolObjInfos</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// skip all objects from suspended pools if asked by the
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="c1">// caller.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">if</span> <span class="nx">opts</span><span class="p">.</span><span class="nx">SkipDecommissioned</span> <span class="o">&amp;&amp;</span> <span class="nx">z</span><span class="p">.</span><span class="nf">IsSuspended</span><span class="p">(</span><span class="nx">pinfo</span><span class="p">.</span><span class="nx">Index</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">continue</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// Skip object if it&#39;s from pools participating in a rebalance operation.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">if</span> <span class="nx">opts</span><span class="p">.</span><span class="nx">SkipRebalancing</span> <span class="o">&amp;&amp;</span> <span class="nx">z</span><span class="p">.</span><span class="nf">IsPoolRebalancing</span><span class="p">(</span><span class="nx">pinfo</span><span class="p">.</span><span class="nx">Index</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">continue</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">pinfo</span><span class="p">.</span><span class="nx">Err</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// found a pool
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="k">return</span> <span class="nx">pinfo</span><span class="p">,</span> <span class="nx">z</span><span class="p">.</span><span class="nf">poolsWithObject</span><span class="p">(</span><span class="nx">poolObjInfos</span><span class="p">,</span> <span class="nx">opts</span><span class="p">),</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nf">isErrReadQuorum</span><span class="p">(</span><span class="nx">pinfo</span><span class="p">.</span><span class="nx">Err</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">!</span><span class="nx">opts</span><span class="p">.</span><span class="nx">MetadataChg</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// read quorum is returned when the object is visibly
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="c1">// present but its unreadable, we simply ask the writes to
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="c1">// schedule to this pool instead. If there is no quorum
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="c1">// it will fail anyways, however if there is quorum available
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="c1">// with enough disks online but sufficiently inconsistent to
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="c1">// break parity threshold, allow them to be overwritten
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="c1">// or allow new versions to be added.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span> <span class="nx">pinfo</span><span class="p">,</span> <span class="nx">z</span><span class="p">.</span><span class="nf">poolsWithObject</span><span class="p">(</span><span class="nx">poolObjInfos</span><span class="p">,</span> <span class="nx">opts</span><span class="p">),</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">defPool</span> <span class="p">=</span> <span class="nx">pinfo</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="p">!</span><span class="nf">isErrObjectNotFound</span><span class="p">(</span><span class="nx">pinfo</span><span class="p">.</span><span class="nx">Err</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">!</span><span class="nf">isErrVersionNotFound</span><span class="p">(</span><span class="nx">pinfo</span><span class="p">.</span><span class="nx">Err</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span> <span class="nx">pinfo</span><span class="p">,</span> <span class="nx">noReadQuorumPools</span><span class="p">,</span> <span class="nx">pinfo</span><span class="p">.</span><span class="nx">Err</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">		<span class="c1">// No object exists or its a delete marker,
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="c1">// check objInfo to confirm.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">if</span> <span class="nx">pinfo</span><span class="p">.</span><span class="nx">ObjInfo</span><span class="p">.</span><span class="nx">DeleteMarker</span> <span class="o">&amp;&amp;</span> <span class="nx">pinfo</span><span class="p">.</span><span class="nx">ObjInfo</span><span class="p">.</span><span class="nx">Name</span> <span class="o">!=</span> <span class="s">&#34;&#34;</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span> <span class="nx">pinfo</span><span class="p">,</span> <span class="nx">noReadQuorumPools</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">opts</span><span class="p">.</span><span class="nx">ReplicationRequest</span> <span class="o">&amp;&amp;</span> <span class="nx">opts</span><span class="p">.</span><span class="nx">DeleteMarker</span> <span class="o">&amp;&amp;</span> <span class="nx">defPool</span><span class="p">.</span><span class="nx">Index</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// If the request is a delete marker replication request, return a default pool
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="c1">// in cases where the object does not exist.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="c1">// This is to ensure that the delete marker is replicated to the destination.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">return</span> <span class="nx">defPool</span><span class="p">,</span> <span class="nx">noReadQuorumPools</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">PoolObjInfo</span><span class="p">{},</span> <span class="nx">noReadQuorumPools</span><span class="p">,</span> <span class="nf">toObjectErr</span><span class="p">(</span><span class="nx">errFileNotFound</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>遍历所有的serverPool，调用<code>pool.getObjectInfo</code>在每个server pool中查找对应对象，如果同时在多个server pool中存在对应对象，则选择最新的对象。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// GetObjectInfo - reads object metadata from the hashedSet based on the object name.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">erasureSets</span><span class="p">)</span> <span class="nf">GetObjectInfo</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">opts</span> <span class="nx">ObjectOptions</span><span class="p">)</span> <span class="p">(</span><span class="nx">objInfo</span> <span class="nx">ObjectInfo</span><span class="p">,</span> <span class="nx">err</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">set</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.</span><span class="nf">getHashedSet</span><span class="p">(</span><span class="nx">object</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">set</span><span class="p">.</span><span class="nf">GetObjectInfo</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">,</span> <span class="nx">opts</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// Returns always a same erasure coded set for a given input.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">erasureSets</span><span class="p">)</span> <span class="nf">getHashedSet</span><span class="p">(</span><span class="nx">input</span> <span class="kt">string</span><span class="p">)</span> <span class="p">(</span><span class="nx">set</span> <span class="o">*</span><span class="nx">erasureObjects</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">s</span><span class="p">.</span><span class="nx">sets</span><span class="p">[</span><span class="nx">s</span><span class="p">.</span><span class="nf">getHashedSetIndex</span><span class="p">(</span><span class="nx">input</span><span class="p">)]</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">hashKey</span><span class="p">(</span><span class="nx">algo</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">key</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">cardinality</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">id</span> <span class="p">[</span><span class="mi">16</span><span class="p">]</span><span class="kt">byte</span><span class="p">)</span> <span class="kt">int</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">switch</span> <span class="nx">algo</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">case</span> <span class="nx">formatErasureVersionV2DistributionAlgoV1</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nf">crcHashMod</span><span class="p">(</span><span class="nx">key</span><span class="p">,</span> <span class="nx">cardinality</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">case</span> <span class="nx">formatErasureVersionV3DistributionAlgoV2</span><span class="p">,</span> <span class="nx">formatErasureVersionV3DistributionAlgoV3</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nf">sipHashMod</span><span class="p">(</span><span class="nx">key</span><span class="p">,</span> <span class="nx">cardinality</span><span class="p">,</span> <span class="nx">id</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">default</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// Unknown algorithm returns -1, also if cardinality is lesser than 0.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>在同一个server pool中，一个对象总是加入到同一个earsure set中。所以在一个server pool中只需要检查一个erasure set就可以确定对象是否在这个server pool中。</p>
 <h2 id="名字空间锁的实现原理-todo">名字空间锁的实现原理 （TODO)</h2>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-go">
@@ -1363,6 +1542,281 @@ MinIO 提供了命令行工具xl-meta用来查看xl.meta文件
 <li>通过读取<code>xl.meta</code>获取对象的元数据信息，<code>xl.meta</code>保存了<code>part</code>和<code>verison</code>的全部信息，注意可能存在某些磁盘上的<code>xl.meta</code>由于故障而修改落后，所以依然需要读取法定人数的磁盘，从而确定实际的元数据</li>
 <li>如果 http 请求通过<code>part</code>或者<code>range</code>要求读取部分数据，最终都会转换成对多个 part 的读取，每个 part 都会划分成不同的<code>block</code>进行操作。</li>
 </ul>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">z</span> <span class="o">*</span><span class="nx">erasureServerPools</span><span class="p">)</span> <span class="nf">GetObjectNInfo</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">rs</span> <span class="o">*</span><span class="nx">HTTPRangeSpec</span><span class="p">,</span> <span class="nx">h</span> <span class="nx">http</span><span class="p">.</span><span class="nx">Header</span><span class="p">,</span> <span class="nx">opts</span> <span class="nx">ObjectOptions</span><span class="p">)</span> <span class="p">(</span><span class="nx">gr</span> <span class="o">*</span><span class="nx">GetObjectReader</span><span class="p">,</span> <span class="nx">err</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="p">=</span> <span class="nf">checkGetObjArgs</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// This is a special call attempted first to check for SOS-API calls.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">gr</span><span class="p">,</span> <span class="nx">err</span> <span class="p">=</span> <span class="nf">veeamSOSAPIGetObject</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">,</span> <span class="nx">rs</span><span class="p">,</span> <span class="nx">opts</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">gr</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// reset any error to &#39;nil&#39; and any reader to be &#39;nil&#39;
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">gr</span> <span class="p">=</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">err</span> <span class="p">=</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">object</span> <span class="p">=</span> <span class="nf">encodeDirObject</span><span class="p">(</span><span class="nx">object</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">z</span><span class="p">.</span><span class="nf">SinglePool</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">z</span><span class="p">.</span><span class="nx">serverPools</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nf">GetObjectNInfo</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">,</span> <span class="nx">rs</span><span class="p">,</span> <span class="nx">h</span><span class="p">,</span> <span class="nx">opts</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">unlockOnDefer</span> <span class="kt">bool</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">nsUnlocker</span> <span class="o">:=</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">defer</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">unlockOnDefer</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nf">nsUnlocker</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// Acquire lock
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="p">!</span><span class="nx">opts</span><span class="p">.</span><span class="nx">NoLock</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">lock</span> <span class="o">:=</span> <span class="nx">z</span><span class="p">.</span><span class="nf">NewNSLock</span><span class="p">(</span><span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">lkctx</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">lock</span><span class="p">.</span><span class="nf">GetRLock</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">globalOperationTimeout</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">ctx</span> <span class="p">=</span> <span class="nx">lkctx</span><span class="p">.</span><span class="nf">Context</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">nsUnlocker</span> <span class="p">=</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span> <span class="nx">lock</span><span class="p">.</span><span class="nf">RUnlock</span><span class="p">(</span><span class="nx">lkctx</span><span class="p">)</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">unlockOnDefer</span> <span class="p">=</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">checkPrecondFn</span> <span class="o">:=</span> <span class="nx">opts</span><span class="p">.</span><span class="nx">CheckPrecondFn</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">opts</span><span class="p">.</span><span class="nx">CheckPrecondFn</span> <span class="p">=</span> <span class="kc">nil</span> <span class="c1">// do not need to apply pre-conditions at lower layer.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">opts</span><span class="p">.</span><span class="nx">NoLock</span> <span class="p">=</span> <span class="kc">true</span>        <span class="c1">// no locks needed at lower levels for getObjectInfo()
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">objInfo</span><span class="p">,</span> <span class="nx">zIdx</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">z</span><span class="p">.</span><span class="nf">getLatestObjectInfoWithIdx</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">,</span> <span class="nx">opts</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">objInfo</span><span class="p">.</span><span class="nx">DeleteMarker</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">if</span> <span class="nx">opts</span><span class="p">.</span><span class="nx">VersionID</span> <span class="o">==</span> <span class="s">&#34;&#34;</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="k">return</span> <span class="o">&amp;</span><span class="nx">GetObjectReader</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">ObjInfo</span><span class="p">:</span> <span class="nx">objInfo</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">				<span class="p">},</span> <span class="nf">toObjectErr</span><span class="p">(</span><span class="nx">errFileNotFound</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="p">}</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// Make sure to return object info to provide extra information.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="k">return</span> <span class="o">&amp;</span><span class="nx">GetObjectReader</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">ObjInfo</span><span class="p">:</span> <span class="nx">objInfo</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">			<span class="p">},</span> <span class="nf">toObjectErr</span><span class="p">(</span><span class="nx">errMethodNotAllowed</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// check preconditions before reading the stream.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">checkPrecondFn</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nf">checkPrecondFn</span><span class="p">(</span><span class="nx">objInfo</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">PreConditionFailed</span><span class="p">{}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">opts</span><span class="p">.</span><span class="nx">NoLock</span> <span class="p">=</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">gr</span><span class="p">,</span> <span class="nx">err</span> <span class="p">=</span> <span class="nx">z</span><span class="p">.</span><span class="nx">serverPools</span><span class="p">[</span><span class="nx">zIdx</span><span class="p">].</span><span class="nf">GetObjectNInfo</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">,</span> <span class="nx">rs</span><span class="p">,</span> <span class="nx">h</span><span class="p">,</span> <span class="nx">opts</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">unlockOnDefer</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">unlockOnDefer</span> <span class="p">=</span> <span class="nx">gr</span><span class="p">.</span><span class="nx">ObjInfo</span><span class="p">.</span><span class="nx">Inlined</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="p">!</span><span class="nx">unlockOnDefer</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">gr</span><span class="p">.</span><span class="nf">WithCleanupFuncs</span><span class="p">(</span><span class="nx">nsUnlocker</span><span class="p">),</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">gr</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// getLatestObjectInfoWithIdx returns the objectInfo of the latest object from multiple pools (this function
+</span></span></span><span class="line"><span class="cl"><span class="c1">// is present in-case there were duplicate writes to both pools, this function also returns the
+</span></span></span><span class="line"><span class="cl"><span class="c1">// additional index where the latest object exists, that is used to start the GetObject stream.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">z</span> <span class="o">*</span><span class="nx">erasureServerPools</span><span class="p">)</span> <span class="nf">getLatestObjectInfoWithIdx</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">opts</span> <span class="nx">ObjectOptions</span><span class="p">)</span> <span class="p">(</span><span class="nx">ObjectInfo</span><span class="p">,</span> <span class="kt">int</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">object</span> <span class="p">=</span> <span class="nf">encodeDirObject</span><span class="p">(</span><span class="nx">object</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">results</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">zIdx</span> <span class="kt">int</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">oi</span>   <span class="nx">ObjectInfo</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">err</span>  <span class="kt">error</span>
+</span></span><span class="line"><span class="cl">	<span class="p">},</span> <span class="nb">len</span><span class="p">(</span><span class="nx">z</span><span class="p">.</span><span class="nx">serverPools</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">wg</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">WaitGroup</span>
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">i</span><span class="p">,</span> <span class="nx">pool</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">z</span><span class="p">.</span><span class="nx">serverPools</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">wg</span><span class="p">.</span><span class="nf">Add</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">go</span> <span class="kd">func</span><span class="p">(</span><span class="nx">i</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">pool</span> <span class="o">*</span><span class="nx">erasureSets</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">defer</span> <span class="nx">wg</span><span class="p">.</span><span class="nf">Done</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">results</span><span class="p">[</span><span class="nx">i</span><span class="p">].</span><span class="nx">zIdx</span> <span class="p">=</span> <span class="nx">i</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">results</span><span class="p">[</span><span class="nx">i</span><span class="p">].</span><span class="nx">oi</span><span class="p">,</span> <span class="nx">results</span><span class="p">[</span><span class="nx">i</span><span class="p">].</span><span class="nx">err</span> <span class="p">=</span> <span class="nx">pool</span><span class="p">.</span><span class="nf">GetObjectInfo</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">object</span><span class="p">,</span> <span class="nx">opts</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}(</span><span class="nx">i</span><span class="p">,</span> <span class="nx">pool</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">wg</span><span class="p">.</span><span class="nf">Wait</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// Sort the objInfos such that we always serve latest
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// this is a defensive change to handle any duplicate
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// content that may have been created, we always serve
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// the latest object.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">sort</span><span class="p">.</span><span class="nf">Slice</span><span class="p">(</span><span class="nx">results</span><span class="p">,</span> <span class="kd">func</span><span class="p">(</span><span class="nx">i</span><span class="p">,</span> <span class="nx">j</span> <span class="kt">int</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">a</span><span class="p">,</span> <span class="nx">b</span> <span class="o">:=</span> <span class="nx">results</span><span class="p">[</span><span class="nx">i</span><span class="p">],</span> <span class="nx">results</span><span class="p">[</span><span class="nx">j</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">a</span><span class="p">.</span><span class="nx">oi</span><span class="p">.</span><span class="nx">ModTime</span><span class="p">.</span><span class="nf">Equal</span><span class="p">(</span><span class="nx">b</span><span class="p">.</span><span class="nx">oi</span><span class="p">.</span><span class="nx">ModTime</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// On tiebreak, select the lowest pool index.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="k">return</span> <span class="nx">a</span><span class="p">.</span><span class="nx">zIdx</span> <span class="p">&lt;</span> <span class="nx">b</span><span class="p">.</span><span class="nx">zIdx</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">a</span><span class="p">.</span><span class="nx">oi</span><span class="p">.</span><span class="nx">ModTime</span><span class="p">.</span><span class="nf">After</span><span class="p">(</span><span class="nx">b</span><span class="p">.</span><span class="nx">oi</span><span class="p">.</span><span class="nx">ModTime</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">res</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">results</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">err</span> <span class="o">:=</span> <span class="nx">res</span><span class="p">.</span><span class="nx">err</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">err</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span> <span class="nx">res</span><span class="p">.</span><span class="nx">oi</span><span class="p">,</span> <span class="nx">res</span><span class="p">.</span><span class="nx">zIdx</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="p">!</span><span class="nf">isErrObjectNotFound</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">!</span><span class="nf">isErrVersionNotFound</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// some errors such as MethodNotAllowed for delete marker
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="c1">// should be returned upwards.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="k">return</span> <span class="nx">res</span><span class="p">.</span><span class="nx">oi</span><span class="p">,</span> <span class="nx">res</span><span class="p">.</span><span class="nx">zIdx</span><span class="p">,</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// When its a delete marker and versionID is empty
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="c1">// we should simply return the error right away.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">if</span> <span class="nx">res</span><span class="p">.</span><span class="nx">oi</span><span class="p">.</span><span class="nx">DeleteMarker</span> <span class="o">&amp;&amp;</span> <span class="nx">opts</span><span class="p">.</span><span class="nx">VersionID</span> <span class="o">==</span> <span class="s">&#34;&#34;</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span> <span class="nx">res</span><span class="p">.</span><span class="nx">oi</span><span class="p">,</span> <span class="nx">res</span><span class="p">.</span><span class="nx">zIdx</span><span class="p">,</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">object</span> <span class="p">=</span> <span class="nf">decodeDirObject</span><span class="p">(</span><span class="nx">object</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">opts</span><span class="p">.</span><span class="nx">VersionID</span> <span class="o">!=</span> <span class="s">&#34;&#34;</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">ObjectInfo</span><span class="p">{},</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nx">VersionNotFound</span><span class="p">{</span><span class="nx">Bucket</span><span class="p">:</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">Object</span><span class="p">:</span> <span class="nx">object</span><span class="p">,</span> <span class="nx">VersionID</span><span class="p">:</span> <span class="nx">opts</span><span class="p">.</span><span class="nx">VersionID</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">ObjectInfo</span><span class="p">{},</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nx">ObjectNotFound</span><span class="p">{</span><span class="nx">Bucket</span><span class="p">:</span> <span class="nx">bucket</span><span class="p">,</span> <span class="nx">Object</span><span class="p">:</span> <span class="nx">object</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>geLatestObjectIfoWithIdx需要遍历所有的server pool，对每个server pool调用<code>getObjectInfo</code>获取对象信息，最终返回最新的对象信息。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-go">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// Returns if buf can be erasure decoded.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="o">*</span><span class="nx">parallelReader</span><span class="p">)</span> <span class="nf">canDecode</span><span class="p">(</span><span class="nx">buf</span> <span class="p">[][]</span><span class="kt">byte</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">bufCount</span> <span class="o">:=</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">b</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">buf</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">b</span><span class="p">)</span> <span class="p">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">bufCount</span><span class="o">++</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">bufCount</span> <span class="o">&gt;=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">dataBlocks</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// Read reads from readers in parallel. Returns p.dataBlocks number of bufs.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="o">*</span><span class="nx">parallelReader</span><span class="p">)</span> <span class="nf">Read</span><span class="p">(</span><span class="nx">dst</span> <span class="p">[][]</span><span class="kt">byte</span><span class="p">)</span> <span class="p">([][]</span><span class="kt">byte</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">newBuf</span> <span class="o">:=</span> <span class="nx">dst</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">dst</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">readers</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">newBuf</span> <span class="p">=</span> <span class="nb">make</span><span class="p">([][]</span><span class="kt">byte</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">readers</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">newBuf</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">newBuf</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">=</span> <span class="nx">newBuf</span><span class="p">[</span><span class="nx">i</span><span class="p">][:</span><span class="mi">0</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">newBufLK</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">RWMutex</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">p</span><span class="p">.</span><span class="nx">offset</span><span class="o">+</span><span class="nx">p</span><span class="p">.</span><span class="nx">shardSize</span> <span class="p">&gt;</span> <span class="nx">p</span><span class="p">.</span><span class="nx">shardFileSize</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">p</span><span class="p">.</span><span class="nx">shardSize</span> <span class="p">=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">shardFileSize</span> <span class="o">-</span> <span class="nx">p</span><span class="p">.</span><span class="nx">offset</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">p</span><span class="p">.</span><span class="nx">shardSize</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">newBuf</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">readTriggerCh</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">bool</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">readers</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">	<span class="k">defer</span> <span class="nx">xioutil</span><span class="p">.</span><span class="nf">SafeClose</span><span class="p">(</span><span class="nx">readTriggerCh</span><span class="p">)</span> <span class="c1">// close the channel upon return
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="nx">p</span><span class="p">.</span><span class="nx">dataBlocks</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// Setup read triggers for p.dataBlocks number of reads so that it reads in parallel.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">readTriggerCh</span> <span class="o">&lt;-</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">disksNotFound</span> <span class="o">:=</span> <span class="nb">int32</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">bitrotHeal</span> <span class="o">:=</span> <span class="nb">int32</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>       <span class="c1">// Atomic bool flag.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">missingPartsHeal</span> <span class="o">:=</span> <span class="nb">int32</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="c1">// Atomic bool flag.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">readerIndex</span> <span class="o">:=</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">wg</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">WaitGroup</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// if readTrigger is true, it implies next disk.ReadAt() should be tried
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// if readTrigger is false, it implies previous disk.ReadAt() was successful and there is no need
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// to try reading the next disk.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">for</span> <span class="nx">readTrigger</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">readTriggerCh</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">newBufLK</span><span class="p">.</span><span class="nf">RLock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">canDecode</span> <span class="o">:=</span> <span class="nx">p</span><span class="p">.</span><span class="nf">canDecode</span><span class="p">(</span><span class="nx">newBuf</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">newBufLK</span><span class="p">.</span><span class="nf">RUnlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">canDecode</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">break</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">readerIndex</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">readers</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">break</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="p">!</span><span class="nx">readTrigger</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">continue</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">wg</span><span class="p">.</span><span class="nf">Add</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">go</span> <span class="kd">func</span><span class="p">(</span><span class="nx">i</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">defer</span> <span class="nx">wg</span><span class="p">.</span><span class="nf">Done</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">rr</span> <span class="o">:=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">readers</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">			<span class="k">if</span> <span class="nx">rr</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="c1">// Since reader is nil, trigger another read.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>				<span class="nx">readTriggerCh</span> <span class="o">&lt;-</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl">				<span class="k">return</span>
+</span></span><span class="line"><span class="cl">			<span class="p">}</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">bufIdx</span> <span class="o">:=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">readerToBuf</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">			<span class="k">if</span> <span class="nx">p</span><span class="p">.</span><span class="nx">buf</span><span class="p">[</span><span class="nx">bufIdx</span><span class="p">]</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="c1">// Reading first time on this disk, hence the buffer needs to be allocated.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>				<span class="c1">// Subsequent reads will reuse this buffer.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>				<span class="nx">p</span><span class="p">.</span><span class="nx">buf</span><span class="p">[</span><span class="nx">bufIdx</span><span class="p">]</span> <span class="p">=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="nx">p</span><span class="p">.</span><span class="nx">shardSize</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="p">}</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// For the last shard, the shardsize might be less than previous shard sizes.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="c1">// Hence the following statement ensures that the buffer size is reset to the right size.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">p</span><span class="p">.</span><span class="nx">buf</span><span class="p">[</span><span class="nx">bufIdx</span><span class="p">]</span> <span class="p">=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">buf</span><span class="p">[</span><span class="nx">bufIdx</span><span class="p">][:</span><span class="nx">p</span><span class="p">.</span><span class="nx">shardSize</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">n</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">rr</span><span class="p">.</span><span class="nf">ReadAt</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">buf</span><span class="p">[</span><span class="nx">bufIdx</span><span class="p">],</span> <span class="nx">p</span><span class="p">.</span><span class="nx">offset</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="k">switch</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="k">case</span> <span class="nx">errors</span><span class="p">.</span><span class="nf">Is</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">errFileNotFound</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">atomic</span><span class="p">.</span><span class="nf">StoreInt32</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">missingPartsHeal</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">				<span class="k">case</span> <span class="nx">errors</span><span class="p">.</span><span class="nf">Is</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">errFileCorrupt</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">atomic</span><span class="p">.</span><span class="nf">StoreInt32</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">bitrotHeal</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">				<span class="k">case</span> <span class="nx">errors</span><span class="p">.</span><span class="nf">Is</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">errDiskNotFound</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">atomic</span><span class="p">.</span><span class="nf">AddInt32</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">disksNotFound</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">				<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">				<span class="c1">// This will be communicated upstream.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>				<span class="nx">p</span><span class="p">.</span><span class="nx">orgReaders</span><span class="p">[</span><span class="nx">bufIdx</span><span class="p">]</span> <span class="p">=</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">				<span class="k">if</span> <span class="nx">br</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">readers</span><span class="p">[</span><span class="nx">i</span><span class="p">].(</span><span class="nx">io</span><span class="p">.</span><span class="nx">Closer</span><span class="p">);</span> <span class="nx">ok</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">br</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">				<span class="p">}</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">p</span><span class="p">.</span><span class="nx">readers</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">=</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">				<span class="c1">// Since ReadAt returned error, trigger another read.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>				<span class="nx">readTriggerCh</span> <span class="o">&lt;-</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl">				<span class="k">return</span>
+</span></span><span class="line"><span class="cl">			<span class="p">}</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">newBufLK</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">newBuf</span><span class="p">[</span><span class="nx">bufIdx</span><span class="p">]</span> <span class="p">=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">buf</span><span class="p">[</span><span class="nx">bufIdx</span><span class="p">][:</span><span class="nx">n</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">newBufLK</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// Since ReadAt returned success, there is no need to trigger another read.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">readTriggerCh</span> <span class="o">&lt;-</span> <span class="kc">false</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}(</span><span class="nx">readerIndex</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">readerIndex</span><span class="o">++</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">wg</span><span class="p">.</span><span class="nf">Wait</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">p</span><span class="p">.</span><span class="nf">canDecode</span><span class="p">(</span><span class="nx">newBuf</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">p</span><span class="p">.</span><span class="nx">offset</span> <span class="o">+=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">shardSize</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">missingPartsHeal</span> <span class="o">==</span> <span class="mi">1</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span> <span class="nx">newBuf</span><span class="p">,</span> <span class="nx">errFileNotFound</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="nx">bitrotHeal</span> <span class="o">==</span> <span class="mi">1</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span> <span class="nx">newBuf</span><span class="p">,</span> <span class="nx">errFileCorrupt</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">newBuf</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// If we cannot decode, just return read quorum error.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Errorf</span><span class="p">(</span><span class="s">&#34;%w (offline-disks=%d/%d)&#34;</span><span class="p">,</span> <span class="nx">errErasureReadQuorum</span><span class="p">,</span> <span class="nx">disksNotFound</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">readers</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<p>从这里可以看到，minio在读取对象时，会尝试读取最多datablock份分片，只要成功就返回，不会多读对象，如果某个minio节点有问题，minio会尝试从其他节点读取数据。</p>
 <h2 id="纠删码的基本原理">纠删码的基本原理</h2>
 <p><a href="https://p0kt65jtu2p.feishu.cn/docx/LZ36dMN3LoZCuUxFadccNOXGnKb" target="_blank" rel="noopener noreffer ">https://p0kt65jtu2p.feishu.cn/docx/LZ36dMN3LoZCuUxFadccNOXGnKb</a></p>
 <p>假设将数据分成 4 块，采用 EC:2 冗余比例，可以将原来的数据组合成一个输入矩阵 <code>P = [][]byte</code>， 第一维表示不同的数据块，第二维表示数据块的数据，所以这里的 P 的大小为 <code>4 * n</code>，n 为每个数据块的大小</p>

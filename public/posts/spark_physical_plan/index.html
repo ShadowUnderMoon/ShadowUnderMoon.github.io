@@ -33,7 +33,7 @@
         "mainEntityOfPage": {
             "@type": "WebPage",
             "@id": "http:\/\/example.org\/posts\/spark_physical_plan\/"
-        },"genre": "posts","keywords": "Spark","wordcount":  3962 ,
+        },"genre": "posts","keywords": "Spark","wordcount":  6392 ,
         "url": "http:\/\/example.org\/posts\/spark_physical_plan\/","datePublished": "2025-05-25T11:16:21+08:00","dateModified": "2025-05-25T11:16:21+08:00","publisher": {
             "@type": "Organization",
             "name": ""},"author": {
@@ -107,8 +107,8 @@
             <div class="toc-content" id="toc-content-auto"></div>
         </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Spark物理执行计划</h1><div class="post-meta">
             <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/spark/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Spark</a></span></div>
-            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-25">2025-05-25</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;3962 words&nbsp;
-                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;8 minutes&nbsp;</div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-25">2025-05-25</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;6392 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;13 minutes&nbsp;</div>
         </div><div class="details toc" id="toc-static"  data-kept="">
                 <div class="details-summary toc-title">
                     <span>Contents</span>
@@ -133,6 +133,7 @@
         <li><a href="#count操作">count操作</a></li>
         <li><a href="#getpartitions">getPartitions</a></li>
         <li><a href="#stage">Stage</a></li>
+        <li><a href="#activejob">ActiveJob</a></li>
       </ul>
     </li>
   </ul>
@@ -237,7 +238,7 @@
 <li>UnionRDD</li>
 </ul>
 <h3 id="count操作">count操作</h3>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -281,7 +282,7 @@
 </span></span><span class="line"><span class="cl">  <span class="n">rdd</span><span class="o">.</span><span class="n">doCheckpoint</span><span class="o">()</span>
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
 <p>count操作会调用runJob创建并执行新的job，<code>getCallSite</code>通过堆栈找到用户调用代码的位置以及调用的spark方法，类似于<code>union at FilterDemo.scala:35</code>。</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -312,7 +313,7 @@
 </span></span><span class="line"><span class="cl">  <span class="o">}</span>
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
 <p>DAGScheduler负责提交job，并等待job结束，判断job是否成功。</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -362,7 +363,7 @@
 </span></span><span class="line"><span class="cl">  <span class="n">waiter</span>
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
 <p>submitJob会计算DAG中每个RDD的<code>.partitions</code>，确保<code>getPartitinos</code>在<code>DAGScheduler</code>单线程事件循环外计算，避免<code>RDD.getPartitions</code>的计算影响调度效率。</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -396,7 +397,7 @@
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
 <p><code>eagerlyComputePartitionsForRddAndAncestors</code>函数对DAG中每个RDD调用<code>partitions</code>生成分区。为了避免StackOverFlowError，没有直接采用递归的方式遍历DAG，而是采用手动维护栈的方式遍历DAG。维护已经遍历的RDD的Set和还没有遍历过的RDD的列表，每次从列表中取出一个RDD，判断是否已经遍历过，如果已经遍历过，则忽略，否则计算<code>partitions</code>，并且将它依赖的RDD也加入到列表中，直到列表为空，所有RDD都已经遍历结束。</p>
 <h3 id="getpartitions">getPartitions</h3>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -418,7 +419,7 @@
 </span></span><span class="line"><span class="cl">  <span class="o">}</span>
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
 <p><code>getPartitions</code>是RDD中的虚方法，由RDD子类负责实现。</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -437,7 +438,7 @@
 </span></span><span class="line"><span class="cl">
 </span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">equals</span><span class="o">(</span><span class="n">other</span><span class="k">:</span> <span class="kt">Any</span><span class="o">)</span><span class="k">:</span> <span class="kt">Boolean</span> <span class="o">=</span> <span class="k">super</span><span class="o">.</span><span class="n">equals</span><span class="o">(</span><span class="n">other</span><span class="o">)</span>
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -472,7 +473,7 @@
 </span></span><span class="line"><span class="cl">  <span class="k">extends</span> <span class="nc">RDD</span><span class="o">[</span><span class="kt">U</span><span class="o">](</span><span class="n">prev</span><span class="o">)</span> <span class="o">{</span>
 </span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">getPartitions</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">Partition</span><span class="o">]</span> <span class="k">=</span> <span class="n">firstParent</span><span class="o">[</span><span class="kt">T</span><span class="o">].</span><span class="n">partitions</span></span></span></code></pre></div></div>
 <p>MapPartitionsRDD直接继承父RDD的分区。</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -506,7 +507,7 @@
 </span></span><span class="line"><span class="cl">    <span class="n">array</span>
 </span></span><span class="line"><span class="cl">  <span class="o">}</span></span></span></code></pre></div></div>
 <p>UnionRDD类似于MapPartitionsRDD，分区依据父RDD的分区生成。依次遍历每个父RDD的每个分区，生成对应的UnionRDD的分区。</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -523,7 +524,7 @@
 </span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">val</span> <span class="n">index</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=</span> <span class="n">idx</span>
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
 <p>ShuffledRDD的分区总数通过<code>partitioner.numPartitions</code>得到，生成的分区为ShuffledRDDPartition。</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -552,6 +553,210 @@
 </span></span><span class="line"><span class="cl">  <span class="o">}</span></span></span></code></pre></div></div>
 <p>CoGroupedRDD通过<code>numPartitions</code>获取到当前rdd的分区个数，生成CoGroupPartition分区。当前RDD可能有很多父RDD，如果RDD之间的依赖关系为窄依赖，则记录依赖的父RDD中的对应分区信息，如果是宽依赖，则忽略。每个分区都保存自己依赖的父RDD的对应窄依赖分区。</p>
 <h3 id="stage">Stage</h3>
+<p>一个stage是一组并行的task，这些task都执行相同的函数，并且需要作为一个spark job的一部分来运行，具有相同的shuffle依赖。每一个由调度器执行的任务DAG都会在发生shuffle的边界处分割成多个stage，然后DAGScheduler按照拓扑顺序来依次运行这些stage。</p>
+<p>每个stage可以是shuffle map stage，或者是result stage。如果是shuffle map stage，那么他的task结果将作为其他stage的输入；如果是result stage，那么它的task会直接通过在一个RDD上运行某个函数来执行一个spark action。对于shuffle map stage，Spark还会追踪每个输出分区所在的节点位置。</p>
+<p>每个Stage还有一个<code>firstJobId</code>用于标识最终提交该stage的job，当使用FIFO调度策略时，这个字段可以让调度器优先计算来自较早job的stages，或者在失败时更快的恢复这些较早的stages。</p>
+<p>由于容错恢复（fault recovery）的需要，一个stage可能会被多次重试执行。在这种情况下，stage对象会维护多个<code>StageInfo</code>实例，用于传递给监听器（listeners）或者web ui，最新的一次尝试信息可以通过<code>latestInfo</code>字段访问。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">private</span><span class="o">[</span><span class="kt">scheduler</span><span class="o">]</span> <span class="k">abstract</span> <span class="k">class</span> <span class="nc">Stage</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">id</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">numTasks</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">parents</span><span class="k">:</span> <span class="kt">List</span><span class="o">[</span><span class="kt">Stage</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">firstJobId</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">callSite</span><span class="k">:</span> <span class="kt">CallSite</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">resourceProfileId</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">extends</span> <span class="nc">Logging</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">numPartitions</span> <span class="k">=</span> <span class="n">rdd</span><span class="o">.</span><span class="n">partitions</span><span class="o">.</span><span class="n">length</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/** Set of jobs that this stage belongs to. */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">jobIds</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">HashSet</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/** The ID to use for the next new attempt for this stage. */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">private</span> <span class="k">var</span> <span class="n">nextAttemptId</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl">  <span class="k">private</span><span class="o">[</span><span class="kt">scheduler</span><span class="o">]</span> <span class="k">def</span> <span class="n">getNextAttemptId</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=</span> <span class="n">nextAttemptId</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">name</span><span class="k">:</span> <span class="kt">String</span> <span class="o">=</span> <span class="n">callSite</span><span class="o">.</span><span class="n">shortForm</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">details</span><span class="k">:</span> <span class="kt">String</span> <span class="o">=</span> <span class="n">callSite</span><span class="o">.</span><span class="n">longForm</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/**
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * Pointer to the [[StageInfo]] object for the most recent attempt. This needs to be initialized
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * here, before any attempts have actually been created, because the DAGScheduler uses this
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * StageInfo to tell SparkListeners when a job starts (which happens before any stage attempts
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * have been created).
+</span></span></span><span class="line"><span class="cl"><span class="cm">   */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">private</span> <span class="k">var</span> <span class="nc">_latestInfo</span><span class="k">:</span> <span class="kt">StageInfo</span> <span class="o">=</span>
+</span></span><span class="line"><span class="cl">    <span class="nc">StageInfo</span><span class="o">.</span><span class="n">fromStage</span><span class="o">(</span><span class="k">this</span><span class="o">,</span> <span class="n">nextAttemptId</span><span class="o">,</span> <span class="n">resourceProfileId</span> <span class="k">=</span> <span class="n">resourceProfileId</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/**
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * Set of stage attempt IDs that have failed. We keep track of these failures in order to avoid
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * endless retries if a stage keeps failing.
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * We keep track of each attempt ID that has failed to avoid recording duplicate failures if
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * multiple tasks from the same stage attempt fail (SPARK-5945).
+</span></span></span><span class="line"><span class="cl"><span class="cm">   */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">failedAttemptIds</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">HashSet</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">private</span><span class="o">[</span><span class="kt">scheduler</span><span class="o">]</span> <span class="k">def</span> <span class="n">clearFailures</span><span class="o">()</span> <span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">failedAttemptIds</span><span class="o">.</span><span class="n">clear</span><span class="o">()</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/** Creates a new attempt for this stage by creating a new StageInfo with a new attempt ID. */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">makeNewStageAttempt</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">      <span class="n">numPartitionsToCompute</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">      <span class="n">taskLocalityPreferences</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">Seq</span><span class="o">[</span><span class="kt">TaskLocation</span><span class="o">]]</span> <span class="k">=</span> <span class="nc">Seq</span><span class="o">.</span><span class="n">empty</span><span class="o">)</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">metrics</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">TaskMetrics</span>
+</span></span><span class="line"><span class="cl">    <span class="n">metrics</span><span class="o">.</span><span class="n">register</span><span class="o">(</span><span class="n">rdd</span><span class="o">.</span><span class="n">sparkContext</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="nc">_latestInfo</span> <span class="k">=</span> <span class="nc">StageInfo</span><span class="o">.</span><span class="n">fromStage</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">      <span class="k">this</span><span class="o">,</span> <span class="n">nextAttemptId</span><span class="o">,</span> <span class="nc">Some</span><span class="o">(</span><span class="n">numPartitionsToCompute</span><span class="o">),</span> <span class="n">metrics</span><span class="o">,</span> <span class="n">taskLocalityPreferences</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">      <span class="n">resourceProfileId</span> <span class="k">=</span> <span class="n">resourceProfileId</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="n">nextAttemptId</span> <span class="o">+=</span> <span class="mi">1</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/** Forward the nextAttemptId if skipped and get visited for the first time. */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">increaseAttemptIdOnFirstSkip</span><span class="o">()</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="o">(</span><span class="n">nextAttemptId</span> <span class="o">==</span> <span class="mi">0</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="n">nextAttemptId</span> <span class="k">=</span> <span class="mi">1</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/** Returns the StageInfo for the most recent attempt for this stage. */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">latestInfo</span><span class="k">:</span> <span class="kt">StageInfo</span> <span class="o">=</span> <span class="nc">_latestInfo</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">final</span> <span class="k">def</span> <span class="n">hashCode</span><span class="o">()</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=</span> <span class="n">id</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">final</span> <span class="k">def</span> <span class="n">equals</span><span class="o">(</span><span class="n">other</span><span class="k">:</span> <span class="kt">Any</span><span class="o">)</span><span class="k">:</span> <span class="kt">Boolean</span> <span class="o">=</span> <span class="n">other</span> <span class="k">match</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="n">stage</span><span class="k">:</span> <span class="kt">Stage</span> <span class="o">=&gt;</span> <span class="n">stage</span> <span class="o">!=</span> <span class="kc">null</span> <span class="o">&amp;&amp;</span> <span class="n">stage</span><span class="o">.</span><span class="n">id</span> <span class="o">==</span> <span class="n">id</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="k">_</span> <span class="k">=&gt;</span> <span class="kc">false</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/** Returns the sequence of partition ids that are missing (i.e. needs to be computed). */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">findMissingPartitions</span><span class="o">()</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">isIndeterminate</span><span class="k">:</span> <span class="kt">Boolean</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">rdd</span><span class="o">.</span><span class="n">outputDeterministicLevel</span> <span class="o">==</span> <span class="nc">DeterministicLevel</span><span class="o">.</span><span class="nc">INDETERMINATE</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p>构造参数:</p>
+<ul>
+<li>id 唯一的stage id</li>
+<li>rdd 该stage所运行的RDD，如果是shuffle map stage，那么就是我们要在其上运行map任务的rdd，如果是result stage，那么就是我们执行某个action操作所针对的目标rdd</li>
+<li>numTasks stage中的task总数，特别地result stage可能不会计算rdd的所有分区，比如first, lookup, take等操作</li>
+<li>parents 这个stage依赖的stage列表（通过shuffle dependeny依赖）</li>
+<li>firstJobId 这个stage所属的首个job，用于FIFO 调度</li>
+</ul>
+<p>其他字段：</p>
+<ul>
+<li>jobIds 这个stage所属的所有job</li>
+<li>nextAttemptId stage每次重试都会获得新的newAttemptId，初始值为0</li>
+<li>_latestInfo 最新一次尝试的StageInfo</li>
+<li>failedAttemptId stage尝试失败的集合</li>
+</ul>
+<p>方法：</p>
+<ul>
+<li>makeNewStageAttempt
+创建新的TaskMetrics，并注册到SparkContext中。创建新的StageInfo并递增nextAttemptId</li>
+<li>findMissingPartitions 返回需要计算的partition id 的序列</li>
+</ul>
+<h4 id="resultstage">ResultStage</h4>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">private</span><span class="o">[</span><span class="kt">spark</span><span class="o">]</span> <span class="k">class</span> <span class="nc">ResultStage</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">id</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">func</span><span class="k">:</span> <span class="o">(</span><span class="kt">TaskContext</span><span class="o">,</span> <span class="kt">Iterator</span><span class="o">[</span><span class="k">_</span><span class="o">])</span> <span class="k">=&gt;</span> <span class="k">_</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">partitions</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">Int</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">parents</span><span class="k">:</span> <span class="kt">List</span><span class="o">[</span><span class="kt">Stage</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">firstJobId</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">callSite</span><span class="k">:</span> <span class="kt">CallSite</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">resourceProfileId</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">extends</span> <span class="nc">Stage</span><span class="o">(</span><span class="n">id</span><span class="o">,</span> <span class="n">rdd</span><span class="o">,</span> <span class="n">partitions</span><span class="o">.</span><span class="n">length</span><span class="o">,</span> <span class="n">parents</span><span class="o">,</span> <span class="n">firstJobId</span><span class="o">,</span> <span class="n">callSite</span><span class="o">,</span> <span class="n">resourceProfileId</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/**
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * The active job for this result stage. Will be empty if the job has already finished
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * (e.g., because the job was cancelled).
+</span></span></span><span class="line"><span class="cl"><span class="cm">   */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">private</span><span class="o">[</span><span class="kt">this</span><span class="o">]</span> <span class="k">var</span> <span class="nc">_activeJob</span><span class="k">:</span> <span class="kt">Option</span><span class="o">[</span><span class="kt">ActiveJob</span><span class="o">]</span> <span class="k">=</span> <span class="nc">None</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">activeJob</span><span class="k">:</span> <span class="kt">Option</span><span class="o">[</span><span class="kt">ActiveJob</span><span class="o">]</span> <span class="k">=</span> <span class="nc">_activeJob</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">setActiveJob</span><span class="o">(</span><span class="n">job</span><span class="k">:</span> <span class="kt">ActiveJob</span><span class="o">)</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nc">_activeJob</span> <span class="k">=</span> <span class="nc">Option</span><span class="o">(</span><span class="n">job</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">removeActiveJob</span><span class="o">()</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nc">_activeJob</span> <span class="k">=</span> <span class="nc">None</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/**
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * Returns the sequence of partition ids that are missing (i.e. needs to be computed).
+</span></span></span><span class="line"><span class="cl"><span class="cm">   *
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * This can only be called when there is an active job.
+</span></span></span><span class="line"><span class="cl"><span class="cm">   */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">findMissingPartitions</span><span class="o">()</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">job</span> <span class="k">=</span> <span class="n">activeJob</span><span class="o">.</span><span class="n">get</span>
+</span></span><span class="line"><span class="cl">    <span class="o">(</span><span class="mi">0</span> <span class="n">until</span> <span class="n">job</span><span class="o">.</span><span class="n">numPartitions</span><span class="o">).</span><span class="n">filter</span><span class="o">(</span><span class="n">id</span> <span class="k">=&gt;</span> <span class="o">!</span><span class="n">job</span><span class="o">.</span><span class="n">finished</span><span class="o">(</span><span class="n">id</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">toString</span><span class="k">:</span> <span class="kt">String</span> <span class="o">=</span> <span class="s">&#34;ResultStage &#34;</span> <span class="o">+</span> <span class="n">id</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p>ResultStage是job中最后一个stage，通过对目标RDD的一个或者多个分区应用函数从而计算一个action的结果。ResultStage对象会记录要执行的函数func（将应用于每个目标分区），以及目标分区集合。有些Stage可能不会对RDD的所有分区执行，比如first、lookup等操作。</p>
+<p>字段：</p>
+<ul>
+<li>func 应用于每个目标分区的函数</li>
+<li>partitions 目标分区集合</li>
+<li>_activeJob 这个result stage对应的active job，如果job已经完成, activeJob将为空</li>
+</ul>
+<p>方法：</p>
+<ul>
+<li>findMissingPartitions 需要计算的分区的序列，仅可在activeJob存在时调用</li>
+</ul>
+<h3 id="activejob">ActiveJob</h3>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">private</span><span class="o">[</span><span class="kt">spark</span><span class="o">]</span> <span class="k">class</span> <span class="nc">ActiveJob</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">jobId</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">finalStage</span><span class="k">:</span> <span class="kt">Stage</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">callSite</span><span class="k">:</span> <span class="kt">CallSite</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">listener</span><span class="k">:</span> <span class="kt">JobListener</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">artifacts</span><span class="k">:</span> <span class="kt">JobArtifactSet</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">properties</span><span class="k">:</span> <span class="kt">Properties</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/**
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * Number of partitions we need to compute for this job. Note that result stages may not need
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * to compute all partitions in their target RDD, for actions like first() and lookup().
+</span></span></span><span class="line"><span class="cl"><span class="cm">   */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">numPartitions</span> <span class="k">=</span> <span class="n">finalStage</span> <span class="k">match</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="n">r</span><span class="k">:</span> <span class="kt">ResultStage</span> <span class="o">=&gt;</span> <span class="n">r</span><span class="o">.</span><span class="n">partitions</span><span class="o">.</span><span class="n">length</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="n">m</span><span class="k">:</span> <span class="kt">ShuffleMapStage</span> <span class="o">=&gt;</span> <span class="n">m</span><span class="o">.</span><span class="n">numPartitions</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/** Which partitions of the stage have finished */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">finished</span> <span class="k">=</span> <span class="nc">Array</span><span class="o">.</span><span class="n">fill</span><span class="o">[</span><span class="kt">Boolean</span><span class="o">](</span><span class="n">numPartitions</span><span class="o">)(</span><span class="kc">false</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">var</span> <span class="n">numFinished</span> <span class="k">=</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p>DAGScheduler中的一个运行中job，job可以有两个逻辑类型，result job通过计算ResultStage执行action，map-stage job在下游stage被提交前计算ShuffleMapStage的map输出。后者被用于自适应查询计划，在提交后续stage之前查看map输出的统计信息，我们通过该类中的finalStage区分这两类job。</p>
+<p>只有客户端通过DAGScheduler的submitJob或者submitMapStage方法直接提交的叶子stage，才会被作为job进行追踪，但是，无论是那种类型的job，都可能会触发其依赖的前面stage的执行（这些stage是DAG中所以来的RDD所对应的stage），并且多个job可能会共享其中的一些前置stage。这些依赖关系有DAGScheduler内部进行管理。</p>
+<p>一个job起始于一个目标RDD，但最终可能会包含RDD血缘关系中涉及到的其他所有RDD</p>
+<p>ActiveJob的构造参数包括：</p>
+<ul>
+<li>JobId job的唯一id</li>
+<li>finalStage job计算的stage</li>
+</ul>
+<p><code>mapPartitions</code>字段表示job中需要计算的分区的个数，注意，ResultStage可能不需要计算RDD中的所有分区，比如对于first或者lookup操作。</p>
+<p><code>finished</code>字段记录stage中的哪些分区已经计算完成。</p>
+<p><code>numFinished</code>字段记录已经计算完成的分区的个数。</p>
 </div><div class="post-footer" id="post-footer">
     <div class="post-info">
         <div class="post-info-line">

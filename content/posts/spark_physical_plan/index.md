@@ -425,3 +425,222 @@ CoGroupedRDD通过`numPartitions`获取到当前rdd的分区个数，生成CoGro
 
 ### Stage
 
+一个stage是一组并行的task，这些task都执行相同的函数，并且需要作为一个spark job的一部分来运行，具有相同的shuffle依赖。每一个由调度器执行的任务DAG都会在发生shuffle的边界处分割成多个stage，然后DAGScheduler按照拓扑顺序来依次运行这些stage。
+
+每个stage可以是shuffle map stage，或者是result stage。如果是shuffle map stage，那么他的task结果将作为其他stage的输入；如果是result stage，那么它的task会直接通过在一个RDD上运行某个函数来执行一个spark action。对于shuffle map stage，Spark还会追踪每个输出分区所在的节点位置。
+
+每个Stage还有一个`firstJobId`用于标识最终提交该stage的job，当使用FIFO调度策略时，这个字段可以让调度器优先计算来自较早job的stages，或者在失败时更快的恢复这些较早的stages。
+
+由于容错恢复（fault recovery）的需要，一个stage可能会被多次重试执行。在这种情况下，stage对象会维护多个`StageInfo`实例，用于传递给监听器（listeners）或者web ui，最新的一次尝试信息可以通过`latestInfo`字段访问。
+
+```scala
+private[scheduler] abstract class Stage(
+    val id: Int,
+    val rdd: RDD[_],
+    val numTasks: Int,
+    val parents: List[Stage],
+    val firstJobId: Int,
+    val callSite: CallSite,
+    val resourceProfileId: Int)
+  extends Logging {
+
+  val numPartitions = rdd.partitions.length
+
+  /** Set of jobs that this stage belongs to. */
+  val jobIds = new HashSet[Int]
+
+  /** The ID to use for the next new attempt for this stage. */
+  private var nextAttemptId: Int = 0
+  private[scheduler] def getNextAttemptId: Int = nextAttemptId
+
+  val name: String = callSite.shortForm
+  val details: String = callSite.longForm
+
+  /**
+   * Pointer to the [[StageInfo]] object for the most recent attempt. This needs to be initialized
+   * here, before any attempts have actually been created, because the DAGScheduler uses this
+   * StageInfo to tell SparkListeners when a job starts (which happens before any stage attempts
+   * have been created).
+   */
+  private var _latestInfo: StageInfo =
+    StageInfo.fromStage(this, nextAttemptId, resourceProfileId = resourceProfileId)
+
+  /**
+   * Set of stage attempt IDs that have failed. We keep track of these failures in order to avoid
+   * endless retries if a stage keeps failing.
+   * We keep track of each attempt ID that has failed to avoid recording duplicate failures if
+   * multiple tasks from the same stage attempt fail (SPARK-5945).
+   */
+  val failedAttemptIds = new HashSet[Int]
+
+  private[scheduler] def clearFailures() : Unit = {
+    failedAttemptIds.clear()
+  }
+
+  /** Creates a new attempt for this stage by creating a new StageInfo with a new attempt ID. */
+  def makeNewStageAttempt(
+      numPartitionsToCompute: Int,
+      taskLocalityPreferences: Seq[Seq[TaskLocation]] = Seq.empty): Unit = {
+    val metrics = new TaskMetrics
+    metrics.register(rdd.sparkContext)
+    _latestInfo = StageInfo.fromStage(
+      this, nextAttemptId, Some(numPartitionsToCompute), metrics, taskLocalityPreferences,
+      resourceProfileId = resourceProfileId)
+    nextAttemptId += 1
+  }
+
+  /** Forward the nextAttemptId if skipped and get visited for the first time. */
+  def increaseAttemptIdOnFirstSkip(): Unit = {
+    if (nextAttemptId == 0) {
+      nextAttemptId = 1
+    }
+  }
+
+  /** Returns the StageInfo for the most recent attempt for this stage. */
+  def latestInfo: StageInfo = _latestInfo
+
+  override final def hashCode(): Int = id
+
+  override final def equals(other: Any): Boolean = other match {
+    case stage: Stage => stage != null && stage.id == id
+    case _ => false
+  }
+
+  /** Returns the sequence of partition ids that are missing (i.e. needs to be computed). */
+  def findMissingPartitions(): Seq[Int]
+
+  def isIndeterminate: Boolean = {
+    rdd.outputDeterministicLevel == DeterministicLevel.INDETERMINATE
+  }
+}
+```
+
+
+
+构造参数:
+
+- id 唯一的stage id
+- rdd 该stage所运行的RDD，如果是shuffle map stage，那么就是我们要在其上运行map任务的rdd，如果是result stage，那么就是我们执行某个action操作所针对的目标rdd
+- numTasks stage中的task总数，特别地result stage可能不会计算rdd的所有分区，比如first, lookup, take等操作
+- parents 这个stage依赖的stage列表（通过shuffle dependeny依赖）
+- firstJobId 这个stage所属的首个job，用于FIFO 调度
+
+其他字段：
+
+- jobIds 这个stage所属的所有job
+- nextAttemptId stage每次重试都会获得新的newAttemptId，初始值为0
+- _latestInfo 最新一次尝试的StageInfo
+- failedAttemptId stage尝试失败的集合
+
+方法：
+
+- makeNewStageAttempt 
+    创建新的TaskMetrics，并注册到SparkContext中。创建新的StageInfo并递增nextAttemptId
+- findMissingPartitions 返回需要计算的partition id 的序列
+
+#### ResultStage
+
+```scala
+private[spark] class ResultStage(
+    id: Int,
+    rdd: RDD[_],
+    val func: (TaskContext, Iterator[_]) => _,
+    val partitions: Array[Int],
+    parents: List[Stage],
+    firstJobId: Int,
+    callSite: CallSite,
+    resourceProfileId: Int)
+  extends Stage(id, rdd, partitions.length, parents, firstJobId, callSite, resourceProfileId) {
+
+  /**
+   * The active job for this result stage. Will be empty if the job has already finished
+   * (e.g., because the job was cancelled).
+   */
+  private[this] var _activeJob: Option[ActiveJob] = None
+
+  def activeJob: Option[ActiveJob] = _activeJob
+
+  def setActiveJob(job: ActiveJob): Unit = {
+    _activeJob = Option(job)
+  }
+
+  def removeActiveJob(): Unit = {
+    _activeJob = None
+  }
+
+  /**
+   * Returns the sequence of partition ids that are missing (i.e. needs to be computed).
+   *
+   * This can only be called when there is an active job.
+   */
+  override def findMissingPartitions(): Seq[Int] = {
+    val job = activeJob.get
+    (0 until job.numPartitions).filter(id => !job.finished(id))
+  }
+
+  override def toString: String = "ResultStage " + id
+}
+```
+
+
+
+ResultStage是job中最后一个stage，通过对目标RDD的一个或者多个分区应用函数从而计算一个action的结果。ResultStage对象会记录要执行的函数func（将应用于每个目标分区），以及目标分区集合。有些Stage可能不会对RDD的所有分区执行，比如first、lookup等操作。
+
+字段：
+
+- func 应用于每个目标分区的函数
+- partitions 目标分区集合
+- _activeJob 这个result stage对应的active job，如果job已经完成, activeJob将为空
+
+方法：
+
+- findMissingPartitions 需要计算的分区的序列，仅可在activeJob存在时调用
+
+
+
+
+
+### ActiveJob
+
+```scala
+private[spark] class ActiveJob(
+    val jobId: Int,
+    val finalStage: Stage,
+    val callSite: CallSite,
+    val listener: JobListener,
+    val artifacts: JobArtifactSet,
+    val properties: Properties) {
+
+  /**
+   * Number of partitions we need to compute for this job. Note that result stages may not need
+   * to compute all partitions in their target RDD, for actions like first() and lookup().
+   */
+  val numPartitions = finalStage match {
+    case r: ResultStage => r.partitions.length
+    case m: ShuffleMapStage => m.numPartitions
+  }
+
+  /** Which partitions of the stage have finished */
+  val finished = Array.fill[Boolean](numPartitions)(false)
+
+  var numFinished = 0
+}
+```
+
+DAGScheduler中的一个运行中job，job可以有两个逻辑类型，result job通过计算ResultStage执行action，map-stage job在下游stage被提交前计算ShuffleMapStage的map输出。后者被用于自适应查询计划，在提交后续stage之前查看map输出的统计信息，我们通过该类中的finalStage区分这两类job。
+
+只有客户端通过DAGScheduler的submitJob或者submitMapStage方法直接提交的叶子stage，才会被作为job进行追踪，但是，无论是那种类型的job，都可能会触发其依赖的前面stage的执行（这些stage是DAG中所以来的RDD所对应的stage），并且多个job可能会共享其中的一些前置stage。这些依赖关系有DAGScheduler内部进行管理。
+
+一个job起始于一个目标RDD，但最终可能会包含RDD血缘关系中涉及到的其他所有RDD
+
+ActiveJob的构造参数包括：
+
+- JobId job的唯一id
+- finalStage job计算的stage
+
+`mapPartitions`字段表示job中需要计算的分区的个数，注意，ResultStage可能不需要计算RDD中的所有分区，比如对于first或者lookup操作。
+
+`finished`字段记录stage中的哪些分区已经计算完成。
+
+`numFinished`字段记录已经计算完成的分区的个数。
+

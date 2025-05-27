@@ -38,15 +38,13 @@
 <p>数据操作分为两种，<code>transformation</code>操作并不会触发job的实际执行，<code>action</code>操作创建job并立即执行。类似于java中的stream，采用懒加载的方式。</p>]]></description>
 </item>
 <item>
-    <title>Spark StandAlone</title>
+    <title>Spark基础知识</title>
     <link>http://example.org/posts/spark-base/</link>
     <pubDate>Sat, 10 May 2025 11:51:10 &#43;0800</pubDate>
     <author>爱吃芒果</author>
     <guid>http://example.org/posts/spark-base/</guid>
-    <description><![CDATA[<h2 id="参考文献">参考文献 </h2>
-<ol>
-<li>大数据处理框架 Apache Spark设计与实现</li>
-</ol>]]></description>
+    <description><![CDATA[<h2 id="rdd数据模型">RDD数据模型</h2>
+<p>RDD （Resilient Distributed DataSet)是spark对计算过程中输入输出数据以及中间数据的抽象，表示不可变、分区的集合数据，可以被并行处理。</p>]]></description>
 </item>
 <item>
     <title>Grpc源码分析</title>

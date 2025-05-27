@@ -998,6 +998,181 @@ Shard (分片)
 3. rename 操作，包含将分片移动到目标目录以及写入 `xl.meta`元数据
 4. 最后好像有提交操作，没有看懂
 
+### putObject选择serverPool
+
+```go
+// PutObject - writes an object to least used erasure pool.
+func (z *erasureServerPools) PutObject(ctx context.Context, bucket string, object string, data *PutObjReader, opts ObjectOptions) (ObjectInfo, error) {
+	// Validate put object input args.
+	if err := checkPutObjectArgs(ctx, bucket, object); err != nil {
+		return ObjectInfo{}, err
+	}
+
+	object = encodeDirObject(object)
+	if z.SinglePool() {
+		return z.serverPools[0].PutObject(ctx, bucket, object, data, opts)
+	}
+
+	idx, err := z.getPoolIdx(ctx, bucket, object, data.Size())
+	if err != nil {
+		return ObjectInfo{}, err
+	}
+
+	if opts.DataMovement && idx == opts.SrcPoolIdx {
+		return ObjectInfo{}, DataMovementOverwriteErr{
+			Bucket:    bucket,
+			Object:    object,
+			VersionID: opts.VersionID,
+			Err:       errDataMovementSrcDstPoolSame,
+		}
+	}
+
+	return z.serverPools[idx].PutObject(ctx, bucket, object, data, opts)
+}
+```
+
+如果只有一个server pool，那只能使用当前的server pool。
+
+```go
+// getPoolIdx returns the found previous object and its corresponding pool idx,
+// if none are found falls back to most available space pool, this function is
+// designed to be only used by PutObject, CopyObject (newObject creation) and NewMultipartUpload.
+func (z *erasureServerPools) getPoolIdx(ctx context.Context, bucket, object string, size int64) (idx int, err error) {
+	idx, err = z.getPoolIdxExistingWithOpts(ctx, bucket, object, ObjectOptions{
+		SkipDecommissioned: true,
+		SkipRebalancing:    true,
+	})
+	if err != nil && !isErrObjectNotFound(err) {
+		return idx, err
+	}
+
+	if isErrObjectNotFound(err) {
+		idx = z.getAvailablePoolIdx(ctx, bucket, object, size)
+		if idx < 0 {
+			return -1, toObjectErr(errDiskFull)
+		}
+	}
+
+	return idx, nil
+}
+```
+
+如果对象在某个server pool中已经存在，则返回对应的server pool，否则选择空闲容量最多的server pool。
+
+```go
+func (z *erasureServerPools) getPoolInfoExistingWithOpts(ctx context.Context, bucket, object string, opts ObjectOptions) (PoolObjInfo, []poolErrs, error) {
+	var noReadQuorumPools []poolErrs
+	poolObjInfos := make([]PoolObjInfo, len(z.serverPools))
+	poolOpts := make([]ObjectOptions, len(z.serverPools))
+	for i := range z.serverPools {
+		poolOpts[i] = opts
+	}
+
+	var wg sync.WaitGroup
+	for i, pool := range z.serverPools {
+		wg.Add(1)
+		go func(i int, pool *erasureSets, opts ObjectOptions) {
+			defer wg.Done()
+			// remember the pool index, we may sort the slice original index might be lost.
+			pinfo := PoolObjInfo{
+				Index: i,
+			}
+			// do not remove this check as it can lead to inconsistencies
+			// for all callers of bucket replication.
+			if !opts.MetadataChg {
+				opts.VersionID = ""
+			}
+			pinfo.ObjInfo, pinfo.Err = pool.GetObjectInfo(ctx, bucket, object, opts)
+			poolObjInfos[i] = pinfo
+		}(i, pool, poolOpts[i])
+	}
+	wg.Wait()
+
+	// Sort the objInfos such that we always serve latest
+	// this is a defensive change to handle any duplicate
+	// content that may have been created, we always serve
+	// the latest object.
+	sort.Slice(poolObjInfos, func(i, j int) bool {
+		mtime1 := poolObjInfos[i].ObjInfo.ModTime
+		mtime2 := poolObjInfos[j].ObjInfo.ModTime
+		return mtime1.After(mtime2)
+	})
+
+	defPool := PoolObjInfo{Index: -1}
+	for _, pinfo := range poolObjInfos {
+		// skip all objects from suspended pools if asked by the
+		// caller.
+		if opts.SkipDecommissioned && z.IsSuspended(pinfo.Index) {
+			continue
+		}
+		// Skip object if it's from pools participating in a rebalance operation.
+		if opts.SkipRebalancing && z.IsPoolRebalancing(pinfo.Index) {
+			continue
+		}
+		if pinfo.Err == nil {
+			// found a pool
+			return pinfo, z.poolsWithObject(poolObjInfos, opts), nil
+		}
+
+		if isErrReadQuorum(pinfo.Err) && !opts.MetadataChg {
+			// read quorum is returned when the object is visibly
+			// present but its unreadable, we simply ask the writes to
+			// schedule to this pool instead. If there is no quorum
+			// it will fail anyways, however if there is quorum available
+			// with enough disks online but sufficiently inconsistent to
+			// break parity threshold, allow them to be overwritten
+			// or allow new versions to be added.
+
+			return pinfo, z.poolsWithObject(poolObjInfos, opts), nil
+		}
+		defPool = pinfo
+		if !isErrObjectNotFound(pinfo.Err) && !isErrVersionNotFound(pinfo.Err) {
+			return pinfo, noReadQuorumPools, pinfo.Err
+		}
+
+		// No object exists or its a delete marker,
+		// check objInfo to confirm.
+		if pinfo.ObjInfo.DeleteMarker && pinfo.ObjInfo.Name != "" {
+			return pinfo, noReadQuorumPools, nil
+		}
+	}
+	if opts.ReplicationRequest && opts.DeleteMarker && defPool.Index >= 0 {
+		// If the request is a delete marker replication request, return a default pool
+		// in cases where the object does not exist.
+		// This is to ensure that the delete marker is replicated to the destination.
+		return defPool, noReadQuorumPools, nil
+	}
+	return PoolObjInfo{}, noReadQuorumPools, toObjectErr(errFileNotFound, bucket, object)
+}
+```
+
+遍历所有的serverPool，调用`pool.getObjectInfo`在每个server pool中查找对应对象，如果同时在多个server pool中存在对应对象，则选择最新的对象。
+
+```go
+// GetObjectInfo - reads object metadata from the hashedSet based on the object name.
+func (s *erasureSets) GetObjectInfo(ctx context.Context, bucket, object string, opts ObjectOptions) (objInfo ObjectInfo, err error) {
+	set := s.getHashedSet(object)
+	return set.GetObjectInfo(ctx, bucket, object, opts)
+}
+// Returns always a same erasure coded set for a given input.
+func (s *erasureSets) getHashedSet(input string) (set *erasureObjects) {
+	return s.sets[s.getHashedSetIndex(input)]
+}
+func hashKey(algo string, key string, cardinality int, id [16]byte) int {
+	switch algo {
+	case formatErasureVersionV2DistributionAlgoV1:
+		return crcHashMod(key, cardinality)
+	case formatErasureVersionV3DistributionAlgoV2, formatErasureVersionV3DistributionAlgoV3:
+		return sipHashMod(key, cardinality, id)
+	default:
+		// Unknown algorithm returns -1, also if cardinality is lesser than 0.
+		return -1
+	}
+}
+```
+
+在同一个server pool中，一个对象总是加入到同一个earsure set中。所以在一个server pool中只需要检查一个erasure set就可以确定对象是否在这个server pool中。
+
 ## 名字空间锁的实现原理 （TODO)
 
 ```go
@@ -1157,6 +1332,281 @@ router.Methods(http.MethodGet).Path("/{object:.+}").
 - 首先加分布式读锁
 - 通过读取`xl.meta`获取对象的元数据信息，`xl.meta`保存了`part`和`verison`的全部信息，注意可能存在某些磁盘上的`xl.meta`由于故障而修改落后，所以依然需要读取法定人数的磁盘，从而确定实际的元数据
 - 如果 http 请求通过`part`或者`range`要求读取部分数据，最终都会转换成对多个 part 的读取，每个 part 都会划分成不同的`block`进行操作。
+
+```go
+func (z *erasureServerPools) GetObjectNInfo(ctx context.Context, bucket, object string, rs *HTTPRangeSpec, h http.Header, opts ObjectOptions) (gr *GetObjectReader, err error) {
+	if err = checkGetObjArgs(ctx, bucket, object); err != nil {
+		return nil, err
+	}
+
+	// This is a special call attempted first to check for SOS-API calls.
+	gr, err = veeamSOSAPIGetObject(ctx, bucket, object, rs, opts)
+	if err == nil {
+		return gr, nil
+	}
+
+	// reset any error to 'nil' and any reader to be 'nil'
+	gr = nil
+	err = nil
+
+	object = encodeDirObject(object)
+
+	if z.SinglePool() {
+		return z.serverPools[0].GetObjectNInfo(ctx, bucket, object, rs, h, opts)
+	}
+
+	var unlockOnDefer bool
+	nsUnlocker := func() {}
+	defer func() {
+		if unlockOnDefer {
+			nsUnlocker()
+		}
+	}()
+
+	// Acquire lock
+	if !opts.NoLock {
+		lock := z.NewNSLock(bucket, object)
+		lkctx, err := lock.GetRLock(ctx, globalOperationTimeout)
+		if err != nil {
+			return nil, err
+		}
+		ctx = lkctx.Context()
+		nsUnlocker = func() { lock.RUnlock(lkctx) }
+		unlockOnDefer = true
+	}
+
+	checkPrecondFn := opts.CheckPrecondFn
+	opts.CheckPrecondFn = nil // do not need to apply pre-conditions at lower layer.
+	opts.NoLock = true        // no locks needed at lower levels for getObjectInfo()
+	objInfo, zIdx, err := z.getLatestObjectInfoWithIdx(ctx, bucket, object, opts)
+	if err != nil {
+		if objInfo.DeleteMarker {
+			if opts.VersionID == "" {
+				return &GetObjectReader{
+					ObjInfo: objInfo,
+				}, toObjectErr(errFileNotFound, bucket, object)
+			}
+			// Make sure to return object info to provide extra information.
+			return &GetObjectReader{
+				ObjInfo: objInfo,
+			}, toObjectErr(errMethodNotAllowed, bucket, object)
+		}
+		return nil, err
+	}
+
+	// check preconditions before reading the stream.
+	if checkPrecondFn != nil && checkPrecondFn(objInfo) {
+		return nil, PreConditionFailed{}
+	}
+
+	opts.NoLock = true
+	gr, err = z.serverPools[zIdx].GetObjectNInfo(ctx, bucket, object, rs, h, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	if unlockOnDefer {
+		unlockOnDefer = gr.ObjInfo.Inlined
+	}
+
+	if !unlockOnDefer {
+		return gr.WithCleanupFuncs(nsUnlocker), nil
+	}
+	return gr, nil
+}
+```
+
+
+
+```go
+// getLatestObjectInfoWithIdx returns the objectInfo of the latest object from multiple pools (this function
+// is present in-case there were duplicate writes to both pools, this function also returns the
+// additional index where the latest object exists, that is used to start the GetObject stream.
+func (z *erasureServerPools) getLatestObjectInfoWithIdx(ctx context.Context, bucket, object string, opts ObjectOptions) (ObjectInfo, int, error) {
+	object = encodeDirObject(object)
+	results := make([]struct {
+		zIdx int
+		oi   ObjectInfo
+		err  error
+	}, len(z.serverPools))
+	var wg sync.WaitGroup
+	for i, pool := range z.serverPools {
+		wg.Add(1)
+		go func(i int, pool *erasureSets) {
+			defer wg.Done()
+			results[i].zIdx = i
+			results[i].oi, results[i].err = pool.GetObjectInfo(ctx, bucket, object, opts)
+		}(i, pool)
+	}
+	wg.Wait()
+
+	// Sort the objInfos such that we always serve latest
+	// this is a defensive change to handle any duplicate
+	// content that may have been created, we always serve
+	// the latest object.
+	sort.Slice(results, func(i, j int) bool {
+		a, b := results[i], results[j]
+		if a.oi.ModTime.Equal(b.oi.ModTime) {
+			// On tiebreak, select the lowest pool index.
+			return a.zIdx < b.zIdx
+		}
+		return a.oi.ModTime.After(b.oi.ModTime)
+	})
+
+	for _, res := range results {
+		err := res.err
+		if err == nil {
+			return res.oi, res.zIdx, nil
+		}
+		if !isErrObjectNotFound(err) && !isErrVersionNotFound(err) {
+			// some errors such as MethodNotAllowed for delete marker
+			// should be returned upwards.
+			return res.oi, res.zIdx, err
+		}
+		// When its a delete marker and versionID is empty
+		// we should simply return the error right away.
+		if res.oi.DeleteMarker && opts.VersionID == "" {
+			return res.oi, res.zIdx, err
+		}
+	}
+
+	object = decodeDirObject(object)
+	if opts.VersionID != "" {
+		return ObjectInfo{}, -1, VersionNotFound{Bucket: bucket, Object: object, VersionID: opts.VersionID}
+	}
+	return ObjectInfo{}, -1, ObjectNotFound{Bucket: bucket, Object: object}
+}
+```
+
+geLatestObjectIfoWithIdx需要遍历所有的server pool，对每个server pool调用`getObjectInfo`获取对象信息，最终返回最新的对象信息。
+
+```go
+// Returns if buf can be erasure decoded.
+func (p *parallelReader) canDecode(buf [][]byte) bool {
+	bufCount := 0
+	for _, b := range buf {
+		if len(b) > 0 {
+			bufCount++
+		}
+	}
+	return bufCount >= p.dataBlocks
+}
+
+// Read reads from readers in parallel. Returns p.dataBlocks number of bufs.
+func (p *parallelReader) Read(dst [][]byte) ([][]byte, error) {
+	newBuf := dst
+	if len(dst) != len(p.readers) {
+		newBuf = make([][]byte, len(p.readers))
+	} else {
+		for i := range newBuf {
+			newBuf[i] = newBuf[i][:0]
+		}
+	}
+	var newBufLK sync.RWMutex
+
+	if p.offset+p.shardSize > p.shardFileSize {
+		p.shardSize = p.shardFileSize - p.offset
+	}
+	if p.shardSize == 0 {
+		return newBuf, nil
+	}
+
+	readTriggerCh := make(chan bool, len(p.readers))
+	defer xioutil.SafeClose(readTriggerCh) // close the channel upon return
+
+	for i := 0; i < p.dataBlocks; i++ {
+		// Setup read triggers for p.dataBlocks number of reads so that it reads in parallel.
+		readTriggerCh <- true
+	}
+
+	disksNotFound := int32(0)
+	bitrotHeal := int32(0)       // Atomic bool flag.
+	missingPartsHeal := int32(0) // Atomic bool flag.
+	readerIndex := 0
+	var wg sync.WaitGroup
+	// if readTrigger is true, it implies next disk.ReadAt() should be tried
+	// if readTrigger is false, it implies previous disk.ReadAt() was successful and there is no need
+	// to try reading the next disk.
+	for readTrigger := range readTriggerCh {
+		newBufLK.RLock()
+		canDecode := p.canDecode(newBuf)
+		newBufLK.RUnlock()
+		if canDecode {
+			break
+		}
+		if readerIndex == len(p.readers) {
+			break
+		}
+		if !readTrigger {
+			continue
+		}
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			rr := p.readers[i]
+			if rr == nil {
+				// Since reader is nil, trigger another read.
+				readTriggerCh <- true
+				return
+			}
+			bufIdx := p.readerToBuf[i]
+			if p.buf[bufIdx] == nil {
+				// Reading first time on this disk, hence the buffer needs to be allocated.
+				// Subsequent reads will reuse this buffer.
+				p.buf[bufIdx] = make([]byte, p.shardSize)
+			}
+			// For the last shard, the shardsize might be less than previous shard sizes.
+			// Hence the following statement ensures that the buffer size is reset to the right size.
+			p.buf[bufIdx] = p.buf[bufIdx][:p.shardSize]
+			n, err := rr.ReadAt(p.buf[bufIdx], p.offset)
+			if err != nil {
+				switch {
+				case errors.Is(err, errFileNotFound):
+					atomic.StoreInt32(&missingPartsHeal, 1)
+				case errors.Is(err, errFileCorrupt):
+					atomic.StoreInt32(&bitrotHeal, 1)
+				case errors.Is(err, errDiskNotFound):
+					atomic.AddInt32(&disksNotFound, 1)
+				}
+
+				// This will be communicated upstream.
+				p.orgReaders[bufIdx] = nil
+				if br, ok := p.readers[i].(io.Closer); ok {
+					br.Close()
+				}
+				p.readers[i] = nil
+
+				// Since ReadAt returned error, trigger another read.
+				readTriggerCh <- true
+				return
+			}
+			newBufLK.Lock()
+			newBuf[bufIdx] = p.buf[bufIdx][:n]
+			newBufLK.Unlock()
+			// Since ReadAt returned success, there is no need to trigger another read.
+			readTriggerCh <- false
+		}(readerIndex)
+		readerIndex++
+	}
+	wg.Wait()
+	if p.canDecode(newBuf) {
+		p.offset += p.shardSize
+		if missingPartsHeal == 1 {
+			return newBuf, errFileNotFound
+		} else if bitrotHeal == 1 {
+			return newBuf, errFileCorrupt
+		}
+		return newBuf, nil
+	}
+
+	// If we cannot decode, just return read quorum error.
+	return nil, fmt.Errorf("%w (offline-disks=%d/%d)", errErasureReadQuorum, disksNotFound, len(p.readers))
+}
+```
+
+从这里可以看到，minio在读取对象时，会尝试读取最多datablock份分片，只要成功就返回，不会多读对象，如果某个minio节点有问题，minio会尝试从其他节点读取数据。
+
+
 
 ## 纠删码的基本原理
 

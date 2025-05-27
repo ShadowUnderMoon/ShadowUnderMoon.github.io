@@ -35,7 +35,7 @@ RDD数据模型 数据操作 数据依赖关系 数据操作分为两种，trans
         "mainEntityOfPage": {
             "@type": "WebPage",
             "@id": "http:\/\/example.org\/posts\/spark_logical_plan\/"
-        },"genre": "posts","keywords": "Spark","wordcount":  15871 ,
+        },"genre": "posts","keywords": "Spark","wordcount":  13173 ,
         "url": "http:\/\/example.org\/posts\/spark_logical_plan\/","datePublished": "2025-05-11T15:20:27+08:00","dateModified": "2025-05-11T15:20:27+08:00","publisher": {
             "@type": "Organization",
             "name": ""},"author": {
@@ -109,8 +109,8 @@ RDD数据模型 数据操作 数据依赖关系 数据操作分为两种，trans
             <div class="toc-content" id="toc-content-auto"></div>
         </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Spark逻辑处理流程</h1><div class="post-meta">
             <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/spark/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Spark</a></span></div>
-            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-11">2025-05-11</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;15871 words&nbsp;
-                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;32 minutes&nbsp;</div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-11">2025-05-11</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;13173 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;27 minutes&nbsp;</div>
         </div><div class="details toc" id="toc-static"  data-kept="">
                 <div class="details-summary toc-title">
                     <span>Contents</span>
@@ -118,14 +118,6 @@ RDD数据模型 数据操作 数据依赖关系 数据操作分为两种，trans
                 </div>
                 <div class="details-content toc-content" id="toc-content-static"><nav id="TableOfContents">
   <ul>
-    <li><a href="#rdd数据模型">RDD数据模型</a>
-      <ul>
-        <li><a href="#rdd常用属性">RDD常用属性</a></li>
-        <li><a href="#partition">Partition</a></li>
-        <li><a href="#partitioner">Partitioner</a></li>
-        <li><a href="#dependency">Dependency</a></li>
-      </ul>
-    </li>
     <li><a href="#常用transformation数据操作">常用transformation数据操作</a>
       <ul>
         <li><a href="#map">map</a></li>
@@ -201,319 +193,6 @@ RDD数据模型 数据操作 数据依赖关系 数据操作分为两种，trans
 <li>数据依赖关系</li>
 </ul>
 <p>数据操作分为两种，<code>transformation</code>操作并不会触发job的实际执行，<code>action</code>操作创建job并立即执行。类似于java中的stream，采用懒加载的方式。</p>
-<h2 id="rdd数据模型">RDD数据模型</h2>
-<p>RDD （Resilient Distributed DataSet)是spark对计算过程中输入输出数据以及中间数据的抽象，表示不可变、分区的集合数据，可以被并行处理。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-scala">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">abstract</span> <span class="k">class</span> <span class="nc">RDD</span><span class="o">[</span><span class="kt">T:</span> <span class="kt">ClassTag</span><span class="o">](</span>
-</span></span><span class="line"><span class="cl">    <span class="nd">@transient</span> <span class="k">private</span> <span class="k">var</span> <span class="nc">_sc</span><span class="k">:</span> <span class="kt">SparkContext</span><span class="o">,</span>
-</span></span><span class="line"><span class="cl">    <span class="nd">@transient</span> <span class="k">private</span> <span class="k">var</span> <span class="n">deps</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">Dependency</span><span class="o">[</span><span class="k">_</span><span class="o">]]</span>
-</span></span><span class="line"><span class="cl">  <span class="o">)</span> <span class="k">extends</span> <span class="nc">Serializable</span> <span class="k">with</span> <span class="nc">Logging</span> <span class="o">{</span></span></span></code></pre></div></div>
-<p><code>RDD</code>类包含一些基础操作，比如map、filter和persist，另外</p>
-<ul>
-<li>
-<p><code>PairRDDFunctions</code>包含专门处理键值对RDD的操作，比如<code>groupByKey</code>和<code>join</code></p>
-</li>
-<li>
-<p><code>DoubleRDDFunctions</code>包含数据为Double类型的RDD的操作</p>
-</li>
-<li>
-<p><code>SequenceFileRDDFunction</code>包含可以被保存为SequenceFiels的RDD的操作</p>
-</li>
-<li>
-<p><code>OrderedRDDFunctions</code>键值对RDD，key通过隐式转换后支持排序</p>
-</li>
-</ul>
-<p>RDD主要有5种属性：</p>
-<ul>
-<li>分区列表</li>
-<li>计算每个分区的函数</li>
-<li>对其他RDD的依赖组成的依赖链表</li>
-<li>可选，键值对RDD进行分区的Partitioner 比如某个RDD是hash分区的</li>
-<li>可选，计算每个分区的本地化偏好列表，比如依据hdfs文件的block位置给定偏好，降低网络传输开销</li>
-</ul>
-<h3 id="rdd常用属性">RDD常用属性</h3>
-<ul>
-<li><code>SparkContext</code> RDD所属的上下文</li>
-<li><code>Seq[Dependency[_]]</code> 当前RDD依赖的RDD列表</li>
-<li><code>Option[Partitioner]</code> partitioner，可以被子类重写，表示RDD是如何分区的</li>
-<li><code>Array[Partition]</code> RDD拥有的所有分区</li>
-</ul>
-<h3 id="partition">Partition</h3>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-scala">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="cm">/**
-</span></span></span><span class="line"><span class="cl"><span class="cm"> * An identifier for a partition in an RDD.
-</span></span></span><span class="line"><span class="cl"><span class="cm"> */</span>
-</span></span><span class="line"><span class="cl"><span class="k">trait</span> <span class="nc">Partition</span> <span class="k">extends</span> <span class="nc">Serializable</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">  <span class="cm">/**
-</span></span></span><span class="line"><span class="cl"><span class="cm">   * Get the partition&#39;s index within its parent RDD
-</span></span></span><span class="line"><span class="cl"><span class="cm">   */</span>
-</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">index</span><span class="k">:</span> <span class="kt">Int</span>
-</span></span><span class="line"><span class="cl">
-</span></span><span class="line"><span class="cl">  <span class="c1">// A better default implementation of HashCode
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">override</span> <span class="k">def</span> <span class="n">hashCode</span><span class="o">()</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=</span> <span class="n">index</span>
-</span></span><span class="line"><span class="cl">
-</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">equals</span><span class="o">(</span><span class="n">other</span><span class="k">:</span> <span class="kt">Any</span><span class="o">)</span><span class="k">:</span> <span class="kt">Boolean</span> <span class="o">=</span> <span class="k">super</span><span class="o">.</span><span class="n">equals</span><span class="o">(</span><span class="n">other</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<p><code>Partition</code>表示RDD中的一个分区</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-scala">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">private</span><span class="o">[</span><span class="kt">spark</span><span class="o">]</span> <span class="k">class</span> <span class="nc">PartitionPruningRDDPartition</span><span class="o">(</span><span class="n">idx</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span> <span class="k">val</span> <span class="n">parentSplit</span><span class="k">:</span> <span class="kt">Partition</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">  <span class="k">extends</span> <span class="nc">Partition</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">val</span> <span class="n">index</span> <span class="k">=</span> <span class="n">idx</span>
-</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<p><code>PartitionPruningRDDPartition</code>表示父RDD被剪枝后生成的子RDD中的分区。<code>idx</code>表示子RDD中分区的partition Id，<code>parentsplit</code>表示对应的父RDD中的分区。</p>
-<h3 id="partitioner">Partitioner</h3>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-scala">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">abstract</span> <span class="k">class</span> <span class="nc">Partitioner</span> <span class="k">extends</span> <span class="nc">Serializable</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">numPartitions</span><span class="k">:</span> <span class="kt">Int</span>
-</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">getPartition</span><span class="o">(</span><span class="n">key</span><span class="k">:</span> <span class="kt">Any</span><span class="o">)</span><span class="k">:</span> <span class="kt">Int</span>
-</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<p><code>Partitioner</code>定义了键值对RDD中的元素如何通过key进行分区，映射每个key到一个partition ID，从0到 <code>numPartitions - 1</code>。注意partitioner必须是确定性的，给定相同的partition key必须返回相同的分区。</p>
-<h4 id="hashpartitioner">HashPartitioner</h4>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-scala">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">HashPartitioner</span><span class="o">(</span><span class="n">partitions</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">extends</span> <span class="nc">Partitioner</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">  <span class="n">require</span><span class="o">(</span><span class="n">partitions</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="o">,</span> <span class="s">s&#34;Number of partitions (</span><span class="si">$partitions</span><span class="s">) cannot be negative.&#34;</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">
-</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">numPartitions</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=</span> <span class="n">partitions</span>
-</span></span><span class="line"><span class="cl">
-</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">getPartition</span><span class="o">(</span><span class="n">key</span><span class="k">:</span> <span class="kt">Any</span><span class="o">)</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=</span> <span class="n">key</span> <span class="k">match</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="kc">null</span> <span class="k">=&gt;</span> <span class="mi">0</span>
-</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="k">_</span> <span class="k">=&gt;</span> <span class="nc">Utils</span><span class="o">.</span><span class="n">nonNegativeMod</span><span class="o">(</span><span class="n">key</span><span class="o">.</span><span class="n">hashCode</span><span class="o">,</span> <span class="n">numPartitions</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">  <span class="o">}</span>
-</span></span><span class="line"><span class="cl">
-</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">equals</span><span class="o">(</span><span class="n">other</span><span class="k">:</span> <span class="kt">Any</span><span class="o">)</span><span class="k">:</span> <span class="kt">Boolean</span> <span class="o">=</span> <span class="n">other</span> <span class="k">match</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="n">h</span><span class="k">:</span> <span class="kt">HashPartitioner</span> <span class="o">=&gt;</span>
-</span></span><span class="line"><span class="cl">      <span class="n">h</span><span class="o">.</span><span class="n">numPartitions</span> <span class="o">==</span> <span class="n">numPartitions</span>
-</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="k">_</span> <span class="k">=&gt;</span>
-</span></span><span class="line"><span class="cl">      <span class="kc">false</span>
-</span></span><span class="line"><span class="cl">  <span class="o">}</span>
-</span></span><span class="line"><span class="cl">
-</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">hashCode</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=</span> <span class="n">numPartitions</span>
-</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<p><code>HashPartitioner</code>使用java的<code>Object.hashCode</code>实现了基于hash的分区，java数据的hashCode基于数据的identity而不是他们的内容，所以尝试对<code>RDD[Array[_]]</code>或者<code>RDD[(Array[_], _)]</code>使用HashPartitioner将产生非预期效果。</p>
-<h4 id="rangepartitioner">RangePartitioner</h4>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-scala">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">RangePartitioner</span><span class="o">[</span><span class="kt">K</span> <span class="kt">:</span> <span class="kt">Ordering</span> <span class="kt">:</span> <span class="kt">ClassTag</span>, <span class="kt">V</span><span class="o">](</span>
-</span></span><span class="line"><span class="cl">    <span class="n">partitions</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
-</span></span><span class="line"><span class="cl">    <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="k">_</span> <span class="k">&lt;:</span> <span class="kt">Product2</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]],</span>
-</span></span><span class="line"><span class="cl">    <span class="k">private</span> <span class="k">var</span> <span class="n">ascending</span><span class="k">:</span> <span class="kt">Boolean</span> <span class="o">=</span> <span class="kc">true</span><span class="o">,</span>
-</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">samplePointsPerPartitionHint</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=</span> <span class="mi">20</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">  <span class="k">extends</span> <span class="nc">Partitioner</span> <span class="o">{</span></span></span></code></pre></div></div>
-<p><code>RangePartitioner</code>将可排序的几率按范围划分成大致相等的区间，范围是通过对传入的RDD进行采样确定的。分区的实际数量可能和<code>partitions</code>参数不一致，比如当采样的记录少于partitions时。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-scala">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">def</span> <span class="n">getPartition</span><span class="o">(</span><span class="n">key</span><span class="k">:</span> <span class="kt">Any</span><span class="o">)</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">k</span> <span class="k">=</span> <span class="n">key</span><span class="o">.</span><span class="n">asInstanceOf</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span>
-</span></span><span class="line"><span class="cl">  <span class="k">var</span> <span class="n">partition</span> <span class="k">=</span> <span class="mi">0</span>
-</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="o">(</span><span class="n">rangeBounds</span><span class="o">.</span><span class="n">length</span> <span class="o">&lt;=</span> <span class="mi">128</span><span class="o">)</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">    <span class="c1">// 分区个数很少，没有必要走二分查找
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">while</span> <span class="o">(</span><span class="n">partition</span> <span class="o">&lt;</span> <span class="n">rangeBounds</span><span class="o">.</span><span class="n">length</span> <span class="o">&amp;&amp;</span> <span class="n">ordering</span><span class="o">.</span><span class="n">gt</span><span class="o">(</span><span class="n">k</span><span class="o">,</span> <span class="n">rangeBounds</span><span class="o">(</span><span class="n">partition</span><span class="o">)))</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">      <span class="n">partition</span> <span class="o">+=</span> <span class="mi">1</span>
-</span></span><span class="line"><span class="cl">    <span class="o">}</span>
-</span></span><span class="line"><span class="cl">  <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">    <span class="c1">// Determine which binary search method to use only once.
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">partition</span> <span class="k">=</span> <span class="n">binarySearch</span><span class="o">(</span><span class="n">rangeBounds</span><span class="o">,</span> <span class="n">k</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">    <span class="c1">// binarySearch either returns the match location or -[insertion point]-1
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">if</span> <span class="o">(</span><span class="n">partition</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="o">)</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">      <span class="n">partition</span> <span class="k">=</span> <span class="o">-</span><span class="n">partition</span><span class="o">-</span><span class="mi">1</span>
-</span></span><span class="line"><span class="cl">    <span class="o">}</span>
-</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="o">(</span><span class="n">partition</span> <span class="o">&gt;</span> <span class="n">rangeBounds</span><span class="o">.</span><span class="n">length</span><span class="o">)</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">      <span class="n">partition</span> <span class="k">=</span> <span class="n">rangeBounds</span><span class="o">.</span><span class="n">length</span>
-</span></span><span class="line"><span class="cl">    <span class="o">}</span>
-</span></span><span class="line"><span class="cl">  <span class="o">}</span>
-</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="o">(</span><span class="n">ascending</span><span class="o">)</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">    <span class="n">partition</span>
-</span></span><span class="line"><span class="cl">  <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">    <span class="n">rangeBounds</span><span class="o">.</span><span class="n">length</span> <span class="o">-</span> <span class="n">partition</span>
-</span></span><span class="line"><span class="cl">  <span class="o">}</span>
-</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<p>partitioner最重要的函数<code>getPartition</code>，用于确定某个&lt;K, V&gt; record应该分到哪个partition。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-scala">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="c1">// 前partitions - 1个分区的上边界
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">private</span> <span class="k">var</span> <span class="n">rangeBounds</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="o">(</span><span class="n">partitions</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="o">)</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">    <span class="nc">Array</span><span class="o">.</span><span class="n">empty</span>
-</span></span><span class="line"><span class="cl">  <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">    <span class="c1">// 为了使输出分区大致平衡所需要的采样数据量，最大上限为100万
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">val</span> <span class="n">sampleSize</span> <span class="k">=</span> <span class="n">math</span><span class="o">.</span><span class="n">min</span><span class="o">(</span><span class="n">samplePointsPerPartitionHint</span><span class="o">.</span><span class="n">toDouble</span> <span class="o">*</span> <span class="n">partitions</span><span class="o">,</span> <span class="mi">1</span><span class="n">e6</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">    <span class="c1">// 假设输出的分区大致平衡，这里超采样一部分
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">val</span> <span class="n">sampleSizePerPartition</span> <span class="k">=</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="o">(</span><span class="mf">3.0</span> <span class="o">*</span> <span class="n">sampleSize</span> <span class="o">/</span> <span class="n">rdd</span><span class="o">.</span><span class="n">partitions</span><span class="o">.</span><span class="n">length</span><span class="o">).</span><span class="n">toInt</span>
-</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="o">(</span><span class="n">numItems</span><span class="o">,</span> <span class="n">sketched</span><span class="o">)</span> <span class="k">=</span> <span class="nc">RangePartitioner</span><span class="o">.</span><span class="n">sketch</span><span class="o">(</span><span class="n">rdd</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="k">_</span><span class="o">.</span><span class="n">_1</span><span class="o">),</span> <span class="n">sampleSizePerPartition</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="o">(</span><span class="n">numItems</span> <span class="o">==</span> <span class="mi">0L</span><span class="o">)</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">      <span class="nc">Array</span><span class="o">.</span><span class="n">empty</span>
-</span></span><span class="line"><span class="cl">    <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">      <span class="c1">// 如果某个分区包含的元素数量远多余平均值，将对该分区重新采样，以确保从该分区中收集到足够的样本
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="c1">// fraction表示样本数量和数据总量的比值
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="k">val</span> <span class="n">fraction</span> <span class="k">=</span> <span class="n">math</span><span class="o">.</span><span class="n">min</span><span class="o">(</span><span class="n">sampleSize</span> <span class="o">/</span> <span class="n">math</span><span class="o">.</span><span class="n">max</span><span class="o">(</span><span class="n">numItems</span><span class="o">,</span> <span class="mi">1L</span><span class="o">),</span> <span class="mf">1.0</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">      <span class="k">val</span> <span class="n">candidates</span> <span class="k">=</span> <span class="nc">ArrayBuffer</span><span class="o">.</span><span class="n">empty</span><span class="o">[(</span><span class="kt">K</span>, <span class="kt">Float</span><span class="o">)]</span>
-</span></span><span class="line"><span class="cl">      <span class="k">val</span> <span class="n">imbalancedPartitions</span> <span class="k">=</span> <span class="n">mutable</span><span class="o">.</span><span class="nc">Set</span><span class="o">.</span><span class="n">empty</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>
-</span></span><span class="line"><span class="cl">      <span class="n">sketched</span><span class="o">.</span><span class="n">foreach</span> <span class="o">{</span> <span class="k">case</span> <span class="o">(</span><span class="n">idx</span><span class="o">,</span> <span class="n">n</span><span class="o">,</span> <span class="n">sample</span><span class="o">)</span> <span class="k">=&gt;</span>
-</span></span><span class="line"><span class="cl">        <span class="c1">// 按照比例当前分区应该抽样的平均数量高于实际采样数量，认为当前分区需要重采样
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="k">if</span> <span class="o">(</span><span class="n">fraction</span> <span class="o">*</span> <span class="n">n</span> <span class="o">&gt;</span> <span class="n">sampleSizePerPartition</span><span class="o">)</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">          <span class="n">imbalancedPartitions</span> <span class="o">+=</span> <span class="n">idx</span>
-</span></span><span class="line"><span class="cl">        <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">          <span class="c1">// weight是采样概率的倒数，举个例子，假设有两个分区，都采样了30个样本
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>          <span class="c1">// 但a分区大小为300，b分区大小为60，显然a和b分区采样的每个样本应该占的权重不同
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>          <span class="c1">// weight的作用就在于此
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>          <span class="k">val</span> <span class="n">weight</span> <span class="k">=</span> <span class="o">(</span><span class="n">n</span><span class="o">.</span><span class="n">toDouble</span> <span class="o">/</span> <span class="n">sample</span><span class="o">.</span><span class="n">length</span><span class="o">).</span><span class="n">toFloat</span>
-</span></span><span class="line"><span class="cl">          <span class="k">for</span> <span class="o">(</span><span class="n">key</span> <span class="k">&lt;-</span> <span class="n">sample</span><span class="o">)</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">            <span class="n">candidates</span> <span class="o">+=</span> <span class="o">((</span><span class="n">key</span><span class="o">,</span> <span class="n">weight</span><span class="o">))</span>
-</span></span><span class="line"><span class="cl">          <span class="o">}</span>
-</span></span><span class="line"><span class="cl">        <span class="o">}</span>
-</span></span><span class="line"><span class="cl">      <span class="o">}</span>
-</span></span><span class="line"><span class="cl">      <span class="k">if</span> <span class="o">(</span><span class="n">imbalancedPartitions</span><span class="o">.</span><span class="n">nonEmpty</span><span class="o">)</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">        <span class="c1">// 仅对需要重新抽样的分区进行操作
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="k">val</span> <span class="n">imbalanced</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">PartitionPruningRDD</span><span class="o">(</span><span class="n">rdd</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="k">_</span><span class="o">.</span><span class="n">_1</span><span class="o">),</span> <span class="n">imbalancedPartitions</span><span class="o">.</span><span class="n">contains</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">        <span class="k">val</span> <span class="n">seed</span> <span class="k">=</span> <span class="n">byteswap32</span><span class="o">(-</span><span class="n">rdd</span><span class="o">.</span><span class="n">id</span> <span class="o">-</span> <span class="mi">1</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">        <span class="c1">// 使用sample进行抽样, 抽样的比例为fraction
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="c1">// 假设第一次抽样，总数为3000，抽样大小为30，平均抽样比例为0.1，所以进行重抽样，这次抽样占比为0.1，也就是300
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="k">val</span> <span class="n">reSampled</span> <span class="k">=</span> <span class="n">imbalanced</span><span class="o">.</span><span class="n">sample</span><span class="o">(</span><span class="n">withReplacement</span> <span class="k">=</span> <span class="kc">false</span><span class="o">,</span> <span class="n">fraction</span><span class="o">,</span> <span class="n">seed</span><span class="o">).</span><span class="n">collect</span><span class="o">()</span>
-</span></span><span class="line"><span class="cl">        <span class="k">val</span> <span class="n">weight</span> <span class="k">=</span> <span class="o">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">fraction</span><span class="o">).</span><span class="n">toFloat</span>
-</span></span><span class="line"><span class="cl">        <span class="n">candidates</span> <span class="o">++=</span> <span class="n">reSampled</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">x</span> <span class="k">=&gt;</span> <span class="o">(</span><span class="n">x</span><span class="o">,</span> <span class="n">weight</span><span class="o">))</span>
-</span></span><span class="line"><span class="cl">      <span class="o">}</span>
-</span></span><span class="line"><span class="cl">      <span class="c1">// 如果采样的记录少于partitions，则最终的分区数量也会少于partitions
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="nc">RangePartitioner</span><span class="o">.</span><span class="n">determineBounds</span><span class="o">(</span><span class="n">candidates</span><span class="o">,</span> <span class="n">math</span><span class="o">.</span><span class="n">min</span><span class="o">(</span><span class="n">partitions</span><span class="o">,</span> <span class="n">candidates</span><span class="o">.</span><span class="n">size</span><span class="o">))</span>
-</span></span><span class="line"><span class="cl">    <span class="o">}</span>
-</span></span><span class="line"><span class="cl">  <span class="o">}</span>
-</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-scala">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">def</span> <span class="n">sketch</span><span class="o">[</span><span class="kt">K</span> <span class="kt">:</span> <span class="kt">ClassTag</span><span class="o">](</span>
-</span></span><span class="line"><span class="cl">    <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="kt">K</span><span class="o">],</span>
-</span></span><span class="line"><span class="cl">    <span class="n">sampleSizePerPartition</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span><span class="k">:</span> <span class="o">(</span><span class="kt">Long</span><span class="o">,</span> <span class="kt">Array</span><span class="o">[(</span><span class="kt">Int</span>, <span class="kt">Long</span>, <span class="kt">Array</span><span class="o">[</span><span class="kt">K</span><span class="o">])])</span> <span class="k">=</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">shift</span> <span class="k">=</span> <span class="n">rdd</span><span class="o">.</span><span class="n">id</span>
-</span></span><span class="line"><span class="cl">  <span class="c1">// val classTagK = classTag[K] // to avoid serializing the entire partitioner object
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">sketched</span> <span class="k">=</span> <span class="n">rdd</span><span class="o">.</span><span class="n">mapPartitionsWithIndex</span> <span class="o">{</span> <span class="o">(</span><span class="n">idx</span><span class="o">,</span> <span class="n">iter</span><span class="o">)</span> <span class="k">=&gt;</span>
-</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">seed</span> <span class="k">=</span> <span class="n">byteswap32</span><span class="o">(</span><span class="n">idx</span> <span class="o">^</span> <span class="o">(</span><span class="n">shift</span> <span class="o">&lt;&lt;</span> <span class="mi">16</span><span class="o">))</span>
-</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="o">(</span><span class="n">sample</span><span class="o">,</span> <span class="n">n</span><span class="o">)</span> <span class="k">=</span> <span class="nc">SamplingUtils</span><span class="o">.</span><span class="n">reservoirSampleAndCount</span><span class="o">(</span>
-</span></span><span class="line"><span class="cl">      <span class="n">iter</span><span class="o">,</span> <span class="n">sampleSizePerPartition</span><span class="o">,</span> <span class="n">seed</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">    <span class="nc">Iterator</span><span class="o">((</span><span class="n">idx</span><span class="o">,</span> <span class="n">n</span><span class="o">,</span> <span class="n">sample</span><span class="o">))</span>
-</span></span><span class="line"><span class="cl">  <span class="o">}.</span><span class="n">collect</span><span class="o">()</span>
-</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">numItems</span> <span class="k">=</span> <span class="n">sketched</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="k">_</span><span class="o">.</span><span class="n">_2</span><span class="o">).</span><span class="n">sum</span>
-</span></span><span class="line"><span class="cl">  <span class="o">(</span><span class="n">numItems</span><span class="o">,</span> <span class="n">sketched</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<p><code>sketch</code>函数通过蓄水池抽样法从每个分区中抽样指定数量的样本，蓄水池抽样实现了流式的均匀抽样，不需要所有数据都加载在内存中。通过<code>collect</code>函数将所有数据收集到driver端，<code>numItems</code>是样本总数而不是抽样结果的总数，<code>sketched</code>是抽样列表，其中的每个元素包含抽样的partition Id，分区的大小以及抽样样本数组。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-scala">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">def</span> <span class="n">determineBounds</span><span class="o">[</span><span class="kt">K</span> <span class="kt">:</span> <span class="kt">Ordering</span> <span class="kt">:</span> <span class="kt">ClassTag</span><span class="o">](</span>
-</span></span><span class="line"><span class="cl">    <span class="n">candidates</span><span class="k">:</span> <span class="kt">ArrayBuffer</span><span class="o">[(</span><span class="kt">K</span>, <span class="kt">Float</span><span class="o">)],</span>
-</span></span><span class="line"><span class="cl">    <span class="n">partitions</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">ordering</span> <span class="k">=</span> <span class="n">implicitly</span><span class="o">[</span><span class="kt">Ordering</span><span class="o">[</span><span class="kt">K</span><span class="o">]]</span>
-</span></span><span class="line"><span class="cl">  <span class="c1">// 按照Key进行排序
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">ordered</span> <span class="k">=</span> <span class="n">candidates</span><span class="o">.</span><span class="n">sortBy</span><span class="o">(</span><span class="k">_</span><span class="o">.</span><span class="n">_1</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">numCandidates</span> <span class="k">=</span> <span class="n">ordered</span><span class="o">.</span><span class="n">size</span>
-</span></span><span class="line"><span class="cl">  <span class="c1">// 计算总权重
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">sumWeights</span> <span class="k">=</span> <span class="n">ordered</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="k">_</span><span class="o">.</span><span class="n">_2</span><span class="o">.</span><span class="n">toDouble</span><span class="o">).</span><span class="n">sum</span>
-</span></span><span class="line"><span class="cl">  <span class="c1">// 类似于百分位数，每个区间应该具有的权重
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">step</span> <span class="k">=</span> <span class="n">sumWeights</span> <span class="o">/</span> <span class="n">partitions</span>
-</span></span><span class="line"><span class="cl">  <span class="k">var</span> <span class="n">cumWeight</span> <span class="k">=</span> <span class="mf">0.0</span>
-</span></span><span class="line"><span class="cl">  <span class="k">var</span> <span class="n">target</span> <span class="k">=</span> <span class="n">step</span>
-</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">bounds</span> <span class="k">=</span> <span class="nc">ArrayBuffer</span><span class="o">.</span><span class="n">empty</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span>
-</span></span><span class="line"><span class="cl">  <span class="k">var</span> <span class="n">i</span> <span class="k">=</span> <span class="mi">0</span>
-</span></span><span class="line"><span class="cl">  <span class="k">var</span> <span class="n">j</span> <span class="k">=</span> <span class="mi">0</span>
-</span></span><span class="line"><span class="cl">  <span class="k">var</span> <span class="n">previousBound</span> <span class="k">=</span> <span class="nc">Option</span><span class="o">.</span><span class="n">empty</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span>
-</span></span><span class="line"><span class="cl">  <span class="k">while</span> <span class="o">((</span><span class="n">i</span> <span class="o">&lt;</span> <span class="n">numCandidates</span><span class="o">)</span> <span class="o">&amp;&amp;</span> <span class="o">(</span><span class="n">j</span> <span class="o">&lt;</span> <span class="n">partitions</span> <span class="o">-</span> <span class="mi">1</span><span class="o">))</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="o">(</span><span class="n">key</span><span class="o">,</span> <span class="n">weight</span><span class="o">)</span> <span class="k">=</span> <span class="n">ordered</span><span class="o">(</span><span class="n">i</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">    <span class="n">cumWeight</span> <span class="o">+=</span> <span class="n">weight</span>
-</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="o">(</span><span class="n">cumWeight</span> <span class="o">&gt;=</span> <span class="n">target</span><span class="o">)</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">      <span class="c1">// 跳过重复的值
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="k">if</span> <span class="o">(</span><span class="n">previousBound</span><span class="o">.</span><span class="n">isEmpty</span> <span class="o">||</span> <span class="n">ordering</span><span class="o">.</span><span class="n">gt</span><span class="o">(</span><span class="n">key</span><span class="o">,</span> <span class="n">previousBound</span><span class="o">.</span><span class="n">get</span><span class="o">))</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">        <span class="c1">// bounds中的每个元素表示区间的上边界
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="n">bounds</span> <span class="o">+=</span> <span class="n">key</span>
-</span></span><span class="line"><span class="cl">        <span class="n">target</span> <span class="o">+=</span> <span class="n">step</span>
-</span></span><span class="line"><span class="cl">        <span class="n">j</span> <span class="o">+=</span> <span class="mi">1</span>
-</span></span><span class="line"><span class="cl">        <span class="n">previousBound</span> <span class="k">=</span> <span class="nc">Some</span><span class="o">(</span><span class="n">key</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">      <span class="o">}</span>
-</span></span><span class="line"><span class="cl">    <span class="o">}</span>
-</span></span><span class="line"><span class="cl">    <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
-</span></span><span class="line"><span class="cl">  <span class="o">}</span>
-</span></span><span class="line"><span class="cl">  <span class="n">bounds</span><span class="o">.</span><span class="n">toArray</span>
-</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<p><code>determineBounds</code>为range partition确定范围边界，返回的结果中的每个元素表示区间的上边界。</p>
-<h3 id="dependency">Dependency</h3>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-scala">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="nd">@DeveloperApi</span>
-</span></span><span class="line"><span class="cl"><span class="k">abstract</span> <span class="k">class</span> <span class="nc">Dependency</span><span class="o">[</span><span class="kt">T</span><span class="o">]</span> <span class="nc">extends</span> <span class="nc">Serializable</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">]</span>
-</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<p>RDD依赖的基础类。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-scala">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="nd">@DeveloperApi</span>
-</span></span><span class="line"><span class="cl"><span class="k">abstract</span> <span class="k">class</span> <span class="nc">NarrowDependency</span><span class="o">[</span><span class="kt">T</span><span class="o">](</span><span class="nc">_rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">extends</span> <span class="nc">Dependency</span><span class="o">[</span><span class="kt">T</span><span class="o">]</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">  <span class="cm">/**
-</span></span></span><span class="line"><span class="cl"><span class="cm">   * Get the parent partitions for a child partition.
-</span></span></span><span class="line"><span class="cl"><span class="cm">   * @param partitionId a partition of the child RDD
-</span></span></span><span class="line"><span class="cl"><span class="cm">   * @return the partitions of the parent RDD that the child partition depends upon
-</span></span></span><span class="line"><span class="cl"><span class="cm">   */</span>
-</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">getParents</span><span class="o">(</span><span class="n">partitionId</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>
-</span></span><span class="line"><span class="cl">
-</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">]</span> <span class="k">=</span> <span class="nc">_rdd</span>
-</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<p>窄依赖<code>NarrowDependency</code>，子RDD的每个分区依赖于父RDD的一小部分分区，窄依赖允许流水线执行，<code>getParenets</code>返回子RDD分区依赖的所有父RDD分区。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-scala">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">private</span><span class="o">[</span><span class="kt">spark</span><span class="o">]</span> <span class="k">class</span> <span class="nc">PruneDependency</span><span class="o">[</span><span class="kt">T</span><span class="o">](</span><span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">],</span> <span class="n">partitionFilterFunc</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=&gt;</span> <span class="nc">Boolean</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">  <span class="k">extends</span> <span class="nc">NarrowDependency</span><span class="o">[</span><span class="kt">T</span><span class="o">](</span><span class="n">rdd</span><span class="o">)</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">
-</span></span><span class="line"><span class="cl">  <span class="nd">@transient</span>
-</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">partitions</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">Partition</span><span class="o">]</span> <span class="k">=</span> <span class="n">rdd</span><span class="o">.</span><span class="n">partitions</span>
-</span></span><span class="line"><span class="cl">    <span class="o">.</span><span class="n">filter</span><span class="o">(</span><span class="n">s</span> <span class="k">=&gt;</span> <span class="n">partitionFilterFunc</span><span class="o">(</span><span class="n">s</span><span class="o">.</span><span class="n">index</span><span class="o">)).</span><span class="n">zipWithIndex</span>
-</span></span><span class="line"><span class="cl">    <span class="c1">// idx是子RDD的partition Id，从0开始
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="c1">// split是对应的父RDD中的分区
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="o">.</span><span class="n">map</span> <span class="o">{</span> <span class="k">case</span><span class="o">(</span><span class="n">split</span><span class="o">,</span> <span class="n">idx</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="k">new</span> <span class="nc">PartitionPruningRDDPartition</span><span class="o">(</span><span class="n">idx</span><span class="o">,</span> <span class="n">split</span><span class="o">)</span> <span class="k">:</span> <span class="kt">Partition</span> <span class="o">}</span>
-</span></span><span class="line"><span class="cl">
-</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">getParents</span><span class="o">(</span><span class="n">partitionId</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span><span class="k">:</span> <span class="kt">List</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">    <span class="nc">List</span><span class="o">(</span><span class="n">partitions</span><span class="o">(</span><span class="n">partitionId</span><span class="o">).</span><span class="n">asInstanceOf</span><span class="o">[</span><span class="kt">PartitionPruningRDDPartition</span><span class="o">].</span><span class="n">parentSplit</span><span class="o">.</span><span class="n">index</span><span class="o">)</span>
-</span></span><span class="line"><span class="cl">  <span class="o">}</span>
-</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<p><code>PruneDependency</code>是窄依赖的一种，子RDD中的分区是父RDD中分区剪枝后的子集，子RDD中的分区唯一依赖于父RDD的中一个分区。</p>
 <h2 id="常用transformation数据操作">常用transformation数据操作</h2>
 <h3 id="map">map</h3>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
@@ -1981,7 +1660,7 @@ RDD数据模型 数据操作 数据依赖关系 数据操作分为两种，trans
         </section>
     </div>
 
-    <div class="post-nav"><a href="/posts/spark-base/" class="prev" rel="prev" title="Spark StandAlone"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>Spark StandAlone</a>
+    <div class="post-nav"><a href="/posts/spark-base/" class="prev" rel="prev" title="Spark基础知识"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>Spark基础知识</a>
             <a href="/posts/grpc-metric/" class="next" rel="next" title="Grpc Metric">Grpc Metric<i class="fas fa-angle-right fa-fw" aria-hidden="true"></i></a></div>
 </div>
 <div id="comments"><div id="utterances" class="comment"></div><noscript>
