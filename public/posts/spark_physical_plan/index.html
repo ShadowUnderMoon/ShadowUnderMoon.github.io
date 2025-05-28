@@ -238,7 +238,7 @@
 <li>UnionRDD</li>
 </ul>
 <h3 id="count操作">count操作</h3>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -282,7 +282,7 @@
 </span></span><span class="line"><span class="cl">  <span class="n">rdd</span><span class="o">.</span><span class="n">doCheckpoint</span><span class="o">()</span>
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
 <p>count操作会调用runJob创建并执行新的job，<code>getCallSite</code>通过堆栈找到用户调用代码的位置以及调用的spark方法，类似于<code>union at FilterDemo.scala:35</code>。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -313,7 +313,7 @@
 </span></span><span class="line"><span class="cl">  <span class="o">}</span>
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
 <p>DAGScheduler负责提交job，并等待job结束，判断job是否成功。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -363,7 +363,7 @@
 </span></span><span class="line"><span class="cl">  <span class="n">waiter</span>
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
 <p>submitJob会计算DAG中每个RDD的<code>.partitions</code>，确保<code>getPartitinos</code>在<code>DAGScheduler</code>单线程事件循环外计算，避免<code>RDD.getPartitions</code>的计算影响调度效率。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -397,7 +397,7 @@
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
 <p><code>eagerlyComputePartitionsForRddAndAncestors</code>函数对DAG中每个RDD调用<code>partitions</code>生成分区。为了避免StackOverFlowError，没有直接采用递归的方式遍历DAG，而是采用手动维护栈的方式遍历DAG。维护已经遍历的RDD的Set和还没有遍历过的RDD的列表，每次从列表中取出一个RDD，判断是否已经遍历过，如果已经遍历过，则忽略，否则计算<code>partitions</code>，并且将它依赖的RDD也加入到列表中，直到列表为空，所有RDD都已经遍历结束。</p>
 <h3 id="getpartitions">getPartitions</h3>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
