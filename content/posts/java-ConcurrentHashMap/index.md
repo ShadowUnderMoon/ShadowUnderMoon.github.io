@@ -46,19 +46,47 @@ Java7中使用Entry来代表每个HashMap的数据节点，Java8中使用Node，
 ## Java8 ConcurrentHashMap
 
 ```java
-    /**
-     * The array of bins. Lazily initialized upon first insertion.
-     * Size is always a power of two. Accessed directly by iterators.
-     */
-    transient volatile Node<K,V>[] table;
+/**
+ * The array of bins. Lazily initialized upon first insertion.
+ * Size is always a power of two. Accessed directly by iterators.
+ */
+transient volatile Node<K,V>[] table;
 
-    /**
-     * The next table to use; non-null only while resizing.
-     */
-    private transient volatile Node<K,V>[] nextTable;
+/**
+ * The next table to use; non-null only while resizing.
+ */
+// 迁移时使用的临时数组
+private transient volatile Node<K,V>[] nextTable;
 ```
 
 ConcurrentHashMap底层也是一个数组，每个元素要么是链表，要么是红黑树。
+
+### spread函数
+
+```java
+static final int HASH_BITS = 0x7fffffff; // usable bits of normal node hash
+/**
+ * Spreads (XORs) higher bits of hash to lower and also forces top
+ * bit to 0. Because the table uses power-of-two masking, sets of
+ * hashes that vary only in bits above the current mask will
+ * always collide. (Among known examples are sets of Float keys
+ * holding consecutive whole numbers in small tables.)  So we
+ * apply a transform that spreads the impact of higher bits
+ * downward. There is a tradeoff between speed, utility, and
+ * quality of bit-spreading. Because many common sets of hashes
+ * are already reasonably distributed (so don't benefit from
+ * spreading), and because we use trees to handle large sets of
+ * collisions in bins, we just XOR some shifted bits in the
+ * cheapest possible way to reduce systematic lossage, as well as
+ * to incorporate impact of the highest bits that would otherwise
+ * never be used in index calculations because of table bounds.
+ */
+static final int spread(int h) {
+    return (h ^ (h >>> 16)) & HASH_BITS;
+}
+```
+
+spread函数将原来的hash值进行处理，获取新的hash值，尽量避免hash碰撞。
 
 ### put过程分析
 
@@ -84,7 +112,9 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
                          new Node<K,V>(hash, key, value, null)))
                 break;                   // no lock when adding to empty bin
         }
-      	// 当前位置正在扩容，后面再解释，先略过
+      	// 当前位置已经扩容完成，MOVED用于标记扩容
+      	// helpTransfer之后会进入下一轮循环
+      	// 这里也能看出，put操作如果遇到对应的hash桶已经被迁移，那么不得已，当前线程需要协助transfer，直到整个table迁移完成
         else if ((fh = f.hash) == MOVED)
             tab = helpTransfer(tab, f);
         else {
@@ -93,6 +123,7 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
           	// 获取数组该位置头结点的监视器锁
             synchronized (f) {
               	// 获取锁之后重新判断一下当前位置的节点是否已经改变，如果已经改变，进入下一个循环
+              	// 当迁移完成时，头节点改成ForwardingNode，判断失败，会进入下一轮循环，走MOVED分支
                 if (tabAt(tab, i) == f) {
                   	// 头结点的hash值大于0，说明是链表
                     if (fh >= 0) {
@@ -100,7 +131,7 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
                         binCount = 1;
                         for (Node<K,V> e = f;; ++binCount) {
                             K ek;
-                          	// 如果发现了相等的key，判断是否需要进行值覆盖，退出循环
+                          	// 如果发现了相等的key，判断是否需要进行值覆盖，最后跳出循环
                             if (e.hash == hash &&
                                 ((ek = e.key) == key ||
                                  (ek != null && key.equals(ek)))) {
@@ -189,6 +220,45 @@ private final Node<K,V>[] initTable() {
 
 初始化方法中的并发问题是通过对sizeCtl进行一个CAS操作来控制的。
 
+### helpTransfer
+
+```java
+/**
+ * The maximum number of threads that can help resize.
+ * Must fit in 32 - RESIZE_STAMP_BITS bits.
+ */
+private static final int MAX_RESIZERS = (1 << (32 - RESIZE_STAMP_BITS)) - 1;
+/**
+ * Helps transfer if a resize is in progress.
+ */
+final Node<K,V>[] helpTransfer(Node<K,V>[] tab, Node<K,V> f) {
+    Node<K,V>[] nextTab; int sc;
+    if (tab != null && (f instanceof ForwardingNode) &&
+        (nextTab = ((ForwardingNode<K,V>)f).nextTable) != null) {
+        int rs = resizeStamp(tab.length) << RESIZE_STAMP_SHIFT;
+        while (nextTab == nextTable && table == tab &&
+               (sc = sizeCtl) < 0) {
+          	// 这里有三种情况，不帮忙transfer
+          	// 1. 帮助迁移的线程数已经达到上限
+          	// 2. 
+          	// 3. transferIndex小于0，表示数组已经迁移完成
+            if (sc == rs + MAX_RESIZERS || sc == rs + 1 ||
+                transferIndex <= 0)
+                break;
+          	// CAS操作将sizeCtrl加一，成功后进行transfer并跳出循环
+            if (U.compareAndSwapInt(this, SIZECTL, sc, sc + 1)) {
+                transfer(tab, nextTab);
+                break;
+            }
+        }
+        return nextTab;
+    }
+    return table;
+}
+```
+
+
+
 ### 链表转红黑树： treeifyBin
 
 ```java
@@ -202,7 +272,7 @@ private final void treeifyBin(Node<K,V>[] tab, int index) {
       	// MIN_TREEIFY_CAPACITY为64
       	// 所以，如果数组长度小于64的时候，其实也就是32或者16或者更小的时候，会进行数组扩容
         if ((n = tab.length) < MIN_TREEIFY_CAPACITY)
-          	// 数组扩容方法，稍后介绍
+          	// 触发扩容
             tryPresize(n << 1);
       	// 当前位置是链表
         else if ((b = tabAt(tab, index)) != null && b.hash >= 0) {
@@ -243,6 +313,7 @@ private final void tryPresize(int size) {
     int c = (size >= (MAXIMUM_CAPACITY >>> 1)) ? MAXIMUM_CAPACITY :
         tableSizeFor(size + (size >>> 1) + 1);
     int sc;
+  	// resize开始后, sizeCtl为负数，所以如果已经开始resize，这段逻辑会被跳过
     while ((sc = sizeCtl) >= 0) {
         Node<K,V>[] tab = table; int n;
       	// 初始化数组，和之前类似
@@ -266,19 +337,19 @@ private final void tryPresize(int size) {
             break;
         else if (tab == table) {
             int rs = resizeStamp(n);
-						// https://bugs.java.com/bugdatabase/view_bug.do?bug_id=8215409 sc < 0永远不会成立，所以这段代码不起作用，在jdk11中已经去掉
+						// https://bugs.java.com/bugdatabase/view_bug.do?bug_id=8215409 
+          	// sc < 0永远不会成立，所以这段代码不起作用，在jdk11中已经去掉
+          	// 复制粘贴是每位程序员的必备技能
             if (sc < 0) {
                 Node<K,V>[] nt;
-              	// 是否允许当前线程参与扩容
                 if ((sc >>> RESIZE_STAMP_SHIFT) != rs || sc == rs + 1 ||
                     sc == rs + MAX_RESIZERS || (nt = nextTable) == null ||
                     transferIndex <= 0)
                     break;
-              	// CAS将sizeCtl加1，然后执行transfer方法，此时nextTab不为null
                 if (U.compareAndSwapInt(this, SIZECTL, sc, sc + 1))
                     transfer(tab, nt);
             }
-          	// 将sizectl设置为负数，并且具有resize戳
+          	// 这里为什么要加2，没有看懂
             else if (U.compareAndSwapInt(this, SIZECTL, sc,
                                          (rs << RESIZE_STAMP_SHIFT) + 2))
                 transfer(tab, null);
@@ -294,6 +365,7 @@ private final void tryPresize(int size) {
  * The maximum number of threads that can help resize.
  * Must fit in 32 - RESIZE_STAMP_BITS bits.
  */
+// 高16位为0，低16位为1
 private static final int MAX_RESIZERS = (1 << (32 - RESIZE_STAMP_BITS)) - 1;
 /**
  * The number of bits used for generation stamp in sizeCtl.
@@ -304,6 +376,9 @@ private static int RESIZE_STAMP_BITS = 16;
  * Returns the stamp bits for resizing a table of size n.
  * Must be negative when shifted left by RESIZE_STAMP_SHIFT.
  */
+// n为数组长度，所以一定是2^n，n的前导零个数实际上用更少的位数编码了n
+// 从低位起第16位为1（从1开始计数），这样左移16位后一定是一个负数
+// 所以 resizeStamp(int n)的效果是将n进行了重新编码，并且添加了resize戳记
 static final int resizeStamp(int n) {
     return Integer.numberOfLeadingZeros(n) | (1 << (RESIZE_STAMP_BITS - 1));
 }
@@ -324,6 +399,10 @@ static final int resizeStamp(int n) {
 之前提到，原数组i位置的键值对会被分配到新数组i位置和新数组i + oldLength位置，这样每个迁移小任务相互之前不存在资源竞争。
 
 ```java
+/**
+ * The next table index (plus one) to split while resizing.
+ */
+private transient volatile int transferIndex;
 /**
  * Moves and/or copies the nodes in each bin to new table. See
  * above for explanation.
@@ -348,7 +427,7 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
         }
       	// 赋值给nextTable属性
         nextTable = nextTab;
-      	// transfer属性用于控制迁移的位置
+      	// transfer属性用于控制迁移的位置，初始为原先数组的长度
         transferIndex = n;
     }
     int nextn = nextTab.length;
@@ -464,6 +543,7 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
                         setTabAt(nextTab, i, ln);
                         setTabAt(nextTab, i + n, hn);
                         setTabAt(tab, i, fwd);
+                      	// 此时旧数组上对应位置的节点可能会被gc，后面访问不到了
                         advance = true;
                     }
                     else if (f instanceof TreeBin) {
@@ -553,13 +633,16 @@ static final class ForwardingNode<K,V> extends Node<K,V> {
 
     Node<K,V> find(int h, Object k) {
         // loop to avoid arbitrarily deep recursion on forwarding nodes
+      	// 通过循环来避免对ForwardingNode的递归
         outer: for (Node<K,V>[] tab = nextTable;;) {
             Node<K,V> e; int n;
+          	// 没有找到元素，返回null
             if (k == null || tab == null || (n = tab.length) == 0 ||
                 (e = tabAt(tab, (n - 1) & h)) == null)
                 return null;
             for (;;) {
                 int eh; K ek;
+              	// 头节点就是所需要的节点，直接返回
                 if ((eh = e.hash) == h &&
                     ((ek = e.key) == k || (ek != null && k.equals(ek))))
                     return e;
@@ -571,9 +654,255 @@ static final class ForwardingNode<K,V> extends Node<K,V> {
                     else
                         return e.find(h, k);
                 }
+              	// 搜索到了链表末尾，返回null
                 if ((e = e.next) == null)
                     return null;
             }
+        }
+    }
+}
+```
+
+### clear过程分析
+
+```java
+/**
+ * Removes all of the mappings from this map.
+ */
+public void clear() {
+    long delta = 0L; // negative number of deletions
+    int i = 0;
+    Node<K,V>[] tab = table;
+    while (tab != null && i < tab.length) {
+        int fh;
+      	// 遍历数组中的每个元素
+        Node<K,V> f = tabAt(tab, i);
+      	// 元素为null，继续下一个
+        if (f == null)
+            ++i;
+      	// 如果当前位置的元素已经被移动到新的数组中，帮助transfer，然后restart
+      	// restart 跳到新的table上，重新开始
+        else if ((fh = f.hash) == MOVED) {
+            tab = helpTransfer(tab, f);
+            i = 0; // restart
+        }
+        else {
+          	// 获取当前位置的头节点的监视器
+            synchronized (f) {
+                if (tabAt(tab, i) == f) {
+                    Node<K,V> p = (fh >= 0 ? f :
+                                   (f instanceof TreeBin) ?
+                                   ((TreeBin<K,V>)f).first : null);
+                  	// 遍历链表或者红黑树，获取删除的节点个数
+                    while (p != null) {
+                        --delta;
+                        p = p.next;
+                    }
+                  	// 清空当前位置
+                    setTabAt(tab, i++, null);
+                }
+            }
+        }
+    }
+    if (delta != 0L)
+        addCount(delta, -1);
+}
+```
+
+### remove操作
+
+```java
+/**
+ * Removes the key (and its corresponding value) from this map.
+ * This method does nothing if the key is not in the map.
+ *
+ * @param  key the key that needs to be removed
+ * @return the previous value associated with {@code key}, or
+ *         {@code null} if there was no mapping for {@code key}
+ * @throws NullPointerException if the specified key is null
+ */
+public V remove(Object key) {
+    return replaceNode(key, null, null);
+}
+/**
+ * Implementation for the four public remove/replace methods:
+ * Replaces node value with v, conditional upon match of cv if
+ * non-null.  If resulting value is null, delete.
+ */
+// cv是compareValue的缩写，表示期望值
+// 如果cv不为null并且匹配当前值，将节点的值替换为v，如果替换后的值为null，则删除该节点
+final V replaceNode(Object key, V value, Object cv) {
+    int hash = spread(key.hashCode());
+    for (Node<K,V>[] tab = table;;) {
+        Node<K,V> f; int n, i, fh;
+      	// 通过hash值判断key不存在，直接返回
+        if (tab == null || (n = tab.length) == 0 ||
+            (f = tabAt(tab, i = (n - 1) & hash)) == null)
+            break;
+      	// table正在扩容，帮助扩容，然后进入下一轮循环
+        else if ((fh = f.hash) == MOVED)
+            tab = helpTransfer(tab, f);
+        else {
+            V oldVal = null;
+            boolean validated = false;
+          	// 对数组当前位置的头节点加监视器锁
+            synchronized (f) {
+                if (tabAt(tab, i) == f) {
+                    if (fh >= 0) {
+                        validated = true;
+                      	// 遍历链表
+                        for (Node<K,V> e = f, pred = null;;) {
+                            K ek;
+                            if (e.hash == hash &&
+                                ((ek = e.key) == key ||
+                                 (ek != null && key.equals(ek)))) {
+                                V ev = e.val;
+                              	// 如果cv为null或者cv和当前节点的value相等
+                                if (cv == null || cv == ev ||
+                                    (ev != null && cv.equals(ev))) {
+                                    oldVal = ev;
+                                  	// value不为null，替换当前值
+                                    if (value != null)
+                                        e.val = value;
+                                  	// 删除当前节点，当前节点不是头节点
+                                    else if (pred != null)
+                                        pred.next = e.next;
+                                  	// 删除当前节点，当前节点是头节点
+                                    else
+                                        setTabAt(tab, i, e.next);
+                                }
+                                break;
+                            }
+                            pred = e;
+                            if ((e = e.next) == null)
+                                break;
+                        }
+                    }
+                  	// 红黑树逻辑
+                    else if (f instanceof TreeBin) {
+                        validated = true;
+                        TreeBin<K,V> t = (TreeBin<K,V>)f;
+                        TreeNode<K,V> r, p;
+                        if ((r = t.root) != null &&
+                            (p = r.findTreeNode(hash, key, null)) != null) {
+                            V pv = p.val;
+                            if (cv == null || cv == pv ||
+                                (pv != null && cv.equals(pv))) {
+                                oldVal = pv;
+                                if (value != null)
+                                    p.val = value;
+                                else if (t.removeTreeNode(p))
+                                    setTabAt(tab, i, untreeify(t.first));
+                            }
+                        }
+                    }
+                    else if (f instanceof ReservationNode)
+                        throw new IllegalStateException("Recursive update");
+                }
+            }
+            if (validated) {
+                if (oldVal != null) {
+                    if (value == null)
+                        addCount(-1L, -1);
+                    return oldVal;
+                }
+                break;
+            }
+        }
+    }
+    return null;
+}
+```
+
+### size操作
+
+可以看到，size采用类似于LongAdder的方式，将统计mapping数量的工作分散到多个变量上，避免影响性能。
+
+```java
+/**
+ * A padded cell for distributing counts.  Adapted from LongAdder
+ * and Striped64.  See their internal docs for explanation.
+ */
+@jdk.internal.vm.annotation.Contended static final class CounterCell {
+    volatile long value;
+    CounterCell(long x) { value = x; }
+}
+/**
+ * Base counter value, used mainly when there is no contention,
+ * but also as a fallback during table initialization
+ * races. Updated via CAS.
+ */
+private transient volatile long baseCount;
+/**
+ * Table of counter cells. When non-null, size is a power of 2.
+ */
+private transient volatile CounterCell[] counterCells;
+/**
+ * {@inheritDoc}
+ */
+public int size() {
+    long n = sumCount();
+    return ((n < 0L) ? 0 :
+            (n > (long)Integer.MAX_VALUE) ? Integer.MAX_VALUE :
+            (int)n);
+}
+final long sumCount() {
+    CounterCell[] cs = counterCells;
+    long sum = baseCount;
+    if (cs != null) {
+        for (CounterCell c : cs)
+            if (c != null)
+                sum += c.value;
+    }
+    return sum;
+}
+```
+
+
+
+```java
+/**
+ * Adds to count, and if table is too small and not already
+ * resizing, initiates transfer. If already resizing, helps
+ * perform transfer if work is available.  Rechecks occupancy
+ * after a transfer to see if another resize is already needed
+ * because resizings are lagging additions.
+ *
+ * @param x the count to add
+ * @param check if <0, don't check resize, if <= 1 only check if uncontended
+ */
+private final void addCount(long x, int check) {
+    CounterCell[] cs; long b, s;
+    if ((cs = counterCells) != null ||
+        !U.compareAndSetLong(this, BASECOUNT, b = baseCount, s = b + x)) {
+        CounterCell c; long v; int m;
+        boolean uncontended = true;
+        if (cs == null || (m = cs.length - 1) < 0 ||
+            (c = cs[ThreadLocalRandom.getProbe() & m]) == null ||
+            !(uncontended =
+              U.compareAndSetLong(c, CELLVALUE, v = c.value, v + x))) {
+            fullAddCount(x, uncontended);
+            return;
+        }
+        if (check <= 1)
+            return;
+        s = sumCount();
+    }
+    if (check >= 0) {
+        Node<K,V>[] tab, nt; int n, sc;
+        while (s >= (long)(sc = sizeCtl) && (tab = table) != null &&
+               (n = tab.length) < MAXIMUM_CAPACITY) {
+            int rs = resizeStamp(n) << RESIZE_STAMP_SHIFT;
+            if (sc < 0) {
+                if (sc == rs + MAX_RESIZERS || sc == rs + 1 ||
+                    (nt = nextTable) == null || transferIndex <= 0)
+                    break;
+                if (U.compareAndSetInt(this, SIZECTL, sc, sc + 1))
+                    transfer(tab, nt);
+            }
+            else if (U.compareAndSetInt(this, SIZECTL, sc, rs + 2))
+                transfer(tab, null);
+            s = sumCount();
         }
     }
 }
