@@ -33,7 +33,7 @@
         "mainEntityOfPage": {
             "@type": "WebPage",
             "@id": "http:\/\/example.org\/posts\/spark_physical_plan\/"
-        },"genre": "posts","keywords": "Spark","wordcount":  6392 ,
+        },"genre": "posts","keywords": "Spark","wordcount":  10601 ,
         "url": "http:\/\/example.org\/posts\/spark_physical_plan\/","datePublished": "2025-05-25T11:16:21+08:00","dateModified": "2025-05-25T11:16:21+08:00","publisher": {
             "@type": "Organization",
             "name": ""},"author": {
@@ -107,8 +107,8 @@
             <div class="toc-content" id="toc-content-auto"></div>
         </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Spark物理执行计划</h1><div class="post-meta">
             <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/spark/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Spark</a></span></div>
-            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-25">2025-05-25</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;6392 words&nbsp;
-                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;13 minutes&nbsp;</div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-25">2025-05-25</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;10601 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;22 minutes&nbsp;</div>
         </div><div class="details toc" id="toc-static"  data-kept="">
                 <div class="details-summary toc-title">
                     <span>Contents</span>
@@ -130,7 +130,13 @@
     <li><a href="#生成物理执行计划的源码分析">生成物理执行计划的源码分析</a>
       <ul>
         <li><a href="#demo程序">demo程序</a></li>
-        <li><a href="#count操作">count操作</a></li>
+        <li><a href="#-runjob">### runJob</a></li>
+        <li><a href="#createresultstage">createResultStage</a></li>
+        <li><a href="#submitstage">submitStage</a></li>
+        <li><a href="#getmissingparentstages">getMissingParentStages</a></li>
+        <li><a href="#submitmissingtasks">submitMissingTasks</a></li>
+        <li><a href="#getpreferredlocs">getPreferredLocs</a></li>
+        <li><a href="#jobwaiter的实现">JobWaiter的实现</a></li>
         <li><a href="#getpartitions">getPartitions</a></li>
         <li><a href="#stage">Stage</a></li>
         <li><a href="#activejob">ActiveJob</a></li>
@@ -237,7 +243,7 @@
 <li>MapPartitionsRDD</li>
 <li>UnionRDD</li>
 </ul>
-<h3 id="count操作">count操作</h3>
+<h3 id="-runjob">### runJob</h3>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
@@ -312,7 +318,7 @@
 </span></span><span class="line"><span class="cl">      <span class="k">throw</span> <span class="n">exception</span>
 </span></span><span class="line"><span class="cl">  <span class="o">}</span>
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<p>DAGScheduler负责提交job，并等待job结束，判断job是否成功。</p>
+<p><code>runJob</code>会调用<code>submitJob</code> 提交任务，获得JobWaiter句柄，并等待任务结束。</p>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
@@ -362,40 +368,400 @@
 </span></span><span class="line"><span class="cl">    <span class="nc">Utils</span><span class="o">.</span><span class="n">cloneProperties</span><span class="o">(</span><span class="n">properties</span><span class="o">)))</span>
 </span></span><span class="line"><span class="cl">  <span class="n">waiter</span>
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<p>submitJob会计算DAG中每个RDD的<code>.partitions</code>，确保<code>getPartitinos</code>在<code>DAGScheduler</code>单线程事件循环外计算，避免<code>RDD.getPartitions</code>的计算影响调度效率。</p>
+<p>submitJob会计算DAG中每个RDD的<code>.partitions</code>，确保<code>getPartitinos</code>在<code>DAGScheduler</code>单线程事件循环外计算，避免<code>RDD.getPartitions</code>的计算影响调度效率，最后向eventProcessLoop中发布一条<code>JobSubmitted</code>消息，并返回waiter。</p>
+<p><code>eagerlyComputePartitionsForRddAndAncestors</code>函数对DAG中每个RDD调用<code>partitions</code>生成分区。为了避免StackOverFlowError，没有直接采用递归的方式遍历DAG，而是采用手动维护栈的方式遍历DAG。维护已经遍历的RDD的Set和还没有遍历过的RDD的列表，每次从列表中取出一个RDD，判断是否已经遍历过，如果已经遍历过，则忽略，否则计算<code>partitions</code>，并且将它依赖的RDD也加入到列表中，直到列表为空，所有RDD都已经遍历结束。</p>
+<p>提交job会包装成<code>JobSubmitted</code>类型的event提交到DAGScheduler的event loop中，然后单线程消费这些event。</p>
+<p><code>JobSubmitted</code> event最终会被<code>handleJobSubmitted</code>处理。里面会调用<code>createResultStage</code>生成ResultStage，并创建对应的ActiveJob，向listenerBus中发布SparkListenerJobStart事件，最终调用<code>submitStage</code>提交stage。</p>
+<h3 id="createresultstage">createResultStage</h3>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
         <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">private</span> <span class="k">def</span> <span class="n">eagerlyComputePartitionsForRddAndAncestors</span><span class="o">(</span><span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">])</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">startTime</span> <span class="k">=</span> <span class="nc">System</span><span class="o">.</span><span class="n">nanoTime</span>
-</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">visitedRdds</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">HashSet</span><span class="o">[</span><span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">]]</span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">private</span> <span class="k">def</span> <span class="n">createResultStage</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">func</span><span class="k">:</span> <span class="o">(</span><span class="kt">TaskContext</span><span class="o">,</span> <span class="kt">Iterator</span><span class="o">[</span><span class="k">_</span><span class="o">])</span> <span class="k">=&gt;</span> <span class="k">_</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">partitions</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">Int</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">jobId</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">callSite</span><span class="k">:</span> <span class="kt">CallSite</span><span class="o">)</span><span class="k">:</span> <span class="kt">ResultStage</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 获取当前RDD直接依赖的shuffleDependencies
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="o">(</span><span class="n">shuffleDeps</span><span class="o">,</span> <span class="n">resourceProfiles</span><span class="o">)</span> <span class="k">=</span> <span class="n">getShuffleDependenciesAndResourceProfiles</span><span class="o">(</span><span class="n">rdd</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">resourceProfile</span> <span class="k">=</span> <span class="n">mergeResourceProfilesForStage</span><span class="o">(</span><span class="n">resourceProfiles</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="n">checkBarrierStageWithDynamicAllocation</span><span class="o">(</span><span class="n">rdd</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="n">checkBarrierStageWithNumSlots</span><span class="o">(</span><span class="n">rdd</span><span class="o">,</span> <span class="n">resourceProfile</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="n">checkBarrierStageWithRDDChainPattern</span><span class="o">(</span><span class="n">rdd</span><span class="o">,</span> <span class="n">partitions</span><span class="o">.</span><span class="n">toSet</span><span class="o">.</span><span class="n">size</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 获取parent stages，这里其他是一个递归过程，内部会调用getShuffleDependenciesAndResourceProfiles
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">parents</span> <span class="k">=</span> <span class="n">getOrCreateParentStages</span><span class="o">(</span><span class="n">shuffleDeps</span><span class="o">,</span> <span class="n">jobId</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// stageId是整个SparkContext范围内唯一的
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">id</span> <span class="k">=</span> <span class="n">nextStageId</span><span class="o">.</span><span class="n">getAndIncrement</span><span class="o">()</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 创建新的ResultStage，将parent stages传入作为参数
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">stage</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ResultStage</span><span class="o">(</span><span class="n">id</span><span class="o">,</span> <span class="n">rdd</span><span class="o">,</span> <span class="n">func</span><span class="o">,</span> <span class="n">partitions</span><span class="o">,</span> <span class="n">parents</span><span class="o">,</span> <span class="n">jobId</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">callSite</span><span class="o">,</span> <span class="n">resourceProfile</span><span class="o">.</span><span class="n">id</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="n">stageIdToStage</span><span class="o">(</span><span class="n">id</span><span class="o">)</span> <span class="k">=</span> <span class="n">stage</span>
+</span></span><span class="line"><span class="cl">  <span class="n">updateJobIdStageIdMaps</span><span class="o">(</span><span class="n">jobId</span><span class="o">,</span> <span class="n">stage</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="n">stage</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p><code>createResultStage</code>负责构建整个Job的Stage依赖关系，通过递归地获取ShuffleDependency将job切割成多个stage，并最终返回ResultStage。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">private</span><span class="o">[</span><span class="kt">scheduler</span><span class="o">]</span> <span class="k">def</span> <span class="n">getShuffleDependenciesAndResourceProfiles</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">])</span><span class="k">:</span> <span class="o">(</span><span class="kt">HashSet</span><span class="o">[</span><span class="kt">ShuffleDependency</span><span class="o">[</span><span class="k">_</span>, <span class="k">_</span>, <span class="k">_</span><span class="o">]],</span> <span class="nc">HashSet</span><span class="o">[</span><span class="kt">ResourceProfile</span><span class="o">])</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">parents</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">HashSet</span><span class="o">[</span><span class="kt">ShuffleDependency</span><span class="o">[</span><span class="k">_</span>, <span class="k">_</span>, <span class="k">_</span><span class="o">]]</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">resourceProfiles</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">HashSet</span><span class="o">[</span><span class="kt">ResourceProfile</span><span class="o">]</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">visited</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">HashSet</span><span class="o">[</span><span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">]]</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">waitingForVisit</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ListBuffer</span><span class="o">[</span><span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">]]</span>
+</span></span><span class="line"><span class="cl">  <span class="n">waitingForVisit</span> <span class="o">+=</span> <span class="n">rdd</span>
+</span></span><span class="line"><span class="cl">  <span class="k">while</span> <span class="o">(</span><span class="n">waitingForVisit</span><span class="o">.</span><span class="n">nonEmpty</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">toVisit</span> <span class="k">=</span> <span class="n">waitingForVisit</span><span class="o">.</span><span class="n">remove</span><span class="o">(</span><span class="mi">0</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="o">(!</span><span class="n">visited</span><span class="o">(</span><span class="n">toVisit</span><span class="o">))</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="n">visited</span> <span class="o">+=</span> <span class="n">toVisit</span>
+</span></span><span class="line"><span class="cl">      <span class="nc">Option</span><span class="o">(</span><span class="n">toVisit</span><span class="o">.</span><span class="n">getResourceProfile</span><span class="o">()).</span><span class="n">foreach</span><span class="o">(</span><span class="n">resourceProfiles</span> <span class="o">+=</span> <span class="k">_</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="n">toVisit</span><span class="o">.</span><span class="n">dependencies</span><span class="o">.</span><span class="n">foreach</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">case</span> <span class="n">shuffleDep</span><span class="k">:</span> <span class="kt">ShuffleDependency</span><span class="o">[</span><span class="k">_</span>, <span class="k">_</span>, <span class="k">_</span><span class="o">]</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">          <span class="n">parents</span> <span class="o">+=</span> <span class="n">shuffleDep</span>
+</span></span><span class="line"><span class="cl">        <span class="k">case</span> <span class="n">dependency</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">          <span class="n">waitingForVisit</span><span class="o">.</span><span class="n">prepend</span><span class="o">(</span><span class="n">dependency</span><span class="o">.</span><span class="n">rdd</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="o">}</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="o">(</span><span class="n">parents</span><span class="o">,</span> <span class="n">resourceProfiles</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p><code>getShuffleDependenciesAndResourceProfiles</code>返回给定 RDD 直接依赖的ShuffleDependency，以及该stage中与这些 RDD 相关联的ResourceProfiles。</p>
+<p>遍历当前RDD的所有依赖，将RDD的ResourceProfile添加到结果resourceProfiles，依赖如果是ShuffleDependency，则将ShuffleDependency添加到结果集中，如果遇到其他类型的依赖，则开始递归遍历父RDD。当然实际实现了为了避免StackOverFlowError，采用了手动维护栈的方法。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">private</span> <span class="k">def</span> <span class="n">getOrCreateParentStages</span><span class="o">(</span><span class="n">shuffleDeps</span><span class="k">:</span> <span class="kt">HashSet</span><span class="o">[</span><span class="kt">ShuffleDependency</span><span class="o">[</span><span class="k">_</span>, <span class="k">_</span>, <span class="k">_</span><span class="o">]],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">firstJobId</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span><span class="k">:</span> <span class="kt">List</span><span class="o">[</span><span class="kt">Stage</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="n">shuffleDeps</span><span class="o">.</span><span class="n">map</span> <span class="o">{</span> <span class="n">shuffleDep</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="n">getOrCreateShuffleMapStage</span><span class="o">(</span><span class="n">shuffleDep</span><span class="o">,</span> <span class="n">firstJobId</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}.</span><span class="n">toList</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="k">private</span> <span class="k">def</span> <span class="n">getOrCreateShuffleMapStage</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">shuffleDep</span><span class="k">:</span> <span class="kt">ShuffleDependency</span><span class="o">[</span><span class="k">_</span>, <span class="k">_</span>, <span class="k">_</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">firstJobId</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span><span class="k">:</span> <span class="kt">ShuffleMapStage</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="n">shuffleIdToMapStage</span><span class="o">.</span><span class="n">get</span><span class="o">(</span><span class="n">shuffleDep</span><span class="o">.</span><span class="n">shuffleId</span><span class="o">)</span> <span class="k">match</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="nc">Some</span><span class="o">(</span><span class="n">stage</span><span class="o">)</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">      <span class="n">stage</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="nc">None</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">      <span class="c1">// Create stages for all missing ancestor shuffle dependencies.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="n">getMissingAncestorShuffleDependencies</span><span class="o">(</span><span class="n">shuffleDep</span><span class="o">.</span><span class="n">rdd</span><span class="o">).</span><span class="n">foreach</span> <span class="o">{</span> <span class="n">dep</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">        <span class="c1">// Even though getMissingAncestorShuffleDependencies only returns shuffle dependencies
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="c1">// that were not already in shuffleIdToMapStage, it&#39;s possible that by the time we
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="c1">// get to a particular dependency in the foreach loop, it&#39;s been added to
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="c1">// shuffleIdToMapStage by the stage creation process for an earlier dependency. See
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="c1">// SPARK-13902 for more information.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="k">if</span> <span class="o">(!</span><span class="n">shuffleIdToMapStage</span><span class="o">.</span><span class="n">contains</span><span class="o">(</span><span class="n">dep</span><span class="o">.</span><span class="n">shuffleId</span><span class="o">))</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">          <span class="n">createShuffleMapStage</span><span class="o">(</span><span class="n">dep</span><span class="o">,</span> <span class="n">firstJobId</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">        <span class="o">}</span>
+</span></span><span class="line"><span class="cl">      <span class="o">}</span>
+</span></span><span class="line"><span class="cl">      <span class="c1">// Finally, create a stage for the given shuffle dependency.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="n">createShuffleMapStage</span><span class="o">(</span><span class="n">shuffleDep</span><span class="o">,</span> <span class="n">firstJobId</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p>对于每个ShuffleDependency，获取对应的ShuffleMapStage。</p>
+<p>通过shuffleId查询ShuffleMapStage，如果存在，直接返回。</p>
+<p>如果不存在，获取当前ShuffleDependency直接或间接依赖的所有上游缺失的ShuffleDependency，再次检查ShuffleDependency是否已经创建ShuffleMapStage，如果没有创建，则调用<code>createShuffleMapStage</code>创建，最后所有上游的ShuffleMapStage已经创建完毕，创建当前ShuffleDependency的ShuffleMapStage。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="cm">/** Find ancestor shuffle dependencies that are not registered in shuffleToMapStage yet */</span>
+</span></span><span class="line"><span class="cl"><span class="k">private</span> <span class="k">def</span> <span class="n">getMissingAncestorShuffleDependencies</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">])</span><span class="k">:</span> <span class="kt">ListBuffer</span><span class="o">[</span><span class="kt">ShuffleDependency</span><span class="o">[</span><span class="k">_</span>, <span class="k">_</span>, <span class="k">_</span><span class="o">]]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">ancestors</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ListBuffer</span><span class="o">[</span><span class="kt">ShuffleDependency</span><span class="o">[</span><span class="k">_</span>, <span class="k">_</span>, <span class="k">_</span><span class="o">]]</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">visited</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">HashSet</span><span class="o">[</span><span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">]]</span>
 </span></span><span class="line"><span class="cl">  <span class="c1">// We are manually maintaining a stack here to prevent StackOverflowError
 </span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// caused by recursively visiting
 </span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">waitingForVisit</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ListBuffer</span><span class="o">[</span><span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">]]</span>
 </span></span><span class="line"><span class="cl">  <span class="n">waitingForVisit</span> <span class="o">+=</span> <span class="n">rdd</span>
+</span></span><span class="line"><span class="cl">  <span class="k">while</span> <span class="o">(</span><span class="n">waitingForVisit</span><span class="o">.</span><span class="n">nonEmpty</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">toVisit</span> <span class="k">=</span> <span class="n">waitingForVisit</span><span class="o">.</span><span class="n">remove</span><span class="o">(</span><span class="mi">0</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="o">(!</span><span class="n">visited</span><span class="o">(</span><span class="n">toVisit</span><span class="o">))</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="n">visited</span> <span class="o">+=</span> <span class="n">toVisit</span>
+</span></span><span class="line"><span class="cl">      <span class="k">val</span> <span class="o">(</span><span class="n">shuffleDeps</span><span class="o">,</span> <span class="k">_</span><span class="o">)</span> <span class="k">=</span> <span class="n">getShuffleDependenciesAndResourceProfiles</span><span class="o">(</span><span class="n">toVisit</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="n">shuffleDeps</span><span class="o">.</span><span class="n">foreach</span> <span class="o">{</span> <span class="n">shuffleDep</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">        <span class="k">if</span> <span class="o">(!</span><span class="n">shuffleIdToMapStage</span><span class="o">.</span><span class="n">contains</span><span class="o">(</span><span class="n">shuffleDep</span><span class="o">.</span><span class="n">shuffleId</span><span class="o">))</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">          <span class="n">ancestors</span><span class="o">.</span><span class="n">prepend</span><span class="o">(</span><span class="n">shuffleDep</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">          <span class="n">waitingForVisit</span><span class="o">.</span><span class="n">prepend</span><span class="o">(</span><span class="n">shuffleDep</span><span class="o">.</span><span class="n">rdd</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">        <span class="o">}</span> <span class="c1">// Otherwise, the dependency and its ancestors have already been registered.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="o">}</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="n">ancestors</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p><code>getMissingAncestorShuffleDependencies</code>通过<code>getShuffleDependenciesAndResourceProflies</code>获取rdd直接依赖的ShuffleDependency，遍历每个ShuffleDependency，如果ShuffleDependency还没有创建对应的MapShuffleStage，则添加到结果集，并对<code>shuffleDep.rdd</code>展开递归操作，继续获取缺失的shuffleDependency，最终返回rdd直接或者间接依赖的ShuffleDependeny集合。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="cm">/**
+</span></span></span><span class="line"><span class="cl"><span class="cm"> * Creates a ShuffleMapStage that generates the given shuffle dependency&#39;s partitions. If a
+</span></span></span><span class="line"><span class="cl"><span class="cm"> * previously run stage generated the same shuffle data, this function will copy the output
+</span></span></span><span class="line"><span class="cl"><span class="cm"> * locations that are still available from the previous shuffle to avoid unnecessarily
+</span></span></span><span class="line"><span class="cl"><span class="cm"> * regenerating data.
+</span></span></span><span class="line"><span class="cl"><span class="cm"> */</span>
+</span></span><span class="line"><span class="cl"><span class="k">def</span> <span class="n">createShuffleMapStage</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">C</span><span class="o">](</span>
+</span></span><span class="line"><span class="cl">    <span class="n">shuffleDep</span><span class="k">:</span> <span class="kt">ShuffleDependency</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">C</span><span class="o">],</span> <span class="n">jobId</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span><span class="k">:</span> <span class="kt">ShuffleMapStage</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">rdd</span> <span class="k">=</span> <span class="n">shuffleDep</span><span class="o">.</span><span class="n">rdd</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 获取直接依赖的ShuffleDependency列表
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="o">(</span><span class="n">shuffleDeps</span><span class="o">,</span> <span class="n">resourceProfiles</span><span class="o">)</span> <span class="k">=</span> <span class="n">getShuffleDependenciesAndResourceProfiles</span><span class="o">(</span><span class="n">rdd</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">resourceProfile</span> <span class="k">=</span> <span class="n">mergeResourceProfilesForStage</span><span class="o">(</span><span class="n">resourceProfiles</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="n">checkBarrierStageWithDynamicAllocation</span><span class="o">(</span><span class="n">rdd</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="n">checkBarrierStageWithNumSlots</span><span class="o">(</span><span class="n">rdd</span><span class="o">,</span> <span class="n">resourceProfile</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="n">checkBarrierStageWithRDDChainPattern</span><span class="o">(</span><span class="n">rdd</span><span class="o">,</span> <span class="n">rdd</span><span class="o">.</span><span class="n">getNumPartitions</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">numTasks</span> <span class="k">=</span> <span class="n">rdd</span><span class="o">.</span><span class="n">partitions</span><span class="o">.</span><span class="n">length</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 创建上游的ShuffleMapStage
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">parents</span> <span class="k">=</span> <span class="n">getOrCreateParentStages</span><span class="o">(</span><span class="n">shuffleDeps</span><span class="o">,</span> <span class="n">jobId</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">id</span> <span class="k">=</span> <span class="n">nextStageId</span><span class="o">.</span><span class="n">getAndIncrement</span><span class="o">()</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// 创建当前ShuffleDependency对应的ShuffleMapStage
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">stage</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ShuffleMapStage</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">id</span><span class="o">,</span> <span class="n">rdd</span><span class="o">,</span> <span class="n">numTasks</span><span class="o">,</span> <span class="n">parents</span><span class="o">,</span> <span class="n">jobId</span><span class="o">,</span> <span class="n">rdd</span><span class="o">.</span><span class="n">creationSite</span><span class="o">,</span> <span class="n">shuffleDep</span><span class="o">,</span> <span class="n">mapOutputTracker</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">resourceProfile</span><span class="o">.</span><span class="n">id</span><span class="o">)</span>
 </span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="n">stageIdToStage</span><span class="o">(</span><span class="n">id</span><span class="o">)</span> <span class="k">=</span> <span class="n">stage</span>
+</span></span><span class="line"><span class="cl">  <span class="n">shuffleIdToMapStage</span><span class="o">(</span><span class="n">shuffleDep</span><span class="o">.</span><span class="n">shuffleId</span><span class="o">)</span> <span class="k">=</span> <span class="n">stage</span>
+</span></span><span class="line"><span class="cl">  <span class="n">updateJobIdStageIdMaps</span><span class="o">(</span><span class="n">jobId</span><span class="o">,</span> <span class="n">stage</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="o">(!</span><span class="n">mapOutputTracker</span><span class="o">.</span><span class="n">containsShuffle</span><span class="o">(</span><span class="n">shuffleDep</span><span class="o">.</span><span class="n">shuffleId</span><span class="o">))</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// Kind of ugly: need to register RDDs with the cache and map output tracker here
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="c1">// since we can&#39;t do it in the RDD constructor because # of partitions is unknown
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">logInfo</span><span class="o">(</span><span class="n">log</span><span class="s">&#34;Registering RDD ${MDC(RDD_ID, rdd.id)} &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">      <span class="n">log</span><span class="s">&#34;(${MDC(CREATION_SITE, rdd.getCreationSite)}) as input to &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">      <span class="n">log</span><span class="s">&#34;shuffle ${MDC(SHUFFLE_ID, shuffleDep.shuffleId)}&#34;</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// partition是在eagerlyComputePartitionsForRddAndAncestors中计算得到的，创建RDD时还不存在
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">mapOutputTracker</span><span class="o">.</span><span class="n">registerShuffle</span><span class="o">(</span><span class="n">shuffleDep</span><span class="o">.</span><span class="n">shuffleId</span><span class="o">,</span> <span class="n">rdd</span><span class="o">.</span><span class="n">partitions</span><span class="o">.</span><span class="n">length</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">      <span class="n">shuffleDep</span><span class="o">.</span><span class="n">partitioner</span><span class="o">.</span><span class="n">numPartitions</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="n">stage</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p><code>createShuffleMapStage</code>先创建上游缺失的ShuffleMapStage，然后创建当前的ShuffleMapStage，并在mapOuputTracker中注册shuffle。</p>
+<h3 id="submitstage">submitStage</h3>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="cm">/** Submits stage, but first recursively submits any missing parents. */</span>
+</span></span><span class="line"><span class="cl"><span class="k">private</span> <span class="k">def</span> <span class="n">submitStage</span><span class="o">(</span><span class="n">stage</span><span class="k">:</span> <span class="kt">Stage</span><span class="o">)</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">jobId</span> <span class="k">=</span> <span class="n">activeJobForStage</span><span class="o">(</span><span class="n">stage</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="o">(</span><span class="n">jobId</span><span class="o">.</span><span class="n">isDefined</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">logDebug</span><span class="o">(</span><span class="s">s&#34;submitStage(</span><span class="si">$stage</span><span class="s"> (name=</span><span class="si">${</span><span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s">;&#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">      <span class="s">s&#34;jobs=</span><span class="si">${</span><span class="n">stage</span><span class="o">.</span><span class="n">jobIds</span><span class="o">.</span><span class="n">toSeq</span><span class="o">.</span><span class="n">sorted</span><span class="o">.</span><span class="n">mkString</span><span class="o">(</span><span class="s">&#34;,&#34;</span><span class="o">)</span><span class="si">}</span><span class="s">))&#34;</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// waitingStages 正在等待的stage集合
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="c1">// runningStages 正在执行的stage集合
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="c1">// failedStages 失败等待手动提交重试的集合
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">if</span> <span class="o">(!</span><span class="n">waitingStages</span><span class="o">(</span><span class="n">stage</span><span class="o">)</span> <span class="o">&amp;&amp;</span> <span class="o">!</span><span class="n">runningStages</span><span class="o">(</span><span class="n">stage</span><span class="o">)</span> <span class="o">&amp;&amp;</span> <span class="o">!</span><span class="n">failedStages</span><span class="o">(</span><span class="n">stage</span><span class="o">))</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="c1">// stage尝试次数超过最大限制，abort stage
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="k">if</span> <span class="o">(</span><span class="n">stage</span><span class="o">.</span><span class="n">getNextAttemptId</span> <span class="o">&gt;=</span> <span class="n">maxStageAttempts</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">val</span> <span class="n">reason</span> <span class="k">=</span> <span class="s">s&#34;</span><span class="si">$stage</span><span class="s"> (name=</span><span class="si">${</span><span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s">) has been resubmitted for the maximum &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">          <span class="s">s&#34;allowable number of times: </span><span class="si">${</span><span class="n">maxStageAttempts</span><span class="si">}</span><span class="s">, which is the max value of &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">          <span class="s">s&#34;config `</span><span class="si">${</span><span class="n">config</span><span class="o">.</span><span class="nc">STAGE_MAX_ATTEMPTS</span><span class="o">.</span><span class="n">key</span><span class="si">}</span><span class="s">` and &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">          <span class="s">s&#34;`</span><span class="si">${</span><span class="n">config</span><span class="o">.</span><span class="nc">STAGE_MAX_CONSECUTIVE_ATTEMPTS</span><span class="o">.</span><span class="n">key</span><span class="si">}</span><span class="s">`.&#34;</span>
+</span></span><span class="line"><span class="cl">        <span class="n">abortStage</span><span class="o">(</span><span class="n">stage</span><span class="o">,</span> <span class="n">reason</span><span class="o">,</span> <span class="nc">None</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">        <span class="c1">// 找到stage直接依赖的缺失的stage
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="k">val</span> <span class="n">missing</span> <span class="k">=</span> <span class="n">getMissingParentStages</span><span class="o">(</span><span class="n">stage</span><span class="o">).</span><span class="n">sortBy</span><span class="o">(</span><span class="k">_</span><span class="o">.</span><span class="n">id</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">        <span class="n">logDebug</span><span class="o">(</span><span class="s">&#34;missing: &#34;</span> <span class="o">+</span> <span class="n">missing</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">        <span class="k">if</span> <span class="o">(</span><span class="n">missing</span><span class="o">.</span><span class="n">isEmpty</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">          <span class="n">logInfo</span><span class="o">(</span><span class="n">log</span><span class="s">&#34;Submitting ${MDC(STAGE, stage)} (${MDC(RDD_ID, stage.rdd)}), &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">                  <span class="n">log</span><span class="s">&#34;which has no missing parents&#34;</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">          <span class="c1">// 依赖的stage都已经就绪，直接提交当前stage的task
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>          <span class="n">submitMissingTasks</span><span class="o">(</span><span class="n">stage</span><span class="o">,</span> <span class="n">jobId</span><span class="o">.</span><span class="n">get</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">        <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">          <span class="c1">// 否则尝试提交依赖的stage，进入递归流程
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>          <span class="k">for</span> <span class="o">(</span><span class="n">parent</span> <span class="k">&lt;-</span> <span class="n">missing</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">            <span class="n">submitStage</span><span class="o">(</span><span class="n">parent</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">          <span class="o">}</span>
+</span></span><span class="line"><span class="cl">          <span class="c1">// 当前stage加入等待集合
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>          <span class="n">waitingStages</span> <span class="o">+=</span> <span class="n">stage</span>
+</span></span><span class="line"><span class="cl">        <span class="o">}</span>
+</span></span><span class="line"><span class="cl">      <span class="o">}</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">abortStage</span><span class="o">(</span><span class="n">stage</span><span class="o">,</span> <span class="s">&#34;No active job for stage &#34;</span> <span class="o">+</span> <span class="n">stage</span><span class="o">.</span><span class="n">id</span><span class="o">,</span> <span class="nc">None</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p><code>submitStage</code>首先需要查找并提交任何缺失的父stage，如果存在这样的父stage，会递归提交父stage，并将自身加入等待集合中，否则，直接提交当前stage的缺失task。</p>
+<h3 id="getmissingparentstages">getMissingParentStages</h3>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">private</span> <span class="k">def</span> <span class="n">getMissingParentStages</span><span class="o">(</span><span class="n">stage</span><span class="k">:</span> <span class="kt">Stage</span><span class="o">)</span><span class="k">:</span> <span class="kt">List</span><span class="o">[</span><span class="kt">Stage</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">missing</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">HashSet</span><span class="o">[</span><span class="kt">Stage</span><span class="o">]</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">visited</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">HashSet</span><span class="o">[</span><span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">]]</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// We are manually maintaining a stack here to prevent StackOverflowError
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// caused by recursively visiting
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">waitingForVisit</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ListBuffer</span><span class="o">[</span><span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">]]</span>
+</span></span><span class="line"><span class="cl">  <span class="n">waitingForVisit</span> <span class="o">+=</span> <span class="n">stage</span><span class="o">.</span><span class="n">rdd</span>
 </span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">visit</span><span class="o">(</span><span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">])</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="o">(!</span><span class="n">visitedRdds</span><span class="o">(</span><span class="n">rdd</span><span class="o">))</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">      <span class="n">visitedRdds</span> <span class="o">+=</span> <span class="n">rdd</span>
-</span></span><span class="line"><span class="cl">
-</span></span><span class="line"><span class="cl">      <span class="c1">// Eagerly compute:
-</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="n">rdd</span><span class="o">.</span><span class="n">partitions</span>
-</span></span><span class="line"><span class="cl">
-</span></span><span class="line"><span class="cl">      <span class="k">for</span> <span class="o">(</span><span class="n">dep</span> <span class="k">&lt;-</span> <span class="n">rdd</span><span class="o">.</span><span class="n">dependencies</span><span class="o">)</span> <span class="o">{</span>
-</span></span><span class="line"><span class="cl">        <span class="n">waitingForVisit</span><span class="o">.</span><span class="n">prepend</span><span class="o">(</span><span class="n">dep</span><span class="o">.</span><span class="n">rdd</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="o">(!</span><span class="n">visited</span><span class="o">(</span><span class="n">rdd</span><span class="o">))</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="n">visited</span> <span class="o">+=</span> <span class="n">rdd</span>
+</span></span><span class="line"><span class="cl">      <span class="c1">// stage依赖的rdd是否已经计算过并且缓存
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="k">val</span> <span class="n">rddHasUncachedPartitions</span> <span class="k">=</span> <span class="n">getCacheLocs</span><span class="o">(</span><span class="n">rdd</span><span class="o">).</span><span class="n">contains</span><span class="o">(</span><span class="nc">Nil</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="k">if</span> <span class="o">(</span><span class="n">rddHasUncachedPartitions</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">        <span class="c1">// 如果rdd需要重新计算，遍历rdd的依赖关系
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="k">for</span> <span class="o">(</span><span class="n">dep</span> <span class="k">&lt;-</span> <span class="n">rdd</span><span class="o">.</span><span class="n">dependencies</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">          <span class="n">dep</span> <span class="k">match</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">            <span class="c1">// 获取ShuffleDependency对应的ShuffleMapStage，如果mapStage的结果不可得，添加到结果集中
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>            <span class="k">case</span> <span class="n">shufDep</span><span class="k">:</span> <span class="kt">ShuffleDependency</span><span class="o">[</span><span class="k">_</span>, <span class="k">_</span>, <span class="k">_</span><span class="o">]</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">              <span class="k">val</span> <span class="n">mapStage</span> <span class="k">=</span> <span class="n">getOrCreateShuffleMapStage</span><span class="o">(</span><span class="n">shufDep</span><span class="o">,</span> <span class="n">stage</span><span class="o">.</span><span class="n">firstJobId</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">              <span class="c1">// Mark mapStage as available with shuffle outputs only after shuffle merge is
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>              <span class="c1">// finalized with push based shuffle. If not, subsequent ShuffleMapStage won&#39;t
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>              <span class="c1">// read from merged output as the MergeStatuses are not available.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>              <span class="k">if</span> <span class="o">(!</span><span class="n">mapStage</span><span class="o">.</span><span class="n">isAvailable</span> <span class="o">||</span> <span class="o">!</span><span class="n">mapStage</span><span class="o">.</span><span class="n">shuffleDep</span><span class="o">.</span><span class="n">shuffleMergeFinalized</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">                <span class="n">missing</span> <span class="o">+=</span> <span class="n">mapStage</span>
+</span></span><span class="line"><span class="cl">              <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">                <span class="c1">// Forward the nextAttemptId if skipped and get visited for the first time.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>                <span class="c1">// Otherwise, once it gets retried,
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>                <span class="c1">// 1) the stuffs in stage info become distorting, e.g. task num, input byte, e.t.c
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>                <span class="c1">// 2) the first attempt starts from 0-idx, it will not be marked as a retry
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>                <span class="n">mapStage</span><span class="o">.</span><span class="n">increaseAttemptIdOnFirstSkip</span><span class="o">()</span>
+</span></span><span class="line"><span class="cl">              <span class="o">}</span>
+</span></span><span class="line"><span class="cl">            <span class="c1">// 如果是窄依赖，则继续回溯
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>            <span class="k">case</span> <span class="n">narrowDep</span><span class="k">:</span> <span class="kt">NarrowDependency</span><span class="o">[</span><span class="k">_</span><span class="o">]</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">              <span class="n">waitingForVisit</span><span class="o">.</span><span class="n">prepend</span><span class="o">(</span><span class="n">narrowDep</span><span class="o">.</span><span class="n">rdd</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">          <span class="o">}</span>
+</span></span><span class="line"><span class="cl">        <span class="o">}</span>
 </span></span><span class="line"><span class="cl">      <span class="o">}</span>
 </span></span><span class="line"><span class="cl">    <span class="o">}</span>
 </span></span><span class="line"><span class="cl">  <span class="o">}</span>
-</span></span><span class="line"><span class="cl">
 </span></span><span class="line"><span class="cl">  <span class="k">while</span> <span class="o">(</span><span class="n">waitingForVisit</span><span class="o">.</span><span class="n">nonEmpty</span><span class="o">)</span> <span class="o">{</span>
 </span></span><span class="line"><span class="cl">    <span class="n">visit</span><span class="o">(</span><span class="n">waitingForVisit</span><span class="o">.</span><span class="n">remove</span><span class="o">(</span><span class="mi">0</span><span class="o">))</span>
 </span></span><span class="line"><span class="cl">  <span class="o">}</span>
-</span></span><span class="line"><span class="cl">  <span class="n">logDebug</span><span class="o">(</span><span class="s">&#34;eagerlyComputePartitionsForRddAndAncestors for RDD %d took %f seconds&#34;</span>
-</span></span><span class="line"><span class="cl">    <span class="o">.</span><span class="n">format</span><span class="o">(</span><span class="n">rdd</span><span class="o">.</span><span class="n">id</span><span class="o">,</span> <span class="o">(</span><span class="nc">System</span><span class="o">.</span><span class="n">nanoTime</span> <span class="o">-</span> <span class="n">startTime</span><span class="o">)</span> <span class="o">/</span> <span class="mi">1</span><span class="n">e9</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">  <span class="n">missing</span><span class="o">.</span><span class="n">toList</span>
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<p><code>eagerlyComputePartitionsForRddAndAncestors</code>函数对DAG中每个RDD调用<code>partitions</code>生成分区。为了避免StackOverFlowError，没有直接采用递归的方式遍历DAG，而是采用手动维护栈的方式遍历DAG。维护已经遍历的RDD的Set和还没有遍历过的RDD的列表，每次从列表中取出一个RDD，判断是否已经遍历过，如果已经遍历过，则忽略，否则计算<code>partitions</code>，并且将它依赖的RDD也加入到列表中，直到列表为空，所有RDD都已经遍历结束。</p>
+<p><code>getMissingParentStages</code>找到当前stage直接依赖的缺失的stage。</p>
+<h3 id="submitmissingtasks">submitMissingTasks</h3>
+<h3 id="getpreferredlocs">getPreferredLocs</h3>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">def</span> <span class="n">getPreferredLocs</span><span class="o">(</span><span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">],</span> <span class="n">partition</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">TaskLocation</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="n">getPreferredLocsInternal</span><span class="o">(</span><span class="n">rdd</span><span class="o">,</span> <span class="n">partition</span><span class="o">,</span> <span class="k">new</span> <span class="nc">HashSet</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="k">private</span> <span class="k">def</span> <span class="n">getPreferredLocsInternal</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">partition</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">visited</span><span class="k">:</span> <span class="kt">HashSet</span><span class="o">[(</span><span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">]</span>, <span class="kt">Int</span><span class="o">)])</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">TaskLocation</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// If the partition has already been visited, no need to re-visit.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// This avoids exponential path exploration.  SPARK-695
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">if</span> <span class="o">(!</span><span class="n">visited</span><span class="o">.</span><span class="n">add</span><span class="o">((</span><span class="n">rdd</span><span class="o">,</span> <span class="n">partition</span><span class="o">)))</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// Nil has already been returned for previously visited partitions.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">return</span> <span class="nc">Nil</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// If the partition is cached, return the cache locations
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">cached</span> <span class="k">=</span> <span class="n">getCacheLocs</span><span class="o">(</span><span class="n">rdd</span><span class="o">)(</span><span class="n">partition</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="o">(</span><span class="n">cached</span><span class="o">.</span><span class="n">nonEmpty</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="n">cached</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// If the RDD has some placement preferences (as is the case for input RDDs), get those
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">rddPrefs</span> <span class="k">=</span> <span class="n">rdd</span><span class="o">.</span><span class="n">preferredLocations</span><span class="o">(</span><span class="n">rdd</span><span class="o">.</span><span class="n">partitions</span><span class="o">(</span><span class="n">partition</span><span class="o">)).</span><span class="n">toList</span>
+</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="o">(</span><span class="n">rddPrefs</span><span class="o">.</span><span class="n">nonEmpty</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="n">rddPrefs</span><span class="o">.</span><span class="n">filter</span><span class="o">(</span><span class="k">_</span> <span class="o">!=</span> <span class="kc">null</span><span class="o">).</span><span class="n">map</span><span class="o">(</span><span class="nc">TaskLocation</span><span class="o">(</span><span class="k">_</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="c1">// If the RDD has narrow dependencies, pick the first partition of the first narrow dependency
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// that has any placement preferences. Ideally we would choose based on transfer sizes,
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// but this will do for now.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="n">rdd</span><span class="o">.</span><span class="n">dependencies</span><span class="o">.</span><span class="n">foreach</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="n">n</span><span class="k">:</span> <span class="kt">NarrowDependency</span><span class="o">[</span><span class="k">_</span><span class="o">]</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">      <span class="k">for</span> <span class="o">(</span><span class="n">inPart</span> <span class="k">&lt;-</span> <span class="n">n</span><span class="o">.</span><span class="n">getParents</span><span class="o">(</span><span class="n">partition</span><span class="o">))</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">val</span> <span class="n">locs</span> <span class="k">=</span> <span class="n">getPreferredLocsInternal</span><span class="o">(</span><span class="n">n</span><span class="o">.</span><span class="n">rdd</span><span class="o">,</span> <span class="n">inPart</span><span class="o">,</span> <span class="n">visited</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">        <span class="k">if</span> <span class="o">(</span><span class="n">locs</span> <span class="o">!=</span> <span class="nc">Nil</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">          <span class="k">return</span> <span class="n">locs</span>
+</span></span><span class="line"><span class="cl">        <span class="o">}</span>
+</span></span><span class="line"><span class="cl">      <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="k">_</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="nc">Nil</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p><code>getPreferredLocs</code>获取与特定 RDD 的某个分区相关联的位置（locality）信息。首先检查partition是否被cache，如果被cache，直接返回，否则如果RDD自身有位置信息，直接使用，假设RDD是一个input RDD的场景，最后尝试获取RDD第一个窄依赖的第一个分区的位置信息，这里Spark也提到，理想情况下应该基于transfer size进行选择。</p>
+<h3 id="jobwaiter的实现">JobWaiter的实现</h3>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="kd">private</span><span class="o">[</span><span class="n">spark</span><span class="o">]</span><span class="w"> </span><span class="n">trait</span><span class="w"> </span><span class="n">JobListener</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="n">def</span><span class="w"> </span><span class="nf">taskSucceeded</span><span class="p">(</span><span class="n">index</span><span class="p">:</span><span class="w"> </span><span class="n">Int</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">:</span><span class="w"> </span><span class="n">Any</span><span class="p">):</span><span class="w"> </span><span class="n">Unit</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="n">def</span><span class="w"> </span><span class="nf">jobFailed</span><span class="p">(</span><span class="n">exception</span><span class="p">:</span><span class="w"> </span><span class="n">Exception</span><span class="p">):</span><span class="w"> </span><span class="n">Unit</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
+<p>JobListerner接口用于监听task完成或者失败的事件，当一个task完成或者整个job失败时被通知。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="cm">/**
+</span></span></span><span class="line"><span class="cl"><span class="cm"> * An object that waits for a DAGScheduler job to complete. As tasks finish, it passes their
+</span></span></span><span class="line"><span class="cl"><span class="cm"> * results to the given handler function.
+</span></span></span><span class="line"><span class="cl"><span class="cm"> */</span>
+</span></span><span class="line"><span class="cl"><span class="k">private</span><span class="o">[</span><span class="kt">spark</span><span class="o">]</span> <span class="k">class</span> <span class="nc">JobWaiter</span><span class="o">[</span><span class="kt">T</span><span class="o">](</span>
+</span></span><span class="line"><span class="cl">    <span class="n">dagScheduler</span><span class="k">:</span> <span class="kt">DAGScheduler</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">jobId</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">totalTasks</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">resultHandler</span><span class="k">:</span> <span class="o">(</span><span class="kt">Int</span><span class="o">,</span> <span class="kt">T</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="nc">Unit</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">extends</span> <span class="nc">JobListener</span> <span class="k">with</span> <span class="nc">Logging</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">private</span> <span class="k">val</span> <span class="n">finishedTasks</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">AtomicInteger</span><span class="o">(</span><span class="mi">0</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// If the job is finished, this will be its result. In the case of 0 task jobs (e.g. zero
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// partition RDDs), we set the jobResult directly to JobSucceeded.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">private</span> <span class="k">val</span> <span class="n">jobPromise</span><span class="k">:</span> <span class="kt">Promise</span><span class="o">[</span><span class="kt">Unit</span><span class="o">]</span> <span class="k">=</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="o">(</span><span class="n">totalTasks</span> <span class="o">==</span> <span class="mi">0</span><span class="o">)</span> <span class="nc">Promise</span><span class="o">.</span><span class="n">successful</span><span class="o">(())</span> <span class="k">else</span> <span class="nc">Promise</span><span class="o">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">jobFinished</span><span class="k">:</span> <span class="kt">Boolean</span> <span class="o">=</span> <span class="n">jobPromise</span><span class="o">.</span><span class="n">isCompleted</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">completionFuture</span><span class="k">:</span> <span class="kt">Future</span><span class="o">[</span><span class="kt">Unit</span><span class="o">]</span> <span class="k">=</span> <span class="n">jobPromise</span><span class="o">.</span><span class="n">future</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/**
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * Sends a signal to the DAGScheduler to cancel the job with an optional reason. The
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * cancellation itself is handled asynchronously. After the low level scheduler cancels
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * all the tasks belonging to this job, it will fail this job with a SparkException.
+</span></span></span><span class="line"><span class="cl"><span class="cm">   */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">cancel</span><span class="o">(</span><span class="n">reason</span><span class="k">:</span> <span class="kt">Option</span><span class="o">[</span><span class="kt">String</span><span class="o">])</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">dagScheduler</span><span class="o">.</span><span class="n">cancelJob</span><span class="o">(</span><span class="n">jobId</span><span class="o">,</span> <span class="n">reason</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/**
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * Sends a signal to the DAGScheduler to cancel the job. The cancellation itself is
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * handled asynchronously. After the low level scheduler cancels all the tasks belonging
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * to this job, it will fail this job with a SparkException.
+</span></span></span><span class="line"><span class="cl"><span class="cm">   */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">cancel</span><span class="o">()</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="n">cancel</span><span class="o">(</span><span class="nc">None</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">taskSucceeded</span><span class="o">(</span><span class="n">index</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span> <span class="n">result</span><span class="k">:</span> <span class="kt">Any</span><span class="o">)</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// resultHandler call must be synchronized in case resultHandler itself is not thread safe.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">synchronized</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="n">resultHandler</span><span class="o">(</span><span class="n">index</span><span class="o">,</span> <span class="n">result</span><span class="o">.</span><span class="n">asInstanceOf</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="o">(</span><span class="n">finishedTasks</span><span class="o">.</span><span class="n">incrementAndGet</span><span class="o">()</span> <span class="o">==</span> <span class="n">totalTasks</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="n">jobPromise</span><span class="o">.</span><span class="n">success</span><span class="o">(())</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">jobFailed</span><span class="o">(</span><span class="n">exception</span><span class="k">:</span> <span class="kt">Exception</span><span class="o">)</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="o">(!</span><span class="n">jobPromise</span><span class="o">.</span><span class="n">tryFailure</span><span class="o">(</span><span class="n">exception</span><span class="o">))</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="n">logWarning</span><span class="o">(</span><span class="s">&#34;Ignore failure&#34;</span><span class="o">,</span> <span class="n">exception</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p>jobPromise字段是一个Promise对象，Promise 是一个表示未来结果的对象，它可以被手动完成（赋值）或失败（抛出异常）。</p>
 <h3 id="getpartitions">getPartitions</h3>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
@@ -717,6 +1083,81 @@
 <p>方法：</p>
 <ul>
 <li>findMissingPartitions 需要计算的分区的序列，仅可在activeJob存在时调用</li>
+</ul>
+<h4 id="shufflemapstage">ShuffleMapStage</h4>
+<p>ShuffleMapStage是DAG执行计划中的中间stage，用于给shuffle产生数据，ShuffleMapStage发生在每次shuffle操作前，并且可能包含多个流水线操作。当执行时，保存map输出文件，这些文件后续可以被reduce task获取到。</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">private</span><span class="o">[</span><span class="kt">spark</span><span class="o">]</span> <span class="k">class</span> <span class="nc">ShuffleMapStage</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">id</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="k">_</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">numTasks</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">parents</span><span class="k">:</span> <span class="kt">List</span><span class="o">[</span><span class="kt">Stage</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">firstJobId</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">callSite</span><span class="k">:</span> <span class="kt">CallSite</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">shuffleDep</span><span class="k">:</span> <span class="kt">ShuffleDependency</span><span class="o">[</span><span class="k">_</span>, <span class="k">_</span>, <span class="k">_</span><span class="o">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">mapOutputTrackerMaster</span><span class="k">:</span> <span class="kt">MapOutputTrackerMaster</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">resourceProfileId</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">extends</span> <span class="nc">Stage</span><span class="o">(</span><span class="n">id</span><span class="o">,</span> <span class="n">rdd</span><span class="o">,</span> <span class="n">numTasks</span><span class="o">,</span> <span class="n">parents</span><span class="o">,</span> <span class="n">firstJobId</span><span class="o">,</span> <span class="n">callSite</span><span class="o">,</span> <span class="n">resourceProfileId</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">private</span><span class="o">[</span><span class="kt">this</span><span class="o">]</span> <span class="k">var</span> <span class="nc">_mapStageJobs</span><span class="k">:</span> <span class="kt">List</span><span class="o">[</span><span class="kt">ActiveJob</span><span class="o">]</span> <span class="k">=</span> <span class="nc">Nil</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/**
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * Partitions that either haven&#39;t yet been computed, or that were computed on an executor
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * that has since been lost, so should be re-computed.  This variable is used by the
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * DAGScheduler to determine when a stage has completed. Task successes in both the active
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * attempt for the stage or in earlier attempts for this stage can cause partition ids to get
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * removed from pendingPartitions. As a result, this variable may be inconsistent with the pending
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * tasks in the TaskSetManager for the active attempt for the stage (the partitions stored here
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * will always be a subset of the partitions that the TaskSetManager thinks are pending).
+</span></span></span><span class="line"><span class="cl"><span class="cm">   */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">pendingPartitions</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">HashSet</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">toString</span><span class="k">:</span> <span class="kt">String</span> <span class="o">=</span> <span class="s">&#34;ShuffleMapStage &#34;</span> <span class="o">+</span> <span class="n">id</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/**
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * Returns the list of active jobs,
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * i.e. map-stage jobs that were submitted to execute this stage independently (if any).
+</span></span></span><span class="line"><span class="cl"><span class="cm">   */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">mapStageJobs</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">ActiveJob</span><span class="o">]</span> <span class="k">=</span> <span class="nc">_mapStageJobs</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/** Adds the job to the active job list. */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">addActiveJob</span><span class="o">(</span><span class="n">job</span><span class="k">:</span> <span class="kt">ActiveJob</span><span class="o">)</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nc">_mapStageJobs</span> <span class="k">=</span> <span class="n">job</span> <span class="k">:</span><span class="kt">:</span> <span class="k">_</span><span class="kt">mapStageJobs</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/** Removes the job from the active job list. */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">removeActiveJob</span><span class="o">(</span><span class="n">job</span><span class="k">:</span> <span class="kt">ActiveJob</span><span class="o">)</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nc">_mapStageJobs</span> <span class="k">=</span> <span class="nc">_mapStageJobs</span><span class="o">.</span><span class="n">filter</span><span class="o">(</span><span class="k">_</span> <span class="o">!=</span> <span class="n">job</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/**
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * Number of partitions that have shuffle outputs.
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * When this reaches [[numPartitions]], this map stage is ready.
+</span></span></span><span class="line"><span class="cl"><span class="cm">   */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">numAvailableOutputs</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=</span> <span class="n">mapOutputTrackerMaster</span><span class="o">.</span><span class="n">getNumAvailableOutputs</span><span class="o">(</span><span class="n">shuffleDep</span><span class="o">.</span><span class="n">shuffleId</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/**
+</span></span></span><span class="line"><span class="cl"><span class="cm">   * Returns true if the map stage is ready, i.e. all partitions have shuffle outputs.
+</span></span></span><span class="line"><span class="cl"><span class="cm">   */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">def</span> <span class="n">isAvailable</span><span class="k">:</span> <span class="kt">Boolean</span> <span class="o">=</span> <span class="n">numAvailableOutputs</span> <span class="o">==</span> <span class="n">numPartitions</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="cm">/** Returns the sequence of partition ids that are missing (i.e. needs to be computed). */</span>
+</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">findMissingPartitions</span><span class="o">()</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">mapOutputTrackerMaster</span>
+</span></span><span class="line"><span class="cl">      <span class="o">.</span><span class="n">findMissingPartitions</span><span class="o">(</span><span class="n">shuffleDep</span><span class="o">.</span><span class="n">shuffleId</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="o">.</span><span class="n">getOrElse</span><span class="o">(</span><span class="mi">0</span> <span class="n">until</span> <span class="n">numPartitions</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p>方法：</p>
+<ul>
+<li>findMissingPartitions 返回需要重新计算的分区id列表
+从mapOutputTrackerMaster中查找shuffleId对应的missing分区，如果不存在，假设所有分区需要重新计算</li>
+<li>isAvailable MapShuffleStage是否就绪，如果所有的分区都有shuffle输出，则认为stage已经就绪</li>
+<li>numAvailableOutputs shuffle输出就绪的分区个数，通过查询mapOutputTrackerMaster得知</li>
 </ul>
 <h3 id="activejob">ActiveJob</h3>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
