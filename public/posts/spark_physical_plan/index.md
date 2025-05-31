@@ -503,7 +503,229 @@ private def getMissingParentStages(stage: Stage): List[Stage] = {
 
 ### submitMissingTasks
 
+通过`findMissingPartitions`找到stage对应的所有需要计算的分区的id，调用`getPreferredLocs`得到每个partition的首选位置。
 
+调用`stage.makeNewStageAttempt`创建新的stage尝试。记录stage的`submissionTime`向listenerBus发布SparkListenerStageSubmitted事件
+
+```scala
+// TODO: Maybe we can keep the taskBinary in Stage to avoid serializing it multiple times.
+// Broadcasted binary for the task, used to dispatch tasks to executors. Note that we broadcast
+// the serialized copy of the RDD and for each task we will deserialize it, which means each
+// task gets a different copy of the RDD. This provides stronger isolation between tasks that
+// might modify state of objects referenced in their closures. This is necessary in Hadoop
+// where the JobConf/Configuration object is not thread-safe.
+var taskBinary: Broadcast[Array[Byte]] = null
+var partitions: Array[Partition] = null
+try {
+  // For ShuffleMapTask, serialize and broadcast (rdd, shuffleDep).
+  // For ResultTask, serialize and broadcast (rdd, func).
+  var taskBinaryBytes: Array[Byte] = null
+  // taskBinaryBytes and partitions are both effected by the checkpoint status. We need
+  // this synchronization in case another concurrent job is checkpointing this RDD, so we get a
+  // consistent view of both variables.
+  RDDCheckpointData.synchronized {
+    taskBinaryBytes = stage match {
+      case stage: ShuffleMapStage =>
+        JavaUtils.bufferToArray(
+          closureSerializer.serialize((stage.rdd, stage.shuffleDep): AnyRef))
+      case stage: ResultStage =>
+        JavaUtils.bufferToArray(closureSerializer.serialize((stage.rdd, stage.func): AnyRef))
+    }
+
+    partitions = stage.rdd.partitions
+  }
+
+  if (taskBinaryBytes.length > TaskSetManager.TASK_SIZE_TO_WARN_KIB * 1024) {
+    logWarning(log"Broadcasting large task binary with size " +
+      log"${MDC(NUM_BYTES, Utils.bytesToString(taskBinaryBytes.length))}")
+  }
+  taskBinary = sc.broadcast(taskBinaryBytes)
+} catch {
+  // In the case of a failure during serialization, abort the stage.
+  case e: NotSerializableException =>
+    abortStage(stage, "Task not serializable: " + e.toString, Some(e))
+    runningStages -= stage
+
+    // Abort execution
+    return
+  case e: Throwable =>
+    abortStage(stage, s"Task serialization failed: $e\n${Utils.exceptionString(e)}", Some(e))
+    runningStages -= stage
+
+    // Abort execution
+    return
+}
+
+val artifacts = jobIdToActiveJob(jobId).artifacts
+
+val tasks: Seq[Task[_]] = try {
+  val serializedTaskMetrics = closureSerializer.serialize(stage.latestInfo.taskMetrics).array()
+  stage match {
+    case stage: ShuffleMapStage =>
+      stage.pendingPartitions.clear()
+      partitionsToCompute.map { id =>
+        val locs = taskIdToLocations(id)
+        val part = partitions(id)
+        stage.pendingPartitions += id
+        new ShuffleMapTask(stage.id, stage.latestInfo.attemptNumber(), taskBinary,
+          part, stage.numPartitions, locs, artifacts, properties, serializedTaskMetrics,
+          Option(jobId), Option(sc.applicationId), sc.applicationAttemptId,
+          stage.rdd.isBarrier())
+      }
+
+    case stage: ResultStage =>
+      partitionsToCompute.map { id =>
+        val p: Int = stage.partitions(id)
+        val part = partitions(p)
+        val locs = taskIdToLocations(id)
+        new ResultTask(stage.id, stage.latestInfo.attemptNumber(),
+          taskBinary, part, stage.numPartitions, locs, id, artifacts, properties,
+          serializedTaskMetrics, Option(jobId), Option(sc.applicationId),
+          sc.applicationAttemptId, stage.rdd.isBarrier())
+      }
+  }
+} catch {
+  case NonFatal(e) =>
+    abortStage(stage, s"Task creation failed: $e\n${Utils.exceptionString(e)}", Some(e))
+    runningStages -= stage
+    return
+}
+if (tasks.nonEmpty) {
+  logInfo(log"Submitting ${MDC(NUM_TASKS, tasks.size)} missing tasks from " +
+    log"${MDC(STAGE, stage)} (${MDC(RDD_ID, stage.rdd)}) (first 15 tasks are " +
+    log"for partitions ${MDC(PARTITION_IDS, tasks.take(15).map(_.partitionId))})")
+  val shuffleId = stage match {
+    case s: ShuffleMapStage => Some(s.shuffleDep.shuffleId)
+    case _: ResultStage => None
+  }
+
+  taskScheduler.submitTasks(new TaskSet(
+    tasks.toArray, stage.id, stage.latestInfo.attemptNumber(), jobId, properties,
+    stage.resourceProfileId, shuffleId))
+```
+
+对于ShuffleMapStage，序列化stage.rdd和stage.shuffleDep，对于ResultStage，序列化stage.rdd和stage.func。调用`SparkContext.broadcast`将序列化结果广播。
+
+对于需要计算的分区，每个分区创建一个task，如果stage是ShuffleMapStage，创建ShuffleMapTask，如果stage是ResultStage创建ResultTask。
+
+最终将这些任务打包成TaskSet，并调用`submitTasks`函数提交到`TaskScheduler`进行调度。`submitTasks`从TaskSet创建TaskSetManager，并调用`SchedulerBackend.reviveOffers`更新当前的资源情况并调度task。
+
+`SchedulerBackend`这是一个用于调度系统的后端接口，允许在 TaskSchedulerImpl 之下接入不同的调度实现。
+我们假设一种模型：当机器资源变得可用时，应用程序会接收到资源供给（resource offers），然后可以在这些机器上启动任务。常见的实现有以下几种:
+
+- `StandaloneSchedulerBackend` → 适用于 Spark 自带的独立集群模式；
+- `YarnSchedulerBackend` → 用于对接 Hadoop YARN；
+- `KubernetesClusterSchedulerBackend` → 用于运行在 Kubernetes 上的 Spark 应用。
+- `LocalSchedulerBackend` →  用于本地Spark应用
+
+前三种都基于`CoarseGrainedSchedulerBackend`实现。
+
+```scala
+// CoarseGrainedSchedulerBackend
+override def reviveOffers(): Unit = Utils.tryLogNonFatalError {
+  driverEndpoint.send(ReviveOffers)
+}
+// LocalSchedulerBackend
+override def reviveOffers(): Unit = {
+  localEndpoint.send(ReviveOffers)
+}
+```
+
+`reviveOffers`调用`driveEndpoint`发送`ReviceOffers`消息。在`DriverEndPoint.receive`方法中发现实际调用了`makeOffers`函数。(RPC调用)
+
+```scala
+// Make fake resource offers on all executors
+private def makeOffers(): Unit = {
+  // Make sure no executor is killed while some task is launching on it
+  val taskDescs = withLock {
+    // Filter out executors under killing
+    val activeExecutors = executorDataMap.filter { case (id, _) => isExecutorActive(id) }
+    val workOffers = activeExecutors.map {
+      case (id, executorData) => buildWorkerOffer(id, executorData)
+    }.toIndexedSeq
+    scheduler.resourceOffers(workOffers, true)
+  }
+  if (taskDescs.nonEmpty) {
+    launchTasks(taskDescs)
+  }
+}
+```
+
+`makeOffers`首先过滤出活跃的executor，然后调用`resourceOffers`，这个函数确定是否有足够的资源让某个任务执行，并且确定任务会被调度到哪一个executor节点。最后调用`launchTask`在executor上启动任务。
+
+### resoruceOffers
+
+TODO
+
+### TaskDescription
+
+```scala
+private[spark] class TaskDescription(
+    val taskId: Long, // taskId
+    val attemptNumber: Int, // task attemp number，唯一标记每次重试
+    val executorId: String, // 执行task的executor节点
+    val name: String, 
+    val index: Int,    // Index within this task's TaskSet
+    val partitionId: Int, // 实际计算的分区id
+    val artifacts: JobArtifactSet, // jar包和文件等
+    val properties: Properties, // 属性
+    val cpus: Int, // 需要分配的cpu个数
+    // resources is the total resources assigned to the task
+    // Eg, Map("gpu" -> Map("0" -> ResourceAmountUtils.toInternalResource(0.7))):
+    // assign 0.7 of the gpu address "0" to this task
+    val resources: immutable.Map[String, immutable.Map[String, Long]], // 需要分配的其他资源
+    val serializedTask: ByteBuffer) { // 序列化的Task
+
+  assert(cpus > 0, "CPUs per task should be > 0")
+
+  override def toString: String = s"TaskDescription($name)"
+}
+```
+
+`TaskDescription`描述一个将被传到executor上进行执行的task，通常由`TaskSetManager.resourceOffer`创建，TaskDescription和Task需要被序列化传到executor上，当TaskDescription被executor接收到，executor首先需要得到一系列的jar包和文件，并添加这些到classpath，然后设置属性，再反序列化Task对象（serializedTask)，这也是为什么属性properties被包含在TaskDescription中，尽管它们同样包含在serialized task中。
+
+可以看到，TaskDescription已经确定了task将被发送到的executorId以及对应的RDD分区和资源需求。
+
+### launchTasks
+
+```scala
+// Launch tasks returned by a set of resource offers
+private def launchTasks(tasks: Seq[Seq[TaskDescription]]): Unit = {
+  for (task <- tasks.flatten) {
+    val serializedTask = TaskDescription.encode(task)
+    if (serializedTask.limit() >= maxRpcMessageSize) {
+      Option(scheduler.taskIdToTaskSetManager.get(task.taskId)).foreach { taskSetMgr =>
+        try {
+          var msg = "Serialized task %s:%d was %d bytes, which exceeds max allowed: " +
+            s"${RPC_MESSAGE_MAX_SIZE.key} (%d bytes). Consider increasing " +
+            s"${RPC_MESSAGE_MAX_SIZE.key} or using broadcast variables for large values."
+          msg = msg.format(task.taskId, task.index, serializedTask.limit(), maxRpcMessageSize)
+          taskSetMgr.abort(msg)
+        } catch {
+          case e: Exception => logError("Exception in error callback", e)
+        }
+      }
+    }
+    else {
+      val executorData = executorDataMap(task.executorId)
+      // Do resources allocation here. The allocated resources will get released after the task
+      // finishes.
+      executorData.freeCores -= task.cpus
+      task.resources.foreach { case (rName, addressAmounts) =>
+        executorData.resourcesInfo(rName).acquire(addressAmounts)
+      }
+      logDebug(s"Launching task ${task.taskId} on executor id: ${task.executorId} hostname: " +
+        s"${executorData.executorHost}.")
+
+      executorData.executorEndpoint.send(LaunchTask(new SerializableBuffer(serializedTask)))
+    }
+  }
+}
+```
+
+`launchTasks`批量处理TaskDecription，首先序列化TaskDescription，如果序列化后的长度高于阈值，则放弃当前任务，否则，申请对应的cpu和其他各类资源，最终调用`executorEndpoint.send`发送RPC请求`LaunchTask`携带序列化后的TaskDescription。
+
+这样任务就可以被executor接收，并且执行了。
 
 ### getPreferredLocs
 

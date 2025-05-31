@@ -33,7 +33,7 @@
         "mainEntityOfPage": {
             "@type": "WebPage",
             "@id": "http:\/\/example.org\/posts\/spark_physical_plan\/"
-        },"genre": "posts","keywords": "Spark","wordcount":  10601 ,
+        },"genre": "posts","keywords": "Spark","wordcount":  12934 ,
         "url": "http:\/\/example.org\/posts\/spark_physical_plan\/","datePublished": "2025-05-25T11:16:21+08:00","dateModified": "2025-05-25T11:16:21+08:00","publisher": {
             "@type": "Organization",
             "name": ""},"author": {
@@ -107,8 +107,8 @@
             <div class="toc-content" id="toc-content-auto"></div>
         </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Spark物理执行计划</h1><div class="post-meta">
             <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/spark/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Spark</a></span></div>
-            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-25">2025-05-25</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;10601 words&nbsp;
-                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;22 minutes&nbsp;</div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-25">2025-05-25</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;12934 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;26 minutes&nbsp;</div>
         </div><div class="details toc" id="toc-static"  data-kept="">
                 <div class="details-summary toc-title">
                     <span>Contents</span>
@@ -135,6 +135,9 @@
         <li><a href="#submitstage">submitStage</a></li>
         <li><a href="#getmissingparentstages">getMissingParentStages</a></li>
         <li><a href="#submitmissingtasks">submitMissingTasks</a></li>
+        <li><a href="#resoruceoffers">resoruceOffers</a></li>
+        <li><a href="#taskdescription">TaskDescription</a></li>
+        <li><a href="#launchtasks">launchTasks</a></li>
         <li><a href="#getpreferredlocs">getPreferredLocs</a></li>
         <li><a href="#jobwaiter的实现">JobWaiter的实现</a></li>
         <li><a href="#getpartitions">getPartitions</a></li>
@@ -643,6 +646,224 @@
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
 <p><code>getMissingParentStages</code>找到当前stage直接依赖的缺失的stage。</p>
 <h3 id="submitmissingtasks">submitMissingTasks</h3>
+<p>通过<code>findMissingPartitions</code>找到stage对应的所有需要计算的分区的id，调用<code>getPreferredLocs</code>得到每个partition的首选位置。</p>
+<p>调用<code>stage.makeNewStageAttempt</code>创建新的stage尝试。记录stage的<code>submissionTime</code>向listenerBus发布SparkListenerStageSubmitted事件</p>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="c1">// TODO: Maybe we can keep the taskBinary in Stage to avoid serializing it multiple times.
+</span></span></span><span class="line"><span class="cl"><span class="c1">// Broadcasted binary for the task, used to dispatch tasks to executors. Note that we broadcast
+</span></span></span><span class="line"><span class="cl"><span class="c1">// the serialized copy of the RDD and for each task we will deserialize it, which means each
+</span></span></span><span class="line"><span class="cl"><span class="c1">// task gets a different copy of the RDD. This provides stronger isolation between tasks that
+</span></span></span><span class="line"><span class="cl"><span class="c1">// might modify state of objects referenced in their closures. This is necessary in Hadoop
+</span></span></span><span class="line"><span class="cl"><span class="c1">// where the JobConf/Configuration object is not thread-safe.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">var</span> <span class="n">taskBinary</span><span class="k">:</span> <span class="kt">Broadcast</span><span class="o">[</span><span class="kt">Array</span><span class="o">[</span><span class="kt">Byte</span><span class="o">]]</span> <span class="k">=</span> <span class="kc">null</span>
+</span></span><span class="line"><span class="cl"><span class="k">var</span> <span class="n">partitions</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">Partition</span><span class="o">]</span> <span class="k">=</span> <span class="kc">null</span>
+</span></span><span class="line"><span class="cl"><span class="k">try</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// For ShuffleMapTask, serialize and broadcast (rdd, shuffleDep).
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// For ResultTask, serialize and broadcast (rdd, func).
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">var</span> <span class="n">taskBinaryBytes</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">Byte</span><span class="o">]</span> <span class="k">=</span> <span class="kc">null</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// taskBinaryBytes and partitions are both effected by the checkpoint status. We need
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// this synchronization in case another concurrent job is checkpointing this RDD, so we get a
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// consistent view of both variables.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="nc">RDDCheckpointData</span><span class="o">.</span><span class="n">synchronized</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">taskBinaryBytes</span> <span class="k">=</span> <span class="n">stage</span> <span class="k">match</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="k">case</span> <span class="n">stage</span><span class="k">:</span> <span class="kt">ShuffleMapStage</span> <span class="o">=&gt;</span>
+</span></span><span class="line"><span class="cl">        <span class="nc">JavaUtils</span><span class="o">.</span><span class="n">bufferToArray</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">          <span class="n">closureSerializer</span><span class="o">.</span><span class="n">serialize</span><span class="o">((</span><span class="n">stage</span><span class="o">.</span><span class="n">rdd</span><span class="o">,</span> <span class="n">stage</span><span class="o">.</span><span class="n">shuffleDep</span><span class="o">)</span><span class="k">:</span> <span class="kt">AnyRef</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">      <span class="k">case</span> <span class="n">stage</span><span class="k">:</span> <span class="kt">ResultStage</span> <span class="o">=&gt;</span>
+</span></span><span class="line"><span class="cl">        <span class="nc">JavaUtils</span><span class="o">.</span><span class="n">bufferToArray</span><span class="o">(</span><span class="n">closureSerializer</span><span class="o">.</span><span class="n">serialize</span><span class="o">((</span><span class="n">stage</span><span class="o">.</span><span class="n">rdd</span><span class="o">,</span> <span class="n">stage</span><span class="o">.</span><span class="n">func</span><span class="o">)</span><span class="k">:</span> <span class="kt">AnyRef</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="n">partitions</span> <span class="k">=</span> <span class="n">stage</span><span class="o">.</span><span class="n">rdd</span><span class="o">.</span><span class="n">partitions</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="o">(</span><span class="n">taskBinaryBytes</span><span class="o">.</span><span class="n">length</span> <span class="o">&gt;</span> <span class="nc">TaskSetManager</span><span class="o">.</span><span class="nc">TASK_SIZE_TO_WARN_KIB</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">logWarning</span><span class="o">(</span><span class="n">log</span><span class="s">&#34;Broadcasting large task binary with size &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">      <span class="n">log</span><span class="s">&#34;${MDC(NUM_BYTES, Utils.bytesToString(taskBinaryBytes.length))}&#34;</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="n">taskBinary</span> <span class="k">=</span> <span class="n">sc</span><span class="o">.</span><span class="n">broadcast</span><span class="o">(</span><span class="n">taskBinaryBytes</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span> <span class="k">catch</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// In the case of a failure during serialization, abort the stage.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">case</span> <span class="n">e</span><span class="k">:</span> <span class="kt">NotSerializableException</span> <span class="o">=&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="n">abortStage</span><span class="o">(</span><span class="n">stage</span><span class="o">,</span> <span class="s">&#34;Task not serializable: &#34;</span> <span class="o">+</span> <span class="n">e</span><span class="o">.</span><span class="n">toString</span><span class="o">,</span> <span class="nc">Some</span><span class="o">(</span><span class="n">e</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">    <span class="n">runningStages</span> <span class="o">-=</span> <span class="n">stage</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// Abort execution
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">return</span>
+</span></span><span class="line"><span class="cl">  <span class="k">case</span> <span class="n">e</span><span class="k">:</span> <span class="kt">Throwable</span> <span class="o">=&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="n">abortStage</span><span class="o">(</span><span class="n">stage</span><span class="o">,</span> <span class="s">s&#34;Task serialization failed: </span><span class="si">$e\n$</span><span class="s">{Utils.exceptionString(e)}&#34;</span><span class="o">,</span> <span class="nc">Some</span><span class="o">(</span><span class="n">e</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">    <span class="n">runningStages</span> <span class="o">-=</span> <span class="n">stage</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// Abort execution
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">return</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">val</span> <span class="n">artifacts</span> <span class="k">=</span> <span class="n">jobIdToActiveJob</span><span class="o">(</span><span class="n">jobId</span><span class="o">).</span><span class="n">artifacts</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">val</span> <span class="n">tasks</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">Task</span><span class="o">[</span><span class="k">_</span><span class="o">]]</span> <span class="k">=</span> <span class="k">try</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">serializedTaskMetrics</span> <span class="k">=</span> <span class="n">closureSerializer</span><span class="o">.</span><span class="n">serialize</span><span class="o">(</span><span class="n">stage</span><span class="o">.</span><span class="n">latestInfo</span><span class="o">.</span><span class="n">taskMetrics</span><span class="o">).</span><span class="n">array</span><span class="o">()</span>
+</span></span><span class="line"><span class="cl">  <span class="n">stage</span> <span class="k">match</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="n">stage</span><span class="k">:</span> <span class="kt">ShuffleMapStage</span> <span class="o">=&gt;</span>
+</span></span><span class="line"><span class="cl">      <span class="n">stage</span><span class="o">.</span><span class="n">pendingPartitions</span><span class="o">.</span><span class="n">clear</span><span class="o">()</span>
+</span></span><span class="line"><span class="cl">      <span class="n">partitionsToCompute</span><span class="o">.</span><span class="n">map</span> <span class="o">{</span> <span class="n">id</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">        <span class="k">val</span> <span class="n">locs</span> <span class="k">=</span> <span class="n">taskIdToLocations</span><span class="o">(</span><span class="n">id</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">        <span class="k">val</span> <span class="n">part</span> <span class="k">=</span> <span class="n">partitions</span><span class="o">(</span><span class="n">id</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">        <span class="n">stage</span><span class="o">.</span><span class="n">pendingPartitions</span> <span class="o">+=</span> <span class="n">id</span>
+</span></span><span class="line"><span class="cl">        <span class="k">new</span> <span class="nc">ShuffleMapTask</span><span class="o">(</span><span class="n">stage</span><span class="o">.</span><span class="n">id</span><span class="o">,</span> <span class="n">stage</span><span class="o">.</span><span class="n">latestInfo</span><span class="o">.</span><span class="n">attemptNumber</span><span class="o">(),</span> <span class="n">taskBinary</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">          <span class="n">part</span><span class="o">,</span> <span class="n">stage</span><span class="o">.</span><span class="n">numPartitions</span><span class="o">,</span> <span class="n">locs</span><span class="o">,</span> <span class="n">artifacts</span><span class="o">,</span> <span class="n">properties</span><span class="o">,</span> <span class="n">serializedTaskMetrics</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nc">Option</span><span class="o">(</span><span class="n">jobId</span><span class="o">),</span> <span class="nc">Option</span><span class="o">(</span><span class="n">sc</span><span class="o">.</span><span class="n">applicationId</span><span class="o">),</span> <span class="n">sc</span><span class="o">.</span><span class="n">applicationAttemptId</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">          <span class="n">stage</span><span class="o">.</span><span class="n">rdd</span><span class="o">.</span><span class="n">isBarrier</span><span class="o">())</span>
+</span></span><span class="line"><span class="cl">      <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="n">stage</span><span class="k">:</span> <span class="kt">ResultStage</span> <span class="o">=&gt;</span>
+</span></span><span class="line"><span class="cl">      <span class="n">partitionsToCompute</span><span class="o">.</span><span class="n">map</span> <span class="o">{</span> <span class="n">id</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">        <span class="k">val</span> <span class="n">p</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=</span> <span class="n">stage</span><span class="o">.</span><span class="n">partitions</span><span class="o">(</span><span class="n">id</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">        <span class="k">val</span> <span class="n">part</span> <span class="k">=</span> <span class="n">partitions</span><span class="o">(</span><span class="n">p</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">        <span class="k">val</span> <span class="n">locs</span> <span class="k">=</span> <span class="n">taskIdToLocations</span><span class="o">(</span><span class="n">id</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">        <span class="k">new</span> <span class="nc">ResultTask</span><span class="o">(</span><span class="n">stage</span><span class="o">.</span><span class="n">id</span><span class="o">,</span> <span class="n">stage</span><span class="o">.</span><span class="n">latestInfo</span><span class="o">.</span><span class="n">attemptNumber</span><span class="o">(),</span>
+</span></span><span class="line"><span class="cl">          <span class="n">taskBinary</span><span class="o">,</span> <span class="n">part</span><span class="o">,</span> <span class="n">stage</span><span class="o">.</span><span class="n">numPartitions</span><span class="o">,</span> <span class="n">locs</span><span class="o">,</span> <span class="n">id</span><span class="o">,</span> <span class="n">artifacts</span><span class="o">,</span> <span class="n">properties</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">          <span class="n">serializedTaskMetrics</span><span class="o">,</span> <span class="nc">Option</span><span class="o">(</span><span class="n">jobId</span><span class="o">),</span> <span class="nc">Option</span><span class="o">(</span><span class="n">sc</span><span class="o">.</span><span class="n">applicationId</span><span class="o">),</span>
+</span></span><span class="line"><span class="cl">          <span class="n">sc</span><span class="o">.</span><span class="n">applicationAttemptId</span><span class="o">,</span> <span class="n">stage</span><span class="o">.</span><span class="n">rdd</span><span class="o">.</span><span class="n">isBarrier</span><span class="o">())</span>
+</span></span><span class="line"><span class="cl">      <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span> <span class="k">catch</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">case</span> <span class="nc">NonFatal</span><span class="o">(</span><span class="n">e</span><span class="o">)</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="n">abortStage</span><span class="o">(</span><span class="n">stage</span><span class="o">,</span> <span class="s">s&#34;Task creation failed: </span><span class="si">$e\n$</span><span class="s">{Utils.exceptionString(e)}&#34;</span><span class="o">,</span> <span class="nc">Some</span><span class="o">(</span><span class="n">e</span><span class="o">))</span>
+</span></span><span class="line"><span class="cl">    <span class="n">runningStages</span> <span class="o">-=</span> <span class="n">stage</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="o">(</span><span class="n">tasks</span><span class="o">.</span><span class="n">nonEmpty</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="n">logInfo</span><span class="o">(</span><span class="n">log</span><span class="s">&#34;Submitting ${MDC(NUM_TASKS, tasks.size)} missing tasks from &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">    <span class="n">log</span><span class="s">&#34;${MDC(STAGE, stage)} (${MDC(RDD_ID, stage.rdd)}) (first 15 tasks are &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">    <span class="n">log</span><span class="s">&#34;for partitions ${MDC(PARTITION_IDS, tasks.take(15).map(_.partitionId))})&#34;</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">val</span> <span class="n">shuffleId</span> <span class="k">=</span> <span class="n">stage</span> <span class="k">match</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="n">s</span><span class="k">:</span> <span class="kt">ShuffleMapStage</span> <span class="o">=&gt;</span> <span class="nc">Some</span><span class="o">(</span><span class="n">s</span><span class="o">.</span><span class="n">shuffleDep</span><span class="o">.</span><span class="n">shuffleId</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="k">_:</span> <span class="kt">ResultStage</span> <span class="o">=&gt;</span> <span class="nc">None</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="n">taskScheduler</span><span class="o">.</span><span class="n">submitTasks</span><span class="o">(</span><span class="k">new</span> <span class="nc">TaskSet</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">tasks</span><span class="o">.</span><span class="n">toArray</span><span class="o">,</span> <span class="n">stage</span><span class="o">.</span><span class="n">id</span><span class="o">,</span> <span class="n">stage</span><span class="o">.</span><span class="n">latestInfo</span><span class="o">.</span><span class="n">attemptNumber</span><span class="o">(),</span> <span class="n">jobId</span><span class="o">,</span> <span class="n">properties</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">stage</span><span class="o">.</span><span class="n">resourceProfileId</span><span class="o">,</span> <span class="n">shuffleId</span><span class="o">))</span></span></span></code></pre></div></div>
+<p>对于ShuffleMapStage，序列化stage.rdd和stage.shuffleDep，对于ResultStage，序列化stage.rdd和stage.func。调用<code>SparkContext.broadcast</code>将序列化结果广播。</p>
+<p>对于需要计算的分区，每个分区创建一个task，如果stage是ShuffleMapStage，创建ShuffleMapTask，如果stage是ResultStage创建ResultTask。</p>
+<p>最终将这些任务打包成TaskSet，并调用<code>submitTasks</code>函数提交到<code>TaskScheduler</code>进行调度。<code>submitTasks</code>从TaskSet创建TaskSetManager，并调用<code>SchedulerBackend.reviveOffers</code>更新当前的资源情况并调度task。</p>
+<p><code>SchedulerBackend</code>这是一个用于调度系统的后端接口，允许在 TaskSchedulerImpl 之下接入不同的调度实现。
+我们假设一种模型：当机器资源变得可用时，应用程序会接收到资源供给（resource offers），然后可以在这些机器上启动任务。常见的实现有以下几种:</p>
+<ul>
+<li><code>StandaloneSchedulerBackend</code> → 适用于 Spark 自带的独立集群模式；</li>
+<li><code>YarnSchedulerBackend</code> → 用于对接 Hadoop YARN；</li>
+<li><code>KubernetesClusterSchedulerBackend</code> → 用于运行在 Kubernetes 上的 Spark 应用。</li>
+<li><code>LocalSchedulerBackend</code> →  用于本地Spark应用</li>
+</ul>
+<p>前三种都基于<code>CoarseGrainedSchedulerBackend</code>实现。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="c1">// CoarseGrainedSchedulerBackend
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">override</span> <span class="k">def</span> <span class="n">reviveOffers</span><span class="o">()</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="nc">Utils</span><span class="o">.</span><span class="n">tryLogNonFatalError</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="n">driverEndpoint</span><span class="o">.</span><span class="n">send</span><span class="o">(</span><span class="nc">ReviveOffers</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// LocalSchedulerBackend
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">override</span> <span class="k">def</span> <span class="n">reviveOffers</span><span class="o">()</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="n">localEndpoint</span><span class="o">.</span><span class="n">send</span><span class="o">(</span><span class="nc">ReviveOffers</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p><code>reviveOffers</code>调用<code>driveEndpoint</code>发送<code>ReviceOffers</code>消息。在<code>DriverEndPoint.receive</code>方法中发现实际调用了<code>makeOffers</code>函数。(RPC调用)</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="c1">// Make fake resource offers on all executors
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">private</span> <span class="k">def</span> <span class="n">makeOffers</span><span class="o">()</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// Make sure no executor is killed while some task is launching on it
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">val</span> <span class="n">taskDescs</span> <span class="k">=</span> <span class="n">withLock</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// Filter out executors under killing
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">val</span> <span class="n">activeExecutors</span> <span class="k">=</span> <span class="n">executorDataMap</span><span class="o">.</span><span class="n">filter</span> <span class="o">{</span> <span class="k">case</span> <span class="o">(</span><span class="n">id</span><span class="o">,</span> <span class="k">_</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">isExecutorActive</span><span class="o">(</span><span class="n">id</span><span class="o">)</span> <span class="o">}</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">workOffers</span> <span class="k">=</span> <span class="n">activeExecutors</span><span class="o">.</span><span class="n">map</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="k">case</span> <span class="o">(</span><span class="n">id</span><span class="o">,</span> <span class="n">executorData</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">buildWorkerOffer</span><span class="o">(</span><span class="n">id</span><span class="o">,</span> <span class="n">executorData</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}.</span><span class="n">toIndexedSeq</span>
+</span></span><span class="line"><span class="cl">    <span class="n">scheduler</span><span class="o">.</span><span class="n">resourceOffers</span><span class="o">(</span><span class="n">workOffers</span><span class="o">,</span> <span class="kc">true</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="o">(</span><span class="n">taskDescs</span><span class="o">.</span><span class="n">nonEmpty</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">launchTasks</span><span class="o">(</span><span class="n">taskDescs</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p><code>makeOffers</code>首先过滤出活跃的executor，然后调用<code>resourceOffers</code>，这个函数确定是否有足够的资源让某个任务执行，并且确定任务会被调度到哪一个executor节点。最后调用<code>launchTask</code>在executor上启动任务。</p>
+<h3 id="resoruceoffers">resoruceOffers</h3>
+<p>TODO</p>
+<h3 id="taskdescription">TaskDescription</h3>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="k">private</span><span class="o">[</span><span class="kt">spark</span><span class="o">]</span> <span class="k">class</span> <span class="nc">TaskDescription</span><span class="o">(</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">taskId</span><span class="k">:</span> <span class="kt">Long</span><span class="o">,</span> <span class="c1">// taskId
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">val</span> <span class="n">attemptNumber</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span> <span class="c1">// task attemp number，唯一标记每次重试
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">val</span> <span class="n">executorId</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> <span class="c1">// 执行task的executor节点
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">val</span> <span class="n">name</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> 
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">index</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>    <span class="c1">// Index within this task&#39;s TaskSet
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">val</span> <span class="n">partitionId</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span> <span class="c1">// 实际计算的分区id
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">val</span> <span class="n">artifacts</span><span class="k">:</span> <span class="kt">JobArtifactSet</span><span class="o">,</span> <span class="c1">// jar包和文件等
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">val</span> <span class="n">properties</span><span class="k">:</span> <span class="kt">Properties</span><span class="o">,</span> <span class="c1">// 属性
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">val</span> <span class="n">cpus</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span> <span class="c1">// 需要分配的cpu个数
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="c1">// resources is the total resources assigned to the task
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="c1">// Eg, Map(&#34;gpu&#34; -&gt; Map(&#34;0&#34; -&gt; ResourceAmountUtils.toInternalResource(0.7))):
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="c1">// assign 0.7 of the gpu address &#34;0&#34; to this task
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">val</span> <span class="n">resources</span><span class="k">:</span> <span class="kt">immutable.Map</span><span class="o">[</span><span class="kt">String</span>, <span class="kt">immutable.Map</span><span class="o">[</span><span class="kt">String</span>, <span class="kt">Long</span><span class="o">]],</span> <span class="c1">// 需要分配的其他资源
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">val</span> <span class="n">serializedTask</span><span class="k">:</span> <span class="kt">ByteBuffer</span><span class="o">)</span> <span class="o">{</span> <span class="c1">// 序列化的Task
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">  <span class="n">assert</span><span class="o">(</span><span class="n">cpus</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="o">,</span> <span class="s">&#34;CPUs per task should be &gt; 0&#34;</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  <span class="k">override</span> <span class="k">def</span> <span class="n">toString</span><span class="k">:</span> <span class="kt">String</span> <span class="o">=</span> <span class="s">s&#34;TaskDescription(</span><span class="si">$name</span><span class="s">)&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p><code>TaskDescription</code>描述一个将被传到executor上进行执行的task，通常由<code>TaskSetManager.resourceOffer</code>创建，TaskDescription和Task需要被序列化传到executor上，当TaskDescription被executor接收到，executor首先需要得到一系列的jar包和文件，并添加这些到classpath，然后设置属性，再反序列化Task对象（serializedTask)，这也是为什么属性properties被包含在TaskDescription中，尽管它们同样包含在serialized task中。</p>
+<p>可以看到，TaskDescription已经确定了task将被发送到的executorId以及对应的RDD分区和资源需求。</p>
+<h3 id="launchtasks">launchTasks</h3>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-scala">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-scala" data-lang="scala"><span class="line"><span class="cl"><span class="c1">// Launch tasks returned by a set of resource offers
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">private</span> <span class="k">def</span> <span class="n">launchTasks</span><span class="o">(</span><span class="n">tasks</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">Seq</span><span class="o">[</span><span class="kt">TaskDescription</span><span class="o">]])</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">for</span> <span class="o">(</span><span class="n">task</span> <span class="k">&lt;-</span> <span class="n">tasks</span><span class="o">.</span><span class="n">flatten</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">val</span> <span class="n">serializedTask</span> <span class="k">=</span> <span class="nc">TaskDescription</span><span class="o">.</span><span class="n">encode</span><span class="o">(</span><span class="n">task</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="o">(</span><span class="n">serializedTask</span><span class="o">.</span><span class="n">limit</span><span class="o">()</span> <span class="o">&gt;=</span> <span class="n">maxRpcMessageSize</span><span class="o">)</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="nc">Option</span><span class="o">(</span><span class="n">scheduler</span><span class="o">.</span><span class="n">taskIdToTaskSetManager</span><span class="o">.</span><span class="n">get</span><span class="o">(</span><span class="n">task</span><span class="o">.</span><span class="n">taskId</span><span class="o">)).</span><span class="n">foreach</span> <span class="o">{</span> <span class="n">taskSetMgr</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">        <span class="k">try</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">          <span class="k">var</span> <span class="n">msg</span> <span class="k">=</span> <span class="s">&#34;Serialized task %s:%d was %d bytes, which exceeds max allowed: &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">            <span class="s">s&#34;</span><span class="si">${</span><span class="nc">RPC_MESSAGE_MAX_SIZE</span><span class="o">.</span><span class="n">key</span><span class="si">}</span><span class="s"> (%d bytes). Consider increasing &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">            <span class="s">s&#34;</span><span class="si">${</span><span class="nc">RPC_MESSAGE_MAX_SIZE</span><span class="o">.</span><span class="n">key</span><span class="si">}</span><span class="s"> or using broadcast variables for large values.&#34;</span>
+</span></span><span class="line"><span class="cl">          <span class="n">msg</span> <span class="k">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="o">(</span><span class="n">task</span><span class="o">.</span><span class="n">taskId</span><span class="o">,</span> <span class="n">task</span><span class="o">.</span><span class="n">index</span><span class="o">,</span> <span class="n">serializedTask</span><span class="o">.</span><span class="n">limit</span><span class="o">(),</span> <span class="n">maxRpcMessageSize</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">          <span class="n">taskSetMgr</span><span class="o">.</span><span class="n">abort</span><span class="o">(</span><span class="n">msg</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">        <span class="o">}</span> <span class="k">catch</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">          <span class="k">case</span> <span class="n">e</span><span class="k">:</span> <span class="kt">Exception</span> <span class="o">=&gt;</span> <span class="n">logError</span><span class="o">(</span><span class="s">&#34;Exception in error callback&#34;</span><span class="o">,</span> <span class="n">e</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">        <span class="o">}</span>
+</span></span><span class="line"><span class="cl">      <span class="o">}</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">    <span class="k">else</span> <span class="o">{</span>
+</span></span><span class="line"><span class="cl">      <span class="k">val</span> <span class="n">executorData</span> <span class="k">=</span> <span class="n">executorDataMap</span><span class="o">(</span><span class="n">task</span><span class="o">.</span><span class="n">executorId</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="c1">// Do resources allocation here. The allocated resources will get released after the task
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="c1">// finishes.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>      <span class="n">executorData</span><span class="o">.</span><span class="n">freeCores</span> <span class="o">-=</span> <span class="n">task</span><span class="o">.</span><span class="n">cpus</span>
+</span></span><span class="line"><span class="cl">      <span class="n">task</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">foreach</span> <span class="o">{</span> <span class="k">case</span> <span class="o">(</span><span class="n">rName</span><span class="o">,</span> <span class="n">addressAmounts</span><span class="o">)</span> <span class="k">=&gt;</span>
+</span></span><span class="line"><span class="cl">        <span class="n">executorData</span><span class="o">.</span><span class="n">resourcesInfo</span><span class="o">(</span><span class="n">rName</span><span class="o">).</span><span class="n">acquire</span><span class="o">(</span><span class="n">addressAmounts</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">      <span class="o">}</span>
+</span></span><span class="line"><span class="cl">      <span class="n">logDebug</span><span class="o">(</span><span class="s">s&#34;Launching task </span><span class="si">${</span><span class="n">task</span><span class="o">.</span><span class="n">taskId</span><span class="si">}</span><span class="s"> on executor id: </span><span class="si">${</span><span class="n">task</span><span class="o">.</span><span class="n">executorId</span><span class="si">}</span><span class="s"> hostname: &#34;</span> <span class="o">+</span>
+</span></span><span class="line"><span class="cl">        <span class="s">s&#34;</span><span class="si">${</span><span class="n">executorData</span><span class="o">.</span><span class="n">executorHost</span><span class="si">}</span><span class="s">.&#34;</span><span class="o">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">      <span class="n">executorData</span><span class="o">.</span><span class="n">executorEndpoint</span><span class="o">.</span><span class="n">send</span><span class="o">(</span><span class="nc">LaunchTask</span><span class="o">(</span><span class="k">new</span> <span class="nc">SerializableBuffer</span><span class="o">(</span><span class="n">serializedTask</span><span class="o">)))</span>
+</span></span><span class="line"><span class="cl">    <span class="o">}</span>
+</span></span><span class="line"><span class="cl">  <span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
+<p><code>launchTasks</code>批量处理TaskDecription，首先序列化TaskDescription，如果序列化后的长度高于阈值，则放弃当前任务，否则，申请对应的cpu和其他各类资源，最终调用<code>executorEndpoint.send</code>发送RPC请求<code>LaunchTask</code>携带序列化后的TaskDescription。</p>
+<p>这样任务就可以被executor接收，并且执行了。</p>
 <h3 id="getpreferredlocs">getPreferredLocs</h3>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
