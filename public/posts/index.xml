@@ -3,7 +3,15 @@
         <title>All Posts - 爱吃芒果</title>
         <link>http://example.org/posts/</link>
         <description>All Posts | 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Wed, 28 May 2025 16:46:29 &#43;0800</lastBuildDate><atom:link href="http://example.org/posts/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 01 Jun 2025 09:18:40 &#43;0800</lastBuildDate><atom:link href="http://example.org/posts/" rel="self" type="application/rss+xml" /><item>
+    <title>Shuffle</title>
+    <link>http://example.org/posts/shuffle/</link>
+    <pubDate>Sun, 01 Jun 2025 09:18:40 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://example.org/posts/shuffle/</guid>
+    <description><![CDATA[<p>运行在不同stage、不同节点上的task见通过shuffle机制传递数据，shuffle解决的问题是如何将数据进行重新组织，使其能够在上游和下游task之间进行传递和计算。如果只是单纯的数据传递，则只需要将数据进行分区、通过网络传输即可，没有太大的难度，但shuffle机制还需要进行各种类型的计算（如聚合、排序），而且数据量一般会很大，如果支持这些不同类型的计算，如果提高shuffle的性能都是shuffle机制设计的难点。</p>]]></description>
+</item>
+<item>
     <title>Java ConcurrentHashMap</title>
     <link>http://example.org/posts/java-concurrenthashmap/</link>
     <pubDate>Wed, 28 May 2025 16:46:29 &#43;0800</pubDate>
@@ -103,26 +111,6 @@
     <guid>http://example.org/posts/spark_developement_envrionment/</guid>
     <description><![CDATA[<p>通过如下的方法在idea中配置spark开发环境，最后和一般的java项目一样，使用maven面板的 clean和package进行编译。</p>
 <p>我实际使用的编译器为java17，idea会提示配置scala编译器。</p>]]></description>
-</item>
-<item>
-    <title>Spark内存管理</title>
-    <link>http://example.org/posts/spark_memory_manager/</link>
-    <pubDate>Sun, 09 Mar 2025 22:32:09 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/spark_memory_manager/</guid>
-    <description><![CDATA[<h2 id="关键问题">关键问题</h2>
-<ol>
-<li>
-<p>内存被分成哪些区域，各分区之间的关系是什么，通过什么参数控制</p>
-</li>
-<li>
-<p>内存上报和释放的单位是什么，上报和释放是如何实现的</p>
-</li>
-<li>
-<p>如何避免内存没有释放导致资源泄露</p>
-</li>
-<li>
-<p>如何避免重复上报和漏上报问题</p>]]></description>
 </item>
 </channel>
 </rss>
