@@ -3,7 +3,42 @@
         <title>Spark - Tag - 爱吃芒果</title>
         <link>http://example.org/tags/spark/</link>
         <description>Spark - Tag - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 01 Jun 2025 09:18:40 &#43;0800</lastBuildDate><atom:link href="http://example.org/tags/spark/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 07 Jun 2025 19:05:49 &#43;0800</lastBuildDate><atom:link href="http://example.org/tags/spark/" rel="self" type="application/rss+xml" /><item>
+    <title>Spark错误容忍机制</title>
+    <link>http://example.org/posts/spark_fault_tolerance/</link>
+    <pubDate>Sat, 07 Jun 2025 19:05:49 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://example.org/posts/spark_fault_tolerance/</guid>
+    <description><![CDATA[<p>Spark的错误容忍机制的核心方法主要有两种：</p>
+<ol>
+<li>通过重新执行计算任务来容忍错误，当job抛出异常不能继续执行时，重新启动计算任务，再次执行</li>
+<li>通过采用checkpoint机制，对一些重要的输入、输出、中间数据进行持久化，这可以在一定程度上解决数据丢失问题，而且能够提高任务重新计算时的效率。</li>
+</ol>
+<p>Spark采用了延迟删除策略，将上游stage的Shuffle Write的结果写入本地磁盘，只有在当前job完成后，才删除Shuffle Writre写入磁盘的数据。这样，即使stage2中某个task执行失败，但由于上游的stage0和stage1的输出数据还在磁盘上，也可以再次通过Shuffle Read读取得到相同的数据，避免再次执行上游stage中的task，所以，Spark根据ShuffleDependency切分出的stage既保证了task的独立性，也方便了错误容忍的重新计算。</p>]]></description>
+</item>
+<item>
+    <title>Spark Job执行流程</title>
+    <link>http://example.org/posts/spark_job_execution/</link>
+    <pubDate>Sat, 07 Jun 2025 10:16:21 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://example.org/posts/spark_job_execution/</guid>
+    <description><![CDATA[<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="c1">// CoarseGrainedExecutorBackend</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">case</span><span class="w"> </span><span class="n">LaunchTask</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">executor</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">exitExecutor</span><span class="p">(</span><span class="n">1</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;Received LaunchTask command but executor was null&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">val</span><span class="w"> </span><span class="n">taskDesc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TaskDescription</span><span class="p">.</span><span class="na">decode</span><span class="p">(</span><span class="n">data</span><span class="p">.</span><span class="na">value</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">logInfo</span><span class="p">(</span><span class="n">log</span><span class="s">&#34;Got assigned task ${MDC(LogKeys.TASK_ID, taskDesc.taskId)}&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">executor</span><span class="p">.</span><span class="na">launchTask</span><span class="p">(</span><span class="k">this</span><span class="p">,</span><span class="w"> </span><span class="n">taskDesc</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="p">}</span></span></span></code></pre></div></div>
+<p>接收到Drive端传来的task，反序列化后，启动task</p>]]></description>
+</item>
+<item>
     <title>Spark Shuffle机制</title>
     <link>http://example.org/posts/shuffle/</link>
     <pubDate>Sun, 01 Jun 2025 09:18:40 &#43;0800</pubDate>

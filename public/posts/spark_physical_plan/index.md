@@ -102,7 +102,7 @@ object FilterDemo {
 - MapPartitionsRDD
 - UnionRDD
 
-### ### runJob
+### runJob
 
 ```scala
 def count(): Long = sc.runJob(this, Utils.getIteratorSize _).sum
@@ -723,7 +723,7 @@ private def launchTasks(tasks: Seq[Seq[TaskDescription]]): Unit = {
 }
 ```
 
-`launchTasks`批量处理TaskDecription，首先序列化TaskDescription，如果序列化后的长度高于阈值，则放弃当前任务，否则，申请对应的cpu和其他各类资源，最终调用`executorEndpoint.send`发送RPC请求`LaunchTask`携带序列化后的TaskDescription。
+`launchTasks`批量处理TaskDecription，首先序列化TaskDescription，如果序列化后的长度高于阈值，则放弃当前任务，否则，申请对应的cpu和其他各类资源，最终调用`executorEndpoint.send`发送RPC请求`LaunchTask`。
 
 这样任务就可以被executor接收，并且执行了。
 

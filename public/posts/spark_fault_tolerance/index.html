@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noodp" />
+        <title>Spark错误容忍机制 - 爱吃芒果</title><meta name="Description" content="This is my cool site"><meta property="og:url" content="http://example.org/posts/spark_fault_tolerance/">
+  <meta property="og:site_name" content="爱吃芒果">
+  <meta property="og:title" content="Spark错误容忍机制">
+  <meta property="og:description" content="Spark的错误容忍机制的核心方法主要有两种：
+通过重新执行计算任务来容忍错误，当job抛出异常不能继续执行时，重新启动计算任务，再次执行 通过采用checkpoint机制，对一些重要的输入、输出、中间数据进行持久化，这可以在一定程度上解决数据丢失问题，而且能够提高任务重新计算时的效率。 Spark采用了延迟删除策略，将上游stage的Shuffle Write的结果写入本地磁盘，只有在当前job完成后，才删除Shuffle Writre写入磁盘的数据。这样，即使stage2中某个task执行失败，但由于上游的stage0和stage1的输出数据还在磁盘上，也可以再次通过Shuffle Read读取得到相同的数据，避免再次执行上游stage中的task，所以，Spark根据ShuffleDependency切分出的stage既保证了task的独立性，也方便了错误容忍的重新计算。">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-06-07T19:05:49+08:00">
+    <meta property="article:modified_time" content="2025-06-07T19:05:49+08:00">
+    <meta property="article:tag" content="Spark">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Spark错误容忍机制">
+  <meta name="twitter:description" content="Spark的错误容忍机制的核心方法主要有两种：
+通过重新执行计算任务来容忍错误，当job抛出异常不能继续执行时，重新启动计算任务，再次执行 通过采用checkpoint机制，对一些重要的输入、输出、中间数据进行持久化，这可以在一定程度上解决数据丢失问题，而且能够提高任务重新计算时的效率。 Spark采用了延迟删除策略，将上游stage的Shuffle Write的结果写入本地磁盘，只有在当前job完成后，才删除Shuffle Writre写入磁盘的数据。这样，即使stage2中某个task执行失败，但由于上游的stage0和stage1的输出数据还在磁盘上，也可以再次通过Shuffle Read读取得到相同的数据，避免再次执行上游stage中的task，所以，Spark根据ShuffleDependency切分出的stage既保证了task的独立性，也方便了错误容忍的重新计算。">
+<meta name="application-name" content="My cool site">
+<meta name="apple-mobile-web-app-title" content="My cool site">
+<meta name="referrer" content="no-referrer" /><meta name="theme-color" content="#ffffff"><meta name="msapplication-TileColor" content="#da532c"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/spark_fault_tolerance/" /><link rel="prev" href="http://example.org/posts/spark_data_cache/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css"></noscript><link rel="preload" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css"></noscript><script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "headline": "Spark错误容忍机制",
+        "inLanguage": "zh-CN",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "http:\/\/example.org\/posts\/spark_fault_tolerance\/"
+        },"genre": "posts","keywords": "Spark","wordcount":  2239 ,
+        "url": "http:\/\/example.org\/posts\/spark_fault_tolerance\/","datePublished": "2025-06-07T19:05:49+08:00","dateModified": "2025-06-07T19:05:49+08:00","publisher": {
+            "@type": "Organization",
+            "name": ""},"author": {
+                "@type": "Person",
+                "name": "爱吃芒果"
+            },"description": ""
+    }
+    </script></head>
+    <body data-header-desktop="fixed" data-header-mobile="auto"><script>(window.localStorage && localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : ('auto' === 'auto' ? window.matchMedia('(prefers-color-scheme: dark)').matches : 'auto' === 'dark')) && document.body.setAttribute('theme', 'dark');</script>
+
+        <div id="mask"></div><div class="wrapper"><header class="desktop" id="header-desktop">
+    <div class="header-wrapper">
+        <div class="header-title">
+            <a href="/" title="爱吃芒果">My cool site</a>
+        </div>
+        <div class="menu">
+            <div class="menu-inner"><a class="menu-item" href="/posts/"> 文章 </a><a class="menu-item" href="/page/archives/" title="Archives"> Archives </a><a class="menu-item" href="/tags/"> 标签 </a><a class="menu-item" href="/page/search/" title="Search"> Search </a><a class="menu-item" href="/categories/"> 分类 </a><span class="menu-item delimiter"></span><span class="menu-item search" id="search-desktop">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-desktop">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-desktop" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-desktop" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-desktop">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </span><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                    <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+                </a></div>
+        </div>
+    </div>
+</header><header class="mobile" id="header-mobile">
+    <div class="header-container">
+        <div class="header-wrapper">
+            <div class="header-title">
+                <a href="/" title="爱吃芒果">My cool site</a>
+            </div>
+            <div class="menu-toggle" id="menu-toggle-mobile">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div class="menu" id="menu-mobile"><div class="search-wrapper">
+                    <div class="search mobile" id="search-mobile">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-mobile">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-mobile" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-mobile" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-mobile">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </div>
+                    <a href="javascript:void(0);" class="search-cancel" id="search-cancel-mobile">
+                        Cancel
+                    </a>
+                </div><a class="menu-item" href="/posts/" title="">文章</a><a class="menu-item" href="/page/archives/" title="Archives">Archives</a><a class="menu-item" href="/tags/" title="">标签</a><a class="menu-item" href="/page/search/" title="Search">Search</a><a class="menu-item" href="/categories/" title="">分类</a><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+            </a></div>
+    </div>
+</header><div class="search-dropdown desktop">
+        <div id="search-dropdown-desktop"></div>
+    </div>
+    <div class="search-dropdown mobile">
+        <div id="search-dropdown-mobile"></div>
+    </div><main class="main">
+                <div class="container"><div class="toc" id="toc-auto">
+            <h2 class="toc-title">Contents</h2>
+            <div class="toc-content" id="toc-content-auto"></div>
+        </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Spark错误容忍机制</h1><div class="post-meta">
+            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/spark/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Spark</a></span></div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-06-07">2025-06-07</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;2239 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;5 minutes&nbsp;</div>
+        </div><div class="details toc" id="toc-static"  data-kept="">
+                <div class="details-summary toc-title">
+                    <span>Contents</span>
+                    <span><i class="details-icon fas fa-angle-right" aria-hidden="true"></i></span>
+                </div>
+                <div class="details-content toc-content" id="toc-content-static"><nav id="TableOfContents"></nav></div>
+            </div><div class="content" id="content"><p>Spark的错误容忍机制的核心方法主要有两种：</p>
+<ol>
+<li>通过重新执行计算任务来容忍错误，当job抛出异常不能继续执行时，重新启动计算任务，再次执行</li>
+<li>通过采用checkpoint机制，对一些重要的输入、输出、中间数据进行持久化，这可以在一定程度上解决数据丢失问题，而且能够提高任务重新计算时的效率。</li>
+</ol>
+<p>Spark采用了延迟删除策略，将上游stage的Shuffle Write的结果写入本地磁盘，只有在当前job完成后，才删除Shuffle Writre写入磁盘的数据。这样，即使stage2中某个task执行失败，但由于上游的stage0和stage1的输出数据还在磁盘上，也可以再次通过Shuffle Read读取得到相同的数据，避免再次执行上游stage中的task，所以，Spark根据ShuffleDependency切分出的stage既保证了task的独立性，也方便了错误容忍的重新计算。</p>
+<p>Spark采用了lineage来统一对RDD的数据和计算依赖关系进行建模，使用回溯方法解决从哪里开始计算，以及计算什么的问题。</p>
+<p>为了提高重新计算的效率，也为了更好的解决数据丢失问题，Spark采用了检查点（checkpoint）机制。该机制的核心思想是将计算过程汇总某些重要数据进行持久化，这样在再次之心时可以从检查点执行，从而减少重新计算的开销。</p>
+<p>需要被checkpoint的RDD满足的特征是，RDD的数据依赖关系比较复杂且重新计算代价较高，如关联的数据过多，计算链过长，被多次重复使用。</p>
+<p>checkpoint的目的是对重要数据进行持久化，在节点宕机时也能够恢复，因此需要可靠存储，另外，checkpoint的数据量可能很大，因此需要较大的存储空间，所以一般使用分布式文件系统来存储，比如HDFS或者Alluxio。</p>
+<p>在Spark中，提供了spackContext.setCheckpointDir(directory)接口来设置checkpoint的存储路径，同时，提供了rdd.checkpoint来实现checkpoint。</p>
+<p>用户设置rdd.checkpoint后只标记某个RDD需要持久化，计算过程也像正常一样计算，等到当前job计算结束时再重新启动该job计算一遍，对其中需要checkpoint的RDD进行持久化。也就是说，当前job结束后会另外启动专门的job去完成checkpoint，需要checkpoint的RDD会被计算两次。显然，checkpoint启动额外job来进行持久化会增加计算开销，为了解决这个问题，Spark推荐用户将需要被checkpoint的数据先进行缓存，这样额外启动的任务只需要将缓存数据进行checkpoint即可。</p>
+<p>RDD需要经过Initialized -&gt; checkpointingInProgress -&gt; Checkpointed这三个阶段才能真正的被checkpoint</p>
+<ol>
+<li>Initialized 当应用程序使用rdd.checkpoint设定某个RDD需要被checkpoint是，Spark为该RDD添加一个checkpointData属性，用来管理该RDD相关的checkpoint信息</li>
+<li>CheckpointingInProgress 当前job结束后，会调用该job最后一个RDD的doCheckpoint方法，该方法根据finalRDD的computing chain回溯扫描，遇到需要被checkpoint的RDD就将其标记为CheckpointingInProgress。之后Spark会调用runJob再次提交一个job完成checkpoint</li>
+<li>Checkpointed 再次提交的job对RDD完成checkpoint后，spark会建立一个新的newRDD，类型为ReliableCheckpointRDD，用于表示被checkpoint到磁盘上的RDD，和原先的RDD关联，并且切断RDD的lineage，数据已经进行了持久化，不再需要lineage。</li>
+</ol>
+<p>当对某个RDD同时进行缓存和checkpoint时，会对其先进行缓存，然后再次启动job对其进行checkpoint。如果单纯是为了降低job lineage的复杂程度而不是为了持久化，Spark提供了localCheckpooint操作，功能上等价于数据缓存加上checkpoint切断lineage的功能。</p>
+<p><strong>checkpint和数据缓存的区别</strong></p>
+<ol>
+<li>目的不同，数据缓存的目的是加速计算，即加速后续运行的job。而checkpint的目的是在job运行失败后能够快速回复，也就是加速当前需要重新运行的job</li>
+<li>存储性质和位置不同。数据缓存是为了读写速度快，因此主要使用内存，偶尔使用磁盘作为存储空间。而checkpoint是为了能够可靠读写，因此主要使用分布式文件系统作为存储空间</li>
+<li>写入速度和规则不同。数据缓存速度较快，对job的执行时间影响较小，因此可以在job运行时进行缓存，而checkpoint写入速度慢，为了减少对当前job的时延影响，会额外启动专门的job进行持久化</li>
+<li>对lineage的影响不同，对某个RDD进行缓存后，对该RDD的lineage没有影响，这样如果缓存后的RDD丢失还可以重新计算得到，而对某个RDD进行checkpoint以后，会切断该RDD的lineage，因为该RDD已经被可靠存储，所以不需要再保留该RDD是如何计算得到的。</li>
+<li>应用场景不同。数据缓存适用于会被多次读取，占用空间不是非常大的RDD，而checkpoint适用于数据依赖关系比较复杂，重新计算代价较高的RDD，如关联的数据过多、计算链过长、被多次重复使用等。</li>
+</ol>
+</div><div class="post-footer" id="post-footer">
+    <div class="post-info">
+        <div class="post-info-line">
+            <div class="post-info-mod">
+                <span>Updated on 2025-06-07</span>
+            </div></div>
+        <div class="post-info-line">
+            <div class="post-info-md"><span>
+                            <a class="link-to-markdown" href="/posts/spark_fault_tolerance/index.md" target="_blank">Read Markdown</a>
+                        </span></div>
+            <div class="post-info-share">
+                <span><a href="javascript:void(0);" title="Share on X" data-sharer="x" data-url="http://example.org/posts/spark_fault_tolerance/" data-title="Spark错误容忍机制" data-hashtags="Spark"><i class="fab fa-x-twitter fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Threads" data-sharer="threads" data-url="http://example.org/posts/spark_fault_tolerance/" data-title="Spark错误容忍机制"><i class="fab fa-threads fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Facebook" data-sharer="facebook" data-url="http://example.org/posts/spark_fault_tolerance/" data-hashtag="Spark"><i class="fab fa-facebook-square fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Hacker News" data-sharer="hackernews" data-url="http://example.org/posts/spark_fault_tolerance/" data-title="Spark错误容忍机制"><i class="fab fa-hacker-news fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Line" data-sharer="line" data-url="http://example.org/posts/spark_fault_tolerance/" data-title="Spark错误容忍机制"><i data-svg-src="https://cdn.jsdelivr.net/npm/simple-icons@14.9.0/icons/line.svg" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on 微博" data-sharer="weibo" data-url="http://example.org/posts/spark_fault_tolerance/" data-title="Spark错误容忍机制"><i class="fab fa-weibo fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Diaspora" data-sharer="diaspora" data-url="http://example.org/posts/spark_fault_tolerance/" data-title="Spark错误容忍机制" data-description=""><i class="fab fa-diaspora fa-fw" aria-hidden="true"></i></a><a href="https://t.me/share/url?url=http%3a%2f%2fexample.org%2fposts%2fspark_fault_tolerance%2f&amp;text=Spark%e9%94%99%e8%af%af%e5%ae%b9%e5%bf%8d%e6%9c%ba%e5%88%b6" target="_blank" title="Share on Telegram"><i class="fab fa-telegram fa-fw" aria-hidden="true"></i></a></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="post-info-more">
+        <section class="post-tags"><i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/spark/">Spark</a></section>
+        <section>
+            <span><a href="javascript:void(0);" onclick="window.history.back();">Back</a></span>&nbsp;|&nbsp;<span><a href="/">Home</a></span>
+        </section>
+    </div>
+
+    <div class="post-nav"><a href="/posts/spark_data_cache/" class="prev" rel="prev" title="Spark数据缓存"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>Spark数据缓存</a></div>
+</div>
+<div id="comments"><div id="utterances" class="comment"></div><noscript>
+                Please enable JavaScript to view the comments powered by <a href="https://utteranc.es/">utterances</a>.
+            </noscript></div></article></div>
+            </main><footer class="footer">
+        <div class="footer-container"><div class="footer-line">Powered by <a href="https://gohugo.io/" target="_blank" rel="noopener noreffer" title="Hugo 0.140.2">Hugo</a> | Theme - <a href="https://github.com/dillonzq/LoveIt" target="_blank" rel="noopener noreffer" title="LoveIt 0.3.1-DEV"><i class="far fa-kiss-wink-heart fa-fw" aria-hidden="true"></i> LoveIt</a>
+                </div><div class="footer-line" itemscope itemtype="http://schema.org/CreativeWork"><i class="far fa-copyright fa-fw" aria-hidden="true"></i><span itemprop="copyrightYear">2022 - 2025</span><span class="author" itemprop="copyrightHolder">&nbsp;<a href="/" target="_blank">xxxx</a></span></div>
+        </div>
+    </footer></div>
+
+        <div id="fixed-buttons"><a href="#" id="back-to-top" class="fixed-button" title="Back to Top">
+                <i class="fas fa-arrow-up fa-fw" aria-hidden="true"></i>
+            </a>
+        </div>
+
+        <div id="fixed-buttons-hidden"><a href="#" id="view-comments" class="fixed-button" title="View Comments">
+                <i class="fas fa-comment fa-fw" aria-hidden="true"></i>
+            </a>
+        </div><script src="https://cdn.jsdelivr.net/npm/autocomplete.js@0.38.1/dist/autocomplete.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lunr@2.3.9/lunr.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lazysizes@5.3.2/lazysizes.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js"></script><script src="https://cdn.jsdelivr.net/npm/sharer.js@0.5.2/sharer.min.js"></script><script>window.config={"comment":{"utterances":{"darkTheme":"github-dark","issueTerm":"pathname","label":"","lightTheme":"github-light","repo":"ShadowUnderMoon/ShadowUnderMoon.github.io"}},"search":{"highlightTag":"em","lunrIndexURL":"/index.json","maxResultLength":10,"noResultsFound":"No results found","snippetLength":50,"type":"lunr"}};</script><script src="/js/theme.min.js"></script></body>
+</html>

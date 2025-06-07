@@ -22,7 +22,7 @@
 <meta name="apple-mobile-web-app-title" content="My cool site">
 <meta name="referrer" content="no-referrer" /><meta name="theme-color" content="#ffffff"><meta name="msapplication-TileColor" content="#da532c"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/shuffle/" /><link rel="prev" href="http://example.org/posts/java-concurrenthashmap/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/shuffle/" /><link rel="prev" href="http://example.org/posts/java-concurrenthashmap/" /><link rel="next" href="http://example.org/posts/spark_job_execution/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
         <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css"></noscript><link rel="preload" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
         <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css"></noscript><script type="application/ld+json">
     {
@@ -199,7 +199,7 @@
 <p>Spark中使用的是<a href="https://en.wikipedia.org/wiki/Quadratic_probing" target="_blank" rel="noopener noreffer ">二次探测法</a>，如果数组长度为2的幂次方，假定为m，则可以选择探测序列 h, h + 1, h + 3 , h+ 6，间隔分别为1， 2， 3&hellip;，从而保证m长度的探测序列一定是所有数组下标的一种排列，所以只要数组中有空间，一定可以将元素顺利插入。</p>
 <p>实现上和一般的HashMap差别不大，这里主要说一些不太一样的地方</p>
 <p>AppendOnlyMap支持Key为null，对Key为null的情况特殊处理，使用字段<code>hashNullValue</code>和<code>nullValue</code>记录Key为null的record。</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -228,7 +228,7 @@
 </span></span><span class="line"><span class="cl">  <span class="kc">null</span><span class="o">.</span><span class="n">asInstanceOf</span><span class="o">[</span><span class="kt">V</span><span class="o">]</span>
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
 <p><code>apply</code>方法用于获取指定Key对应的Value，对AppendOnlyMap进行原地排序后，原先的HashMap的性质已经丧失，使用<code>destoryed</code>字段表示这种情况，除了对Key为null的特殊处理外，通过二次探测法寻找对应记录。</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -265,7 +265,7 @@
 </span></span><span class="line"><span class="cl">  <span class="o">}</span>
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
 <p><code>update</code>更新操作也是通过二次探测法寻找对应位置并插入或者更新。</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -1195,7 +1195,8 @@
         </section>
     </div>
 
-    <div class="post-nav"><a href="/posts/java-concurrenthashmap/" class="prev" rel="prev" title="Java ConcurrentHashMap"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>Java ConcurrentHashMap</a></div>
+    <div class="post-nav"><a href="/posts/java-concurrenthashmap/" class="prev" rel="prev" title="Java ConcurrentHashMap"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>Java ConcurrentHashMap</a>
+            <a href="/posts/spark_job_execution/" class="next" rel="next" title="Spark Job执行流程">Spark Job执行流程<i class="fas fa-angle-right fa-fw" aria-hidden="true"></i></a></div>
 </div>
 <div id="comments"><div id="utterances" class="comment"></div><noscript>
                 Please enable JavaScript to view the comments powered by <a href="https://utteranc.es/">utterances</a>.

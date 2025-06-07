@@ -2,13 +2,16 @@
     xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
     xmlns:xhtml="http://www.w3.org/1999/xhtml"
     ><url>
-            <loc>http://example.org/categories/</loc><lastmod>2025-06-01T09:18:40&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/posts/</loc><lastmod>2025-06-01T09:18:40&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/tags/spark/</loc><lastmod>2025-06-01T09:18:40&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/categories/spark/</loc><lastmod>2025-06-01T09:18:40&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/categories/</loc><lastmod>2025-06-07T19:05:49&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/posts/</loc><lastmod>2025-06-07T19:05:49&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/tags/spark/</loc><lastmod>2025-06-07T19:05:49&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/categories/spark/</loc><lastmod>2025-06-07T19:05:49&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/posts/spark_fault_tolerance/</loc><lastmod>2025-06-07T19:05:49&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/tags/</loc><lastmod>2025-06-07T19:05:49&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/</loc><lastmod>2025-06-07T19:05:49&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/posts/spark_data_cache/</loc><lastmod>2025-06-07T16:14:21&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/posts/spark_job_execution/</loc><lastmod>2025-06-07T10:16:21&#43;08:00</lastmod></url><url>
             <loc>http://example.org/posts/shuffle/</loc><lastmod>2025-06-01T09:18:40&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/tags/</loc><lastmod>2025-06-01T09:18:40&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/</loc><lastmod>2025-06-01T09:18:40&#43;08:00</lastmod></url><url>
             <loc>http://example.org/posts/java-concurrenthashmap/</loc><lastmod>2025-05-28T16:46:29&#43;08:00</lastmod></url><url>
             <loc>http://example.org/posts/spark_physical_plan/</loc><lastmod>2025-05-25T11:16:21&#43;08:00</lastmod></url><url>
             <loc>http://example.org/tags/grpc/</loc><lastmod>2025-05-13T22:33:46&#43;08:00</lastmod></url><url>

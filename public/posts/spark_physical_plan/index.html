@@ -33,7 +33,7 @@
         "mainEntityOfPage": {
             "@type": "WebPage",
             "@id": "http:\/\/example.org\/posts\/spark_physical_plan\/"
-        },"genre": "posts","keywords": "Spark","wordcount":  12934 ,
+        },"genre": "posts","keywords": "Spark","wordcount":  12911 ,
         "url": "http:\/\/example.org\/posts\/spark_physical_plan\/","datePublished": "2025-05-25T11:16:21+08:00","dateModified": "2025-05-25T11:16:21+08:00","publisher": {
             "@type": "Organization",
             "name": ""},"author": {
@@ -107,7 +107,7 @@
             <div class="toc-content" id="toc-content-auto"></div>
         </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Spark物理执行计划</h1><div class="post-meta">
             <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/spark/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Spark</a></span></div>
-            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-25">2025-05-25</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;12934 words&nbsp;
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-05-25">2025-05-25</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;12911 words&nbsp;
                 <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;26 minutes&nbsp;</div>
         </div><div class="details toc" id="toc-static"  data-kept="">
                 <div class="details-summary toc-title">
@@ -130,7 +130,7 @@
     <li><a href="#生成物理执行计划的源码分析">生成物理执行计划的源码分析</a>
       <ul>
         <li><a href="#demo程序">demo程序</a></li>
-        <li><a href="#-runjob">### runJob</a></li>
+        <li><a href="#runjob">runJob</a></li>
         <li><a href="#createresultstage">createResultStage</a></li>
         <li><a href="#submitstage">submitStage</a></li>
         <li><a href="#getmissingparentstages">getMissingParentStages</a></li>
@@ -246,7 +246,7 @@
 <li>MapPartitionsRDD</li>
 <li>UnionRDD</li>
 </ul>
-<h3 id="-runjob">### runJob</h3>
+<h3 id="runjob">runJob</h3>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-scala">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
@@ -862,7 +862,7 @@
 </span></span><span class="line"><span class="cl">    <span class="o">}</span>
 </span></span><span class="line"><span class="cl">  <span class="o">}</span>
 </span></span><span class="line"><span class="cl"><span class="o">}</span></span></span></code></pre></div></div>
-<p><code>launchTasks</code>批量处理TaskDecription，首先序列化TaskDescription，如果序列化后的长度高于阈值，则放弃当前任务，否则，申请对应的cpu和其他各类资源，最终调用<code>executorEndpoint.send</code>发送RPC请求<code>LaunchTask</code>携带序列化后的TaskDescription。</p>
+<p><code>launchTasks</code>批量处理TaskDecription，首先序列化TaskDescription，如果序列化后的长度高于阈值，则放弃当前任务，否则，申请对应的cpu和其他各类资源，最终调用<code>executorEndpoint.send</code>发送RPC请求<code>LaunchTask</code>。</p>
 <p>这样任务就可以被executor接收，并且执行了。</p>
 <h3 id="getpreferredlocs">getPreferredLocs</h3>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
