@@ -1,0 +1,35 @@
+---
+title: "Spark Standalone"
+author: "爱吃芒果"
+description:
+date: "2025-06-08T22:02:52+08:00"
+image:
+math:
+license:
+hidden: false
+comments: true
+draft: false
+tags:
+categories:
+---
+
+Spark集群可以使用不同的方式进行部署，比如Standalone、Mesos, YARN和Kubernetes，这几个版本的主要区别在于：Standalone版本的资源管理和任务调度器由Spark系统本身提供，其他版本的资源管理和任务调度器依赖于第三方框架，如YARN可以同时管理Spark任务和Hadoop MapReduce任务。
+
+Spark采用Master-Worker结构，Master负责管理应用和任务，Worker节点负责执行任务。
+
+Master节点上常驻Master进程。该进程负责管理全部的Worker节点，如将Spark任务分配给Worker节点，收集Worker节点上任务的运行信息，监控Worker节点的存活状态等。
+
+Worker节点上常驻Worker进程，该进程除了与Master节点通信，还负责管理Spark任务的执行，如启动Executor来执行具体的Spark任务，监控任务运行状态等。
+
+Master节点接收到应用后首先会通知Worker节点启动Executor，然后分配Spark计算任务（task）到Executor上执行，Executor接收到task后，为每个task启动一个线程来执行。
+
+Spark application，即Spark应用，指的是一个可以运行的Spark程序，如WordCount.scala，该程序包含main函数，其数据处理流程一般先从数据源读取数据，再处理数据，最后输出结果。同时，应用程序也包含了一些配置参数，如需要占用的CPU个数，Executor内存大小等。
+
+Spark Driver，也就是Spark驱动程序，指实际在运行Spark应用中main函数的进程。
+
+Executor，也称为Spark执行器，是Spark计算资源的一个单位。Spark先以Executor为单位占用集群资源，然后可以将具体的计算任务分配给Executor执行。由于Spark是由Scala语言编写的，Executor在物理上是一个JVM进程，可以运行多个线程（计算任务）。在Standalone版本中，启动Executor实际上是启动了一个名叫**CoarseGrainedExecutorBackEnd**的JVM进程。之所以起这么长的名字，是为了不与其他版本中的Executor进程名冲突，如Mesos、YARN等版本会有不同的Executor进程名。Worker进程实际只负责启停和观察Executor的执行情况。
+
+Task，即Spark应用的计算任务，Driver在运行Spark应用的main函数是，会将应用拆分为多个计算任务，然后分配给多个Executor执行。task是Spark中最小的计算单位，不能再拆分。task以线程方式运行在Executor进程中，执行具体的计算任务，如map算子、reduce算子等。由于Executor可以配置多个CPU，而一个task一般使用一个CPU，因此当Executor具有多个CPU时，可以运行多个task。比如一个Worker节点有8个CPU，启动了2个Executor，每个Executor可以并行运行4个task。Executor的总内存大小由用户配置，而且Executor的内存空间由多个task共享。
+
+每个Worker进程上存在一个或者多个ExecutorRunner对象，每个ExecutorRunner对象管理一个Executor。Executor持有一个线程池，每个线程执行一个task。Worker进程通过持有的ExecutorRunner对象来控制CoarseGrainedExecutorBackend进程的启停。每个Spark应用启动一个Driver和多个Executor，每个Executor里面运行的task都属于同一个Spark应用。
+

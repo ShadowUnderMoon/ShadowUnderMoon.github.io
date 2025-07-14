@@ -33,6 +33,36 @@ categories:
 
 7. 内存上报是否持有对象引用
 
+## 静态内存管理模型
+
+Spark早期版本（Spark 1.6之前的版本）使用静态内存管理模型（StaticfMemoryManager）将内存空间划分为3个分区：
+
+1. 数据缓存空间（Storage Memory）：约占60%的内存空间，用于存储RDD缓存数据、广播数据、task的一些计算结果等
+2. 框架执行空间（Execution Memory）：约占20%的内存空间，用于存储Shuffle机制中的中间数据
+3. 用户代码空间（User Memory）：约占20%的内存空间，用于存储用户代码的中间计算结果、Spark框架自身产生的内部对象，以及Eexecutor JVM自身的一些内存对象等
+
+## 统一内存管理模型
+
+Executor JVM的整个内存空间划分为以下3个部分
+
+1. 系统保留内存（Reserved Memory) 系统保留内存使用较小的空间存储Spark框架产生的内部对象（如Spark Executor对象，TaskMemoryManager对象等Spark内部对象），系统保留内存大小通过spark.testing.ReservedMemory默认设置为300MB
+2. 用户代码空间（User Memory）用户代码空间被用于存储用户代码生成的对象，如map中用户自定义的数据结构，用户代码空间模拟热约为40%的内存空间
+3. 框架内存空间 （Frameworke Memory）框架缓存空间包括框架执行空间（Execution Memory）和数据缓存空间（Storage Memory）。总大小为spark.memory.fraction (default 0.6) * (heap - ReservedMemory)，约等于60%的内存空间。两者共享这个空间，其中一方空间不足时可以动态向另一方借用。具体地，当数据缓存空间不足时，可以向框架执行空间借用其空闲空间，后续当框架执行需要更多空间时，数据缓存空间需要归还借用的空间，这时候Spark可能将部分缓存数据移除内存来归还空间。同样，当框架执行空间不足时，可以向数据缓存空间借用空间，但至少要保证数据缓存空间具有约50%左右（spark.memory.storageFraction (default 0.5) * Framework memory) 的空间。在框架执行时借走的空间不会归还给数据缓存空间，愿意是难以代码实现。
+
+如果用户定义了堆外内存，其大小通过spark.memory.offHeap.size设置，那么Spark仍然会按照堆内内存使用的spark.memory.storageFraction将堆外内存分为框架执行空间和数据缓存空间，而且堆外内存的管理方式和功能与堆外内存的Framework Memory一样。在运行应用时，Spark会根据应用的Shuffle方式及用户设定的数据缓存级别来决定使用堆外内存还是堆外内存。如SerializedShuffle方法可以利用堆外内存来进行Shuffle Write，用户使用rdd.persist(OFF_HEAP)可以将rdd存储到堆外内存。
+
+由于Executor中存在多个task，因此框架执行空间实际上是由多个task（ShuffleMapTask或ResultTask）共享的。在运行过程中，Executor中活跃的task数目在[0, #ExecutorCores]内变化，#ExecutorCores表示为每个Executor分配的cpu个数。为了公平性，每个task可使用的内存空间被均分，也就是空间大小被控制在[1/2N, 1/N] * ExecutorMemory内，N是当前活跃的task数目。假设一个Executor中最初有4个活跃的task，且只使用堆内内存，那么每个task最多可以占用1/4的On-heap Execution Memory，当其中2个task完成而又新加入4个task后，活跃task变为6个，那么后加入的每个task最多使用1/6的On-heap Execution Memory，这个策略也适用于堆外内存的Execution Memory。
+
+这里重点介绍Shuffle机制中的Serialized Shuffle，Serialized Shuffle用来不需要map端聚合、不需要按照Key进行排序，且分区个数较大的情形，将record对象序列化后存放到可分页存储的数组中，序列化可以减少存储开销，分页可以利用不连续的空间。首先将新来的<K, V> record序列化写入一个1MB的缓冲区（serBuffer），然后将serBuffer中序列化的record放到ShuffleExternalSorter的Page中进行排序。插入和排序的方法是，首先分配一个LongArray来保存record的指针，指针为64位，前24位存储record的partitionId，中间13为存储record所在的Page Num，后27位存储record在该Page中的偏移量。也就是说LongArray最多可以管理1TB的内存，随着record不断地插入Page中，如果LongArray不够用或Page不够用，则会通过allocatePage向TaskMemoryManager申请，如果申请不到，就启动spill程序，将中间结果spill到磁盘上，最后再由UnsafeShuffleWriter进行统一的merge。Page由TaskMemoryManager管理和分配，可以存放在堆内内存或者堆外内存。
+
+数据缓存空间主要用于存放3种数据：RDD缓存数据（RDD partition）、广播数据（Broadcast data），以及task的计算结果（TaskResult）。
+
+Broadcast默认使用类似BT下载的TorrentBroadcast方式，需要广播的数据一般预先存储在Driver端，Spark在Driver端将要广播的数据划分大小为spark.Broadcast.blockSize = 4MB的数据块（block），然后赋予每个数据块一个blockId为BroadcastblockId(id, "piece" + i) ，id表示block的编号，piece表示被划分后的第几个block。之后使用类似BT的方式将每个block广播到每个Executor中，Executor接收到每个block数据块后，将其放到堆内的数据缓存空间的ChunkedByteBuffer里面，缓存模式为MEMORY_AND_DISK_SER，因此，这里的ChunkedByteBuffer构造与MEMORY_ONLY_SER模式中的一样，都是用不连续的空间来存储序列化数据。
+
+许多应用需要在Driver端收集task的计算结果并进行处理，如调用了rdd.collect的应用，当task的输出结果大小超过spark.task.maxDirectResultSize = 1MB且小于1GB使，需要先将每个task的输出结果缓存到执行该task的Executor中，存放模式是MEMORY_AND_DISK_SER，然后Executor将task的输出结果发送到Driver端进一步处理。
+
+目前，针对RDD操作，Spark只提供了Serialized Shuffle Writer方式，没有提供Serialized Shuffle Read方式，实际上， 在SparkSQL项目中，Spark利用SQL操作的特点（如SUM、AVG计算结果的等宽性），提供了更多的Serialized Shuffle方式，直接在序列化的数据上实现聚合等计算，详情可以参考UnsafeFixedAggregationMap、ObjectAggregationMap等数据结构的实现。
+
 
 
 ## 源码分析
