@@ -1,17 +1,5 @@
----
-title: "Trino Practice"
-author: "爱吃芒果"
-description:
-date: "2025-07-09T22:27:56+08:00"
-image:
-math:
-license:
-hidden: false
-comments: true
-draft: false
-tags:
-categories:
----
+# Trino Practice
+
 
 
 
@@ -1644,4 +1632,5 @@ transform函数会使用Pattern进行匹配，如果规则被成功应用，那�
 - HashGenerationOptimizer：为需要分区的执行计划节点根据分区用到的列提前计算好哈希值，减少重复计算
 - PredicatePushDown：自顶向下把过滤谓词尽量下推，使其靠近数据源读取的算子，此外动态过滤（dynamic filtering）特性也被当做一种下推操作在这个优化器中实现
 - UnaliasSymbolReference：将多余的投影映射简化，因为初始逻辑执行计划和优化器都会引入一些类似col_a as col_b的投影变换，这些变换可能是多余的，优化后整个逻辑执行计划看起来更易懂、清晰。
+
 

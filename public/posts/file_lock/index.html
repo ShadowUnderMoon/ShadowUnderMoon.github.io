@@ -1,25 +1,122 @@
-<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
-    <channel>
-        <title>爱吃芒果</title>
-        <link>http://example.org/</link>
-        <description>This is my cool site</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Wed, 09 Jul 2025 22:27:56 &#43;0800</lastBuildDate>
-            <atom:link href="http://example.org/index.xml" rel="self" type="application/rss+xml" />
-        <item>
-    <title>Trino Practice</title>
-    <link>http://example.org/posts/trino-practice/</link>
-    <pubDate>Wed, 09 Jul 2025 22:27:56 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/trino-practice/</guid>
-    <description><![CDATA[<p>直接从maven仓库下载对应版本的<code>presto-cli</code>作为客户端，记得下载<code>presto-cli-350-executable.jar</code>版本，否则可能不能直接运行</p>]]></description>
-</item>
-<item>
-    <title>文件锁</title>
-    <link>http://example.org/posts/file_lock/</link>
-    <pubDate>Tue, 24 Jun 2025 21:39:19 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/file_lock/</guid>
-    <description><![CDATA[<p>在ehcache3中看到ehcache3通过文件锁来保证对目录的唯一拥有</p>
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noodp" />
+        <title>文件锁 - 爱吃芒果</title><meta name="Description" content="This is my cool site"><meta property="og:url" content="http://example.org/posts/file_lock/">
+  <meta property="og:site_name" content="爱吃芒果">
+  <meta property="og:title" content="文件锁">
+  <meta property="og:description" content="在ehcache3中看到ehcache3通过文件锁来保证对目录的唯一拥有
+public class DefaultLocalPersistenceService implements LocalPersistenceService { private static final Logger LOGGER = LoggerFactory.getLogger(DefaultLocalPersistenceService.class); private final File rootDirectory; private final File lockFile; private FileLock lock; private RandomAccessFile rw; private boolean started; /** * Creates a new service instance using the provided configuration. * * @param persistenceConfiguration the configuration to use */ public DefaultLocalPersistenceService(final DefaultPersistenceConfiguration persistenceConfiguration) { if(persistenceConfiguration != null) { rootDirectory = persistenceConfiguration.getRootDirectory(); } else { throw new NullPointerException(&#34;DefaultPersistenceConfiguration cannot be null&#34;); } lockFile = new File(rootDirectory, &#34;.lock&#34;); } private void internalStart() { if (!started) { createLocationIfRequiredAndVerify(rootDirectory); try { rw = new RandomAccessFile(lockFile, &#34;rw&#34;); } catch (FileNotFoundException e) { // should not happen normally since we checked that everything is fine right above throw new RuntimeException(e); } try { lock = rw.getChannel().tryLock(); } catch (OverlappingFileLockException e) { throw new RuntimeException(&#34;Persistence directory already locked by this process: &#34; &#43; rootDirectory.getAbsolutePath(), e); } catch (Exception e) { try { rw.close(); } catch (IOException e1) { // ignore silently } throw new RuntimeException(&#34;Persistence directory couldn&#39;t be locked: &#34; &#43; rootDirectory.getAbsolutePath(), e); } if (lock == null) { throw new RuntimeException(&#34;Persistence directory already locked by another process: &#34; &#43; rootDirectory.getAbsolutePath()); } started = true; LOGGER.debug(&#34;RootDirectory Locked&#34;); } } /** * {@inheritDoc} */ @Override public synchronized void stop() { if (started) { try { lock.release(); // Closing RandomAccessFile so that files gets deleted on windows and // org.ehcache.internal.persistence.DefaultLocalPersistenceServiceTest.testLocksDirectoryAndUnlocks() // passes on windows rw.close(); try { Files.delete(lockFile.toPath()); } catch (IOException e) { LOGGER.debug(&#34;Lock file was not deleted {}.&#34;, lockFile.getPath()); } } catch (IOException e) { throw new RuntimeException(&#34;Couldn&#39;t unlock rootDir: &#34; &#43; rootDirectory.getAbsolutePath(), e); } started = false; LOGGER.debug(&#34;RootDirectory Unlocked&#34;); } }">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-06-24T21:39:19+08:00">
+    <meta property="article:modified_time" content="2025-06-24T21:39:19+08:00">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="文件锁">
+  <meta name="twitter:description" content="在ehcache3中看到ehcache3通过文件锁来保证对目录的唯一拥有
+public class DefaultLocalPersistenceService implements LocalPersistenceService { private static final Logger LOGGER = LoggerFactory.getLogger(DefaultLocalPersistenceService.class); private final File rootDirectory; private final File lockFile; private FileLock lock; private RandomAccessFile rw; private boolean started; /** * Creates a new service instance using the provided configuration. * * @param persistenceConfiguration the configuration to use */ public DefaultLocalPersistenceService(final DefaultPersistenceConfiguration persistenceConfiguration) { if(persistenceConfiguration != null) { rootDirectory = persistenceConfiguration.getRootDirectory(); } else { throw new NullPointerException(&#34;DefaultPersistenceConfiguration cannot be null&#34;); } lockFile = new File(rootDirectory, &#34;.lock&#34;); } private void internalStart() { if (!started) { createLocationIfRequiredAndVerify(rootDirectory); try { rw = new RandomAccessFile(lockFile, &#34;rw&#34;); } catch (FileNotFoundException e) { // should not happen normally since we checked that everything is fine right above throw new RuntimeException(e); } try { lock = rw.getChannel().tryLock(); } catch (OverlappingFileLockException e) { throw new RuntimeException(&#34;Persistence directory already locked by this process: &#34; &#43; rootDirectory.getAbsolutePath(), e); } catch (Exception e) { try { rw.close(); } catch (IOException e1) { // ignore silently } throw new RuntimeException(&#34;Persistence directory couldn&#39;t be locked: &#34; &#43; rootDirectory.getAbsolutePath(), e); } if (lock == null) { throw new RuntimeException(&#34;Persistence directory already locked by another process: &#34; &#43; rootDirectory.getAbsolutePath()); } started = true; LOGGER.debug(&#34;RootDirectory Locked&#34;); } } /** * {@inheritDoc} */ @Override public synchronized void stop() { if (started) { try { lock.release(); // Closing RandomAccessFile so that files gets deleted on windows and // org.ehcache.internal.persistence.DefaultLocalPersistenceServiceTest.testLocksDirectoryAndUnlocks() // passes on windows rw.close(); try { Files.delete(lockFile.toPath()); } catch (IOException e) { LOGGER.debug(&#34;Lock file was not deleted {}.&#34;, lockFile.getPath()); } } catch (IOException e) { throw new RuntimeException(&#34;Couldn&#39;t unlock rootDir: &#34; &#43; rootDirectory.getAbsolutePath(), e); } started = false; LOGGER.debug(&#34;RootDirectory Unlocked&#34;); } }">
+<meta name="application-name" content="My cool site">
+<meta name="apple-mobile-web-app-title" content="My cool site">
+<meta name="referrer" content="no-referrer" /><meta name="theme-color" content="#ffffff"><meta name="msapplication-TileColor" content="#da532c"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/file_lock/" /><link rel="prev" href="http://example.org/posts/size_of_engine/" /><link rel="next" href="http://example.org/posts/trino-practice/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css"></noscript><link rel="preload" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css"></noscript><script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "headline": "文件锁",
+        "inLanguage": "zh-CN",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "http:\/\/example.org\/posts\/file_lock\/"
+        },"genre": "posts","wordcount":  301 ,
+        "url": "http:\/\/example.org\/posts\/file_lock\/","datePublished": "2025-06-24T21:39:19+08:00","dateModified": "2025-06-24T21:39:19+08:00","publisher": {
+            "@type": "Organization",
+            "name": ""},"author": {
+                "@type": "Person",
+                "name": "爱吃芒果"
+            },"description": ""
+    }
+    </script></head>
+    <body data-header-desktop="fixed" data-header-mobile="auto"><script>(window.localStorage && localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : ('auto' === 'auto' ? window.matchMedia('(prefers-color-scheme: dark)').matches : 'auto' === 'dark')) && document.body.setAttribute('theme', 'dark');</script>
+
+        <div id="mask"></div><div class="wrapper"><header class="desktop" id="header-desktop">
+    <div class="header-wrapper">
+        <div class="header-title">
+            <a href="/" title="爱吃芒果">My cool site</a>
+        </div>
+        <div class="menu">
+            <div class="menu-inner"><a class="menu-item" href="/posts/"> 文章 </a><a class="menu-item" href="/page/archives/" title="Archives"> Archives </a><a class="menu-item" href="/tags/"> 标签 </a><a class="menu-item" href="/page/search/" title="Search"> Search </a><a class="menu-item" href="/categories/"> 分类 </a><span class="menu-item delimiter"></span><span class="menu-item search" id="search-desktop">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-desktop">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-desktop" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-desktop" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-desktop">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </span><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                    <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+                </a></div>
+        </div>
+    </div>
+</header><header class="mobile" id="header-mobile">
+    <div class="header-container">
+        <div class="header-wrapper">
+            <div class="header-title">
+                <a href="/" title="爱吃芒果">My cool site</a>
+            </div>
+            <div class="menu-toggle" id="menu-toggle-mobile">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div class="menu" id="menu-mobile"><div class="search-wrapper">
+                    <div class="search mobile" id="search-mobile">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-mobile">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-mobile" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-mobile" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-mobile">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </div>
+                    <a href="javascript:void(0);" class="search-cancel" id="search-cancel-mobile">
+                        Cancel
+                    </a>
+                </div><a class="menu-item" href="/posts/" title="">文章</a><a class="menu-item" href="/page/archives/" title="Archives">Archives</a><a class="menu-item" href="/tags/" title="">标签</a><a class="menu-item" href="/page/search/" title="Search">Search</a><a class="menu-item" href="/categories/" title="">分类</a><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+            </a></div>
+    </div>
+</header><div class="search-dropdown desktop">
+        <div id="search-dropdown-desktop"></div>
+    </div>
+    <div class="search-dropdown mobile">
+        <div id="search-dropdown-mobile"></div>
+    </div><main class="main">
+                <div class="container"><div class="toc" id="toc-auto">
+            <h2 class="toc-title">Contents</h2>
+            <div class="toc-content" id="toc-content-auto"></div>
+        </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">文件锁</h1><div class="post-meta">
+            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span></div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-06-24">2025-06-24</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;301 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;One minute&nbsp;</div>
+        </div><div class="details toc" id="toc-static"  data-kept="">
+                <div class="details-summary toc-title">
+                    <span>Contents</span>
+                    <span><i class="details-icon fas fa-angle-right" aria-hidden="true"></i></span>
+                </div>
+                <div class="details-content toc-content" id="toc-content-static"><nav id="TableOfContents"></nav></div>
+            </div><div class="content" id="content"><p>在ehcache3中看到ehcache3通过文件锁来保证对目录的唯一拥有</p>
 <div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
@@ -103,98 +200,49 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="n">started</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="n">LOGGER</span><span class="p">.</span><span class="na">debug</span><span class="p">(</span><span class="s">&#34;RootDirectory Unlocked&#34;</span><span class="p">);</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="p">}</span></span></span></code></pre></div></div>]]></description>
-</item>
-<item>
-    <title>java Size Of Engine</title>
-    <link>http://example.org/posts/size_of_engine/</link>
-    <pubDate>Sun, 22 Jun 2025 20:20:36 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/size_of_engine/</guid>
-    <description><![CDATA[<p>ehcache3提供了限制缓存容量的选择，如果堆上存储的容量超过了指定的大小，则会驱逐缓存中的元素，直到有空间可以容纳为止。</p>
-<p>自己实现的sizeOfEngine应该实现ehcache3提供的引擎接口。</p>]]></description>
-</item>
-<item>
-    <title>缓存实践</title>
-    <link>http://example.org/posts/cache-in-practice/</link>
-    <pubDate>Sat, 21 Jun 2025 14:01:54 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/cache-in-practice/</guid>
-    <description><![CDATA[<p>提醒；</p>
-<p>本文是对<a href="https://juejin.cn/column/7140852038258147358" target="_blank" rel="noopener noreffer ">深入理解缓存原理与实战设计</a>的学习</p>]]></description>
-</item>
-<item>
-    <title>Spark Standalone</title>
-    <link>http://example.org/posts/spark_standalone/</link>
-    <pubDate>Sun, 08 Jun 2025 22:02:52 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/spark_standalone/</guid>
-    <description><![CDATA[<p>Spark集群可以使用不同的方式进行部署，比如Standalone、Mesos, YARN和Kubernetes，这几个版本的主要区别在于：Standalone版本的资源管理和任务调度器由Spark系统本身提供，其他版本的资源管理和任务调度器依赖于第三方框架，如YARN可以同时管理Spark任务和Hadoop MapReduce任务。</p>]]></description>
-</item>
-<item>
-    <title>Ehcache3</title>
-    <link>http://example.org/posts/ehcache3/</link>
-    <pubDate>Sat, 07 Jun 2025 22:40:41 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/ehcache3/</guid>
-    <description><![CDATA[]]></description>
-</item>
-<item>
-    <title>Spark错误容忍机制</title>
-    <link>http://example.org/posts/spark_fault_tolerance/</link>
-    <pubDate>Sat, 07 Jun 2025 19:05:49 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/spark_fault_tolerance/</guid>
-    <description><![CDATA[<p>Spark的错误容忍机制的核心方法主要有两种：</p>
-<ol>
-<li>通过重新执行计算任务来容忍错误，当job抛出异常不能继续执行时，重新启动计算任务，再次执行</li>
-<li>通过采用checkpoint机制，对一些重要的输入、输出、中间数据进行持久化，这可以在一定程度上解决数据丢失问题，而且能够提高任务重新计算时的效率。</li>
-</ol>
-<p>Spark采用了延迟删除策略，将上游stage的Shuffle Write的结果写入本地磁盘，只有在当前job完成后，才删除Shuffle Writre写入磁盘的数据。这样，即使stage2中某个task执行失败，但由于上游的stage0和stage1的输出数据还在磁盘上，也可以再次通过Shuffle Read读取得到相同的数据，避免再次执行上游stage中的task，所以，Spark根据ShuffleDependency切分出的stage既保证了task的独立性，也方便了错误容忍的重新计算。</p>]]></description>
-</item>
-<item>
-    <title>Spark数据缓存</title>
-    <link>http://example.org/posts/spark_data_cache/</link>
-    <pubDate>Sat, 07 Jun 2025 16:14:21 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/spark_data_cache/</guid>
-    <description><![CDATA[<p>缓存机制实际上是一种空间换时间的方法，集体的，如果数据满足一下3条，就可以进行缓存.</p>
-<ol>
-<li>会被重复使用的数据。更确切地，会被多个job共享使用的数据。被共享使用的次数越多，那么缓存该数据的性价比越高。一般来说，对于迭代型和交互型应用非常适合。</li>
-<li>数据不宜过大。过大会占用大量的存储空间，导致内存不足，也会降低数据计算时可使用的空间。虽然缓存数据过大时也可以存放到磁盘，但磁盘的I/O代价比较高，有时甚至不如重新计算块。</li>
-<li>非重复缓存的数据。重复缓存的意思是如果缓存了某个RDD，那么该RDD通过OneToOneDependency连接的parent RDD就不需要被缓存了，除非有job不使用缓存的RDD，而直接使用parent RDD。</li>
-</ol>
-<p>包含数据缓存操作的应用执行流程生成的规则：Spark首先假设应用没有数据缓存，正常生成逻辑处理流程（RDD之间的数据依赖关系），然后从第2个job开始，将cached RDD 之前的RDD都去掉，得到削减后的逻辑处理流程。最后，将逻辑处理流程转化为物理执行计划。</p>]]></description>
-</item>
-<item>
-    <title>Spark Job执行流程</title>
-    <link>http://example.org/posts/spark_job_execution/</link>
-    <pubDate>Sat, 07 Jun 2025 10:16:21 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/spark_job_execution/</guid>
-    <description><![CDATA[<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-java">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="c1">// CoarseGrainedExecutorBackend</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">case</span><span class="w"> </span><span class="n">LaunchTask</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">executor</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">exitExecutor</span><span class="p">(</span><span class="n">1</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;Received LaunchTask command but executor was null&#34;</span><span class="p">)</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">val</span><span class="w"> </span><span class="n">taskDesc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TaskDescription</span><span class="p">.</span><span class="na">decode</span><span class="p">(</span><span class="n">data</span><span class="p">.</span><span class="na">value</span><span class="p">)</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">logInfo</span><span class="p">(</span><span class="n">log</span><span class="s">&#34;Got assigned task ${MDC(LogKeys.TASK_ID, taskDesc.taskId)}&#34;</span><span class="p">)</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">executor</span><span class="p">.</span><span class="na">launchTask</span><span class="p">(</span><span class="k">this</span><span class="p">,</span><span class="w"> </span><span class="n">taskDesc</span><span class="p">)</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="p">}</span></span></span></code></pre></div></div>
-<p>接收到Drive端传来的task，反序列化后，启动task</p>]]></description>
-</item>
-<item>
-    <title>Spark Shuffle机制</title>
-    <link>http://example.org/posts/spark_shuffle/</link>
-    <pubDate>Sun, 01 Jun 2025 09:18:40 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/spark_shuffle/</guid>
-    <description><![CDATA[<p>运行在不同stage、不同节点上的task见通过shuffle机制传递数据，shuffle解决的问题是如何将数据进行重新组织，使其能够在上游和下游task之间进行传递和计算。如果只是单纯的数据传递，则只需要将数据进行分区、通过网络传输即可，没有太大的难度，但shuffle机制还需要进行各种类型的计算（如聚合、排序），而且数据量一般会很大，如果支持这些不同类型的计算，如果提高shuffle的性能都是shuffle机制设计的难点。</p>]]></description>
-</item>
-</channel>
-</rss>
+</div><div class="post-footer" id="post-footer">
+    <div class="post-info">
+        <div class="post-info-line">
+            <div class="post-info-mod">
+                <span>Updated on 2025-06-24</span>
+            </div></div>
+        <div class="post-info-line">
+            <div class="post-info-md"><span>
+                            <a class="link-to-markdown" href="/posts/file_lock/index.md" target="_blank">Read Markdown</a>
+                        </span></div>
+            <div class="post-info-share">
+                <span><a href="javascript:void(0);" title="Share on X" data-sharer="x" data-url="http://example.org/posts/file_lock/" data-title="文件锁"><i class="fab fa-x-twitter fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Threads" data-sharer="threads" data-url="http://example.org/posts/file_lock/" data-title="文件锁"><i class="fab fa-threads fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Facebook" data-sharer="facebook" data-url="http://example.org/posts/file_lock/"><i class="fab fa-facebook-square fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Hacker News" data-sharer="hackernews" data-url="http://example.org/posts/file_lock/" data-title="文件锁"><i class="fab fa-hacker-news fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Line" data-sharer="line" data-url="http://example.org/posts/file_lock/" data-title="文件锁"><i data-svg-src="https://cdn.jsdelivr.net/npm/simple-icons@14.9.0/icons/line.svg" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on 微博" data-sharer="weibo" data-url="http://example.org/posts/file_lock/" data-title="文件锁"><i class="fab fa-weibo fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Diaspora" data-sharer="diaspora" data-url="http://example.org/posts/file_lock/" data-title="文件锁" data-description=""><i class="fab fa-diaspora fa-fw" aria-hidden="true"></i></a><a href="https://t.me/share/url?url=http%3a%2f%2fexample.org%2fposts%2ffile_lock%2f&amp;text=%e6%96%87%e4%bb%b6%e9%94%81" target="_blank" title="Share on Telegram"><i class="fab fa-telegram fa-fw" aria-hidden="true"></i></a></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="post-info-more">
+        <section class="post-tags"></section>
+        <section>
+            <span><a href="javascript:void(0);" onclick="window.history.back();">Back</a></span>&nbsp;|&nbsp;<span><a href="/">Home</a></span>
+        </section>
+    </div>
+
+    <div class="post-nav"><a href="/posts/size_of_engine/" class="prev" rel="prev" title="java Size Of Engine"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>java Size Of Engine</a>
+            <a href="/posts/trino-practice/" class="next" rel="next" title="Trino Practice">Trino Practice<i class="fas fa-angle-right fa-fw" aria-hidden="true"></i></a></div>
+</div>
+<div id="comments"><div id="utterances" class="comment"></div><noscript>
+                Please enable JavaScript to view the comments powered by <a href="https://utteranc.es/">utterances</a>.
+            </noscript></div></article></div>
+            </main><footer class="footer">
+        <div class="footer-container"><div class="footer-line">Powered by <a href="https://gohugo.io/" target="_blank" rel="noopener noreffer" title="Hugo 0.140.2">Hugo</a> | Theme - <a href="https://github.com/dillonzq/LoveIt" target="_blank" rel="noopener noreffer" title="LoveIt 0.3.1-DEV"><i class="far fa-kiss-wink-heart fa-fw" aria-hidden="true"></i> LoveIt</a>
+                </div><div class="footer-line" itemscope itemtype="http://schema.org/CreativeWork"><i class="far fa-copyright fa-fw" aria-hidden="true"></i><span itemprop="copyrightYear">2022 - 2025</span><span class="author" itemprop="copyrightHolder">&nbsp;<a href="/" target="_blank">xxxx</a></span></div>
+        </div>
+    </footer></div>
+
+        <div id="fixed-buttons"><a href="#" id="back-to-top" class="fixed-button" title="Back to Top">
+                <i class="fas fa-arrow-up fa-fw" aria-hidden="true"></i>
+            </a>
+        </div>
+
+        <div id="fixed-buttons-hidden"><a href="#" id="view-comments" class="fixed-button" title="View Comments">
+                <i class="fas fa-comment fa-fw" aria-hidden="true"></i>
+            </a>
+        </div><script src="https://cdn.jsdelivr.net/npm/autocomplete.js@0.38.1/dist/autocomplete.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lunr@2.3.9/lunr.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lazysizes@5.3.2/lazysizes.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js"></script><script src="https://cdn.jsdelivr.net/npm/sharer.js@0.5.2/sharer.min.js"></script><script>window.config={"comment":{"utterances":{"darkTheme":"github-dark","issueTerm":"pathname","label":"","lightTheme":"github-light","repo":"ShadowUnderMoon/ShadowUnderMoon.github.io"}},"search":{"highlightTag":"em","lunrIndexURL":"/index.json","maxResultLength":10,"noResultsFound":"No results found","snippetLength":50,"type":"lunr"}};</script><script src="/js/theme.min.js"></script></body>
+</html>

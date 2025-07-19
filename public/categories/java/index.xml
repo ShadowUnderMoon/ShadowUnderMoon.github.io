@@ -3,7 +3,16 @@
         <title>Java - Category - 爱吃芒果</title>
         <link>http://example.org/categories/java/</link>
         <description>Java - Category - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</lastBuildDate><atom:link href="http://example.org/categories/java/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 22 Jun 2025 20:20:36 &#43;0800</lastBuildDate><atom:link href="http://example.org/categories/java/" rel="self" type="application/rss+xml" /><item>
+    <title>java Size Of Engine</title>
+    <link>http://example.org/posts/size_of_engine/</link>
+    <pubDate>Sun, 22 Jun 2025 20:20:36 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://example.org/posts/size_of_engine/</guid>
+    <description><![CDATA[<p>ehcache3提供了限制缓存容量的选择，如果堆上存储的容量超过了指定的大小，则会驱逐缓存中的元素，直到有空间可以容纳为止。</p>
+<p>自己实现的sizeOfEngine应该实现ehcache3提供的引擎接口。</p>]]></description>
+</item>
+<item>
     <title>Java线程池源码分析</title>
     <link>http://example.org/posts/java_thread_pool/</link>
     <pubDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</pubDate>

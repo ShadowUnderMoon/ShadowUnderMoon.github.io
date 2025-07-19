@@ -40,10 +40,10 @@
 </item>
 <item>
     <title>Spark Shuffle机制</title>
-    <link>http://example.org/posts/shuffle/</link>
+    <link>http://example.org/posts/spark_shuffle/</link>
     <pubDate>Sun, 01 Jun 2025 09:18:40 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://example.org/posts/shuffle/</guid>
+    <guid>http://example.org/posts/spark_shuffle/</guid>
     <description><![CDATA[<p>运行在不同stage、不同节点上的task见通过shuffle机制传递数据，shuffle解决的问题是如何将数据进行重新组织，使其能够在上游和下游task之间进行传递和计算。如果只是单纯的数据传递，则只需要将数据进行分区、通过网络传输即可，没有太大的难度，但shuffle机制还需要进行各种类型的计算（如聚合、排序），而且数据量一般会很大，如果支持这些不同类型的计算，如果提高shuffle的性能都是shuffle机制设计的难点。</p>]]></description>
 </item>
 <item>
