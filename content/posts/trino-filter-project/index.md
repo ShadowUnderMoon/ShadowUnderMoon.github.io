@@ -32,3 +32,10 @@ graph TD
 ```
 
 TableScan节点：负责从
+
+{{< mermaid >}}
+
+graph TD
+    Output --> TableScan
+
+{{< /mermaid >}}

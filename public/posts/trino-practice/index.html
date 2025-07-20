@@ -398,7 +398,7 @@
 <h3 id="词法与语法分析并生成抽象语法树">词法与语法分析并生成抽象语法树</h3>
 <p>SqlParser使用Antlr4作为解析工具，通过词法和语法解析通过SQL字符串生成抽象语法树。抽象语法树是用一种树形结构表示SQL想要表述的语义，将一段SQL字符串结构化，以支持SQL执行引擎根据抽象语法树生成SQL执行计划。在Presto中，Node表示树的节点的抽象，根据语义不同，SQL抽象语法树中有多种不同类型的节点，都继承了Node节点。</p>
 <p>抽象语法树在我看来只是将字符串转成结构更加严谨的树状结构，和sql的文本表述类似，除了将文本转成树状结构外，没有做额外的操作，比如FunctionCall并没有真的生成调用的函数，而只是描述。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -417,7 +417,7 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">Expression</span><span class="o">&gt;</span><span class="w"> </span><span class="n">arguments</span><span class="p">;</span></span></span></code></pre></div></div>
 <h3 id="创建并提交queryexecution">创建并提交QueryExecution</h3>
 <p><code>dispatchQueryFactory.createDispatchQuery</code>方法在执行中，会根据Statement的类型生成QueryExecution，对于DML操作(Data Manipulatioin language)生成SqlQueryExecution，对于DDL (Data Definition language)生成DataDefinitionExecution，然后进一步包装成LocalDispatchQuery，提交到resourceGroupManager等待运行。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -458,7 +458,7 @@
 </span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
 <h2 id="执行计划的生成和优化">执行计划的生成和优化</h2>
 <h3 id="语义分析生成执行计划">语义分析、生成执行计划</h3>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -499,7 +499,7 @@
 <li>生成执行计划：生成以PlanNode为节点的逻辑执行计划，它也是类似于抽象语法树的树型结构，树节点和根的类型都是PlanNode。</li>
 <li>优化执行计划，生成优化后的执行计划：用预定义的几百个优化器迭代优化之前生成的PlanNode树，并返回优化后的PlanNode树</li>
 </ul>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
