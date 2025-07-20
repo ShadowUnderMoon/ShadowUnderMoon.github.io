@@ -13,6 +13,8 @@ tags:
     - "Presto"
 categories:
     - "Presto"
+math:
+  enable: true
 ---
 
 ## 简单拉取数据查询的实现原理
@@ -96,3 +98,4 @@ stage1：从数据源连接器拉取数据，stage1的输出数据会放到Outpu
 stage0：从上游stage1拉取数据，输出结果给到集群协调节点，stage0输出的数据会放到OutputBuffer中，等待集群协调节点来取
 
 ### 分布式调度与执行的设计实现
+

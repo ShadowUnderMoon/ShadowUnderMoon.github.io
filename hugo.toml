@@ -190,9 +190,6 @@ hasCJKLanguage = true
   taxonomy = ["HTML", "RSS"]
 
 
-[caches]
-  [caches.images]
-    dir = ':cacheDir/images'
 
 [params.page.comment]
   enable = true
@@ -209,3 +206,4 @@ hasCJKLanguage = true
 [params.page.code.render]
   goat = true
   mermaid = true
+

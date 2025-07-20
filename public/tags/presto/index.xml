@@ -21,7 +21,7 @@
 <h4 id="初始逻辑执行计划">初始逻辑执行计划</h4>
 <div class="mermaid" id="id-1"></div><p>TableScan节点：负责从数据源连接器拉取数据</p>
 <p>Output节点：逻辑执行计划的根节点，表示输出计算结果，其自身没有计算逻辑</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>

@@ -163,7 +163,7 @@
 <h2 id="查询的接收解析和提交">查询的接收、解析和提交</h2>
 <h3 id="接收sql查询请求">接收SQL查询请求</h3>
 <p>客户端sql请求作为HTTP POST请求<code>v1/statement</code> 被<code>io.prestosql.dispatcher.QueuedStatementResource#postStatement</code>处理，生成QueryId，然后将查询加入map中，返回响应报文给客户端。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -193,7 +193,7 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">createQueryResultsResponse</span><span class="p">(</span><span class="n">query</span><span class="p">.</span><span class="na">getQueryResults</span><span class="p">(</span><span class="n">query</span><span class="p">.</span><span class="na">getLastToken</span><span class="p">(),</span><span class="w"> </span><span class="n">uriInfo</span><span class="p">),</span><span class="w"> </span><span class="n">compressionEnabled</span><span class="p">);</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
 <p>之后客户端会发起第二次HTTP请求<code>queued/{queryId}/{slug}/{token}</code>，Presto此时才会真正将查询提交到DispatchManager::createQueryInternal来执行。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
