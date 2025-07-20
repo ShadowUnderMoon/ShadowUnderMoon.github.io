@@ -1,5 +1,5 @@
 ---
-title: "Trino Practice"
+title: "Presto的计算流程"
 author: "爱吃芒果"
 description:
 date: "2025-07-09T22:27:56+08:00"
@@ -10,7 +10,9 @@ hidden: false
 comments: true
 draft: false
 tags:
+    - "Presto"
 categories:
+    - "Presto"
 ---
 
 

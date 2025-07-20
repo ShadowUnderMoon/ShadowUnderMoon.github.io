@@ -4,35 +4,36 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="robots" content="noodp" />
-        <title>Trino Practice - 爱吃芒果</title><meta name="Description" content="This is my cool site"><meta property="og:url" content="http://example.org/posts/trino-practice/">
+        <title>Presto的计算流程 - 爱吃芒果</title><meta name="Description" content="This is my cool site"><meta property="og:url" content="http://example.org/posts/trino-practice/">
   <meta property="og:site_name" content="爱吃芒果">
-  <meta property="og:title" content="Trino Practice">
+  <meta property="og:title" content="Presto的计算流程">
   <meta property="og:description" content="直接从maven仓库下载对应版本的presto-cli作为客户端，记得下载presto-cli-350-executable.jar版本，否则可能不能直接运行">
   <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="article">
     <meta property="article:section" content="posts">
     <meta property="article:published_time" content="2025-07-09T22:27:56+08:00">
     <meta property="article:modified_time" content="2025-07-09T22:27:56+08:00">
+    <meta property="article:tag" content="Presto">
 
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Trino Practice">
+  <meta name="twitter:title" content="Presto的计算流程">
   <meta name="twitter:description" content="直接从maven仓库下载对应版本的presto-cli作为客户端，记得下载presto-cli-350-executable.jar版本，否则可能不能直接运行">
 <meta name="application-name" content="My cool site">
 <meta name="apple-mobile-web-app-title" content="My cool site">
 <meta name="referrer" content="no-referrer" /><meta name="theme-color" content="#ffffff"><meta name="msapplication-TileColor" content="#da532c"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/trino-practice/" /><link rel="prev" href="http://example.org/posts/file_lock/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/trino-practice/" /><link rel="prev" href="http://example.org/posts/file_lock/" /><link rel="next" href="http://example.org/posts/trino-filter-project/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
         <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css"></noscript><link rel="preload" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
         <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css"></noscript><script type="application/ld+json">
     {
         "@context": "http://schema.org",
         "@type": "BlogPosting",
-        "headline": "Trino Practice",
+        "headline": "Presto的计算流程",
         "inLanguage": "zh-CN",
         "mainEntityOfPage": {
             "@type": "WebPage",
             "@id": "http:\/\/example.org\/posts\/trino-practice\/"
-        },"genre": "posts","wordcount":  22925 ,
+        },"genre": "posts","keywords": "Presto","wordcount":  22925 ,
         "url": "http:\/\/example.org\/posts\/trino-practice\/","datePublished": "2025-07-09T22:27:56+08:00","dateModified": "2025-07-09T22:27:56+08:00","publisher": {
             "@type": "Organization",
             "name": ""},"author": {
@@ -104,8 +105,8 @@
                 <div class="container"><div class="toc" id="toc-auto">
             <h2 class="toc-title">Contents</h2>
             <div class="toc-content" id="toc-content-auto"></div>
-        </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Trino Practice</h1><div class="post-meta">
-            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span></div>
+        </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Presto的计算流程</h1><div class="post-meta">
+            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/presto/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Presto</a></span></div>
             <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-07-09">2025-07-09</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;22925 words&nbsp;
                 <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;46 minutes&nbsp;</div>
         </div><div class="details toc" id="toc-static"  data-kept="">
@@ -397,7 +398,7 @@
 <h3 id="词法与语法分析并生成抽象语法树">词法与语法分析并生成抽象语法树</h3>
 <p>SqlParser使用Antlr4作为解析工具，通过词法和语法解析通过SQL字符串生成抽象语法树。抽象语法树是用一种树形结构表示SQL想要表述的语义，将一段SQL字符串结构化，以支持SQL执行引擎根据抽象语法树生成SQL执行计划。在Presto中，Node表示树的节点的抽象，根据语义不同，SQL抽象语法树中有多种不同类型的节点，都继承了Node节点。</p>
 <p>抽象语法树在我看来只是将字符串转成结构更加严谨的树状结构，和sql的文本表述类似，除了将文本转成树状结构外，没有做额外的操作，比如FunctionCall并没有真的生成调用的函数，而只是描述。</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -416,7 +417,7 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">Expression</span><span class="o">&gt;</span><span class="w"> </span><span class="n">arguments</span><span class="p">;</span></span></span></code></pre></div></div>
 <h3 id="创建并提交queryexecution">创建并提交QueryExecution</h3>
 <p><code>dispatchQueryFactory.createDispatchQuery</code>方法在执行中，会根据Statement的类型生成QueryExecution，对于DML操作(Data Manipulatioin language)生成SqlQueryExecution，对于DDL (Data Definition language)生成DataDefinitionExecution，然后进一步包装成LocalDispatchQuery，提交到resourceGroupManager等待运行。</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -457,7 +458,7 @@
 </span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
 <h2 id="执行计划的生成和优化">执行计划的生成和优化</h2>
 <h3 id="语义分析生成执行计划">语义分析、生成执行计划</h3>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -498,7 +499,7 @@
 <li>生成执行计划：生成以PlanNode为节点的逻辑执行计划，它也是类似于抽象语法树的树型结构，树节点和根的类型都是PlanNode。</li>
 <li>优化执行计划，生成优化后的执行计划：用预定义的几百个优化器迭代优化之前生成的PlanNode树，并返回优化后的PlanNode树</li>
 </ul>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -615,7 +616,7 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
 <p>从数据源连接器中获取到所有的分片。分片是Presto中分块组织数据的方式，Presto连接器会将待处理的所有数据划分为若干分片让Presto读取，而这些分片也会被安排到多个Presto查询执行节点上来处理以实现分布式高性能计算。分布式OLAP引擎几乎全都有分片的抽象设计，例如Spark、Flink等。</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -632,7 +633,7 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">ConnectorSplit</span><span class="o">&gt;</span><span class="w"> </span><span class="n">splits</span><span class="p">;</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">offset</span><span class="p">;</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -1739,19 +1740,20 @@
                             <a class="link-to-markdown" href="/posts/trino-practice/index.md" target="_blank">Read Markdown</a>
                         </span></div>
             <div class="post-info-share">
-                <span><a href="javascript:void(0);" title="Share on X" data-sharer="x" data-url="http://example.org/posts/trino-practice/" data-title="Trino Practice"><i class="fab fa-x-twitter fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Threads" data-sharer="threads" data-url="http://example.org/posts/trino-practice/" data-title="Trino Practice"><i class="fab fa-threads fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Facebook" data-sharer="facebook" data-url="http://example.org/posts/trino-practice/"><i class="fab fa-facebook-square fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Hacker News" data-sharer="hackernews" data-url="http://example.org/posts/trino-practice/" data-title="Trino Practice"><i class="fab fa-hacker-news fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Line" data-sharer="line" data-url="http://example.org/posts/trino-practice/" data-title="Trino Practice"><i data-svg-src="https://cdn.jsdelivr.net/npm/simple-icons@14.9.0/icons/line.svg" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on 微博" data-sharer="weibo" data-url="http://example.org/posts/trino-practice/" data-title="Trino Practice"><i class="fab fa-weibo fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Diaspora" data-sharer="diaspora" data-url="http://example.org/posts/trino-practice/" data-title="Trino Practice" data-description=""><i class="fab fa-diaspora fa-fw" aria-hidden="true"></i></a><a href="https://t.me/share/url?url=http%3a%2f%2fexample.org%2fposts%2ftrino-practice%2f&amp;text=Trino%20Practice" target="_blank" title="Share on Telegram"><i class="fab fa-telegram fa-fw" aria-hidden="true"></i></a></span>
+                <span><a href="javascript:void(0);" title="Share on X" data-sharer="x" data-url="http://example.org/posts/trino-practice/" data-title="Presto的计算流程" data-hashtags="Presto"><i class="fab fa-x-twitter fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Threads" data-sharer="threads" data-url="http://example.org/posts/trino-practice/" data-title="Presto的计算流程"><i class="fab fa-threads fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Facebook" data-sharer="facebook" data-url="http://example.org/posts/trino-practice/" data-hashtag="Presto"><i class="fab fa-facebook-square fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Hacker News" data-sharer="hackernews" data-url="http://example.org/posts/trino-practice/" data-title="Presto的计算流程"><i class="fab fa-hacker-news fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Line" data-sharer="line" data-url="http://example.org/posts/trino-practice/" data-title="Presto的计算流程"><i data-svg-src="https://cdn.jsdelivr.net/npm/simple-icons@14.9.0/icons/line.svg" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on 微博" data-sharer="weibo" data-url="http://example.org/posts/trino-practice/" data-title="Presto的计算流程"><i class="fab fa-weibo fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Diaspora" data-sharer="diaspora" data-url="http://example.org/posts/trino-practice/" data-title="Presto的计算流程" data-description=""><i class="fab fa-diaspora fa-fw" aria-hidden="true"></i></a><a href="https://t.me/share/url?url=http%3a%2f%2fexample.org%2fposts%2ftrino-practice%2f&amp;text=Presto%e7%9a%84%e8%ae%a1%e7%ae%97%e6%b5%81%e7%a8%8b" target="_blank" title="Share on Telegram"><i class="fab fa-telegram fa-fw" aria-hidden="true"></i></a></span>
             </div>
         </div>
     </div>
 
     <div class="post-info-more">
-        <section class="post-tags"></section>
+        <section class="post-tags"><i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/presto/">Presto</a></section>
         <section>
             <span><a href="javascript:void(0);" onclick="window.history.back();">Back</a></span>&nbsp;|&nbsp;<span><a href="/">Home</a></span>
         </section>
     </div>
 
-    <div class="post-nav"><a href="/posts/file_lock/" class="prev" rel="prev" title="文件锁"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>文件锁</a></div>
+    <div class="post-nav"><a href="/posts/file_lock/" class="prev" rel="prev" title="文件锁"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>文件锁</a>
+            <a href="/posts/trino-filter-project/" class="next" rel="next" title="Presto数据过滤和投影">Presto数据过滤和投影<i class="fas fa-angle-right fa-fw" aria-hidden="true"></i></a></div>
 </div>
 <div id="comments"><div id="utterances" class="comment"></div><noscript>
                 Please enable JavaScript to view the comments powered by <a href="https://utteranc.es/">utterances</a>.

@@ -3,10 +3,28 @@
         <title>爱吃芒果</title>
         <link>http://example.org/</link>
         <description>This is my cool site</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Wed, 09 Jul 2025 22:27:56 &#43;0800</lastBuildDate>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 20 Jul 2025 09:12:14 &#43;0800</lastBuildDate>
             <atom:link href="http://example.org/index.xml" rel="self" type="application/rss+xml" />
         <item>
-    <title>Trino Practice</title>
+    <title>Presto数据过滤和投影</title>
+    <link>http://example.org/posts/trino-filter-project/</link>
+    <pubDate>Sun, 20 Jul 2025 09:12:14 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://example.org/posts/trino-filter-project/</guid>
+    <description><![CDATA[<h2 id="简单拉取数据查询的实现原理">简单拉取数据查询的实现原理</h2>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-sql">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="line"><span class="cl"><span class="k">SELECT</span><span class="w"> </span><span class="n">ss_item_sk</span><span class="p">,</span><span class="w"> </span><span class="n">ss_sales_price</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">FROM</span><span class="w"> </span><span class="n">store_sales</span><span class="p">;</span></span></span></code></pre></div></div>
+<h3 id="执行计划的生成和优化">执行计划的生成和优化</h3>
+<h4 id="初始逻辑执行计划">初始逻辑执行计划</h4>
+<div class="mermaid" id="id-1"></div><p>TableScan节点：负责从</p>]]></description>
+</item>
+<item>
+    <title>Presto的计算流程</title>
     <link>http://example.org/posts/trino-practice/</link>
     <pubDate>Wed, 09 Jul 2025 22:27:56 &#43;0800</pubDate>
     <author>爱吃芒果</author>
@@ -187,14 +205,6 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">executor</span><span class="p">.</span><span class="na">launchTask</span><span class="p">(</span><span class="k">this</span><span class="p">,</span><span class="w"> </span><span class="n">taskDesc</span><span class="p">)</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="p">}</span></span></span></code></pre></div></div>
 <p>接收到Drive端传来的task，反序列化后，启动task</p>]]></description>
-</item>
-<item>
-    <title>Spark Shuffle机制</title>
-    <link>http://example.org/posts/spark_shuffle/</link>
-    <pubDate>Sun, 01 Jun 2025 09:18:40 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/spark_shuffle/</guid>
-    <description><![CDATA[<p>运行在不同stage、不同节点上的task见通过shuffle机制传递数据，shuffle解决的问题是如何将数据进行重新组织，使其能够在上游和下游task之间进行传递和计算。如果只是单纯的数据传递，则只需要将数据进行分区、通过网络传输即可，没有太大的难度，但shuffle机制还需要进行各种类型的计算（如聚合、排序），而且数据量一般会很大，如果支持这些不同类型的计算，如果提高shuffle的性能都是shuffle机制设计的难点。</p>]]></description>
 </item>
 </channel>
 </rss>
