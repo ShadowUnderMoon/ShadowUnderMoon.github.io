@@ -1,23 +1,23 @@
 <rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
     <channel>
         <title>Java - Tag - 爱吃芒果</title>
-        <link>http://example.org/tags/java/</link>
+        <link>http://localhost:1313/tags/java/</link>
         <description>Java - Tag - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 22 Jun 2025 20:20:36 &#43;0800</lastBuildDate><atom:link href="http://example.org/tags/java/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 22 Jun 2025 20:20:36 &#43;0800</lastBuildDate><atom:link href="http://localhost:1313/tags/java/" rel="self" type="application/rss+xml" /><item>
     <title>java Size Of Engine</title>
-    <link>http://example.org/posts/size_of_engine/</link>
+    <link>http://localhost:1313/posts/size_of_engine/</link>
     <pubDate>Sun, 22 Jun 2025 20:20:36 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://example.org/posts/size_of_engine/</guid>
+    <guid>http://localhost:1313/posts/size_of_engine/</guid>
     <description><![CDATA[<p>ehcache3提供了限制缓存容量的选择，如果堆上存储的容量超过了指定的大小，则会驱逐缓存中的元素，直到有空间可以容纳为止。</p>
 <p>自己实现的sizeOfEngine应该实现ehcache3提供的引擎接口。</p>]]></description>
 </item>
 <item>
     <title>Java线程池源码分析</title>
-    <link>http://example.org/posts/java_thread_pool/</link>
+    <link>http://localhost:1313/posts/java_thread_pool/</link>
     <pubDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://example.org/posts/java_thread_pool/</guid>
+    <guid>http://localhost:1313/posts/java_thread_pool/</guid>
     <description><![CDATA[<h2 id="阅前提示">阅前提示</h2>
 <p>参考文献中的文章非常的好，基本看完了就能理解很多东西，推荐阅读</p>
 <p>源码中也提供了很多注释文本，推荐对照源码学习。</p>

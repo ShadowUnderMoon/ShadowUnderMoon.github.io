@@ -204,3 +204,8 @@ hasCJKLanguage = true
     label = ""
     lightTheme = "github-light"
     darkTheme = "github-dark"
+
+
+[params.page.code.render]
+  goat = true
+  mermaid = true
