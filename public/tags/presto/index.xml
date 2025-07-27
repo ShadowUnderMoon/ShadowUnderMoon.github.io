@@ -1,14 +1,14 @@
 <rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
     <channel>
         <title>Presto - Tag - 爱吃芒果</title>
-        <link>http://localhost:1313/tags/presto/</link>
+        <link>http://example.org/tags/presto/</link>
         <description>Presto - Tag - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 20 Jul 2025 09:12:14 &#43;0800</lastBuildDate><atom:link href="http://localhost:1313/tags/presto/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 20 Jul 2025 09:12:14 &#43;0800</lastBuildDate><atom:link href="http://example.org/tags/presto/" rel="self" type="application/rss+xml" /><item>
     <title>Presto数据过滤和投影</title>
-    <link>http://localhost:1313/posts/trino-filter-project/</link>
+    <link>http://example.org/posts/trino-filter-project/</link>
     <pubDate>Sun, 20 Jul 2025 09:12:14 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/trino-filter-project/</guid>
+    <guid>http://example.org/posts/trino-filter-project/</guid>
     <description><![CDATA[<h2 id="简单拉取数据查询的实现原理">简单拉取数据查询的实现原理</h2>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-sql">
@@ -21,7 +21,7 @@
 <h4 id="初始逻辑执行计划">初始逻辑执行计划</h4>
 <div class="mermaid" id="id-1"></div><p>TableScan节点：负责从数据源连接器拉取数据</p>
 <p>Output节点：逻辑执行计划的根节点，表示输出计算结果，其自身没有计算逻辑</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -42,10 +42,10 @@
 </item>
 <item>
     <title>Presto的计算流程</title>
-    <link>http://localhost:1313/posts/trino-practice/</link>
+    <link>http://example.org/posts/trino-practice/</link>
     <pubDate>Wed, 09 Jul 2025 22:27:56 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/trino-practice/</guid>
+    <guid>http://example.org/posts/trino-practice/</guid>
     <description><![CDATA[<p>直接从maven仓库下载对应版本的<code>presto-cli</code>作为客户端，记得下载<code>presto-cli-350-executable.jar</code>版本，否则可能不能直接运行</p>]]></description>
 </item>
 </channel>

@@ -1,14 +1,14 @@
 <rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
     <channel>
         <title>MinIO - Category - 爱吃芒果</title>
-        <link>http://localhost:1313/categories/minio/</link>
+        <link>http://example.org/categories/minio/</link>
         <description>MinIO - Category - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Wed, 22 Jan 2025 19:03:56 &#43;0800</lastBuildDate><atom:link href="http://localhost:1313/categories/minio/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Wed, 22 Jan 2025 19:03:56 &#43;0800</lastBuildDate><atom:link href="http://example.org/categories/minio/" rel="self" type="application/rss+xml" /><item>
     <title>MinIO大杂烩</title>
-    <link>http://localhost:1313/posts/minio-get-started/</link>
+    <link>http://example.org/posts/minio-get-started/</link>
     <pubDate>Wed, 22 Jan 2025 19:03:56 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/minio-get-started/</guid>
+    <guid>http://example.org/posts/minio-get-started/</guid>
     <description><![CDATA[<h2 id="xlmeta-数据结构">xl.meta 数据结构</h2>
 <p>当对象大小超过 128KiB 后，比如<code>a.txt</code>，数据和元数据分开存储</p>
 <p>MinIO 提供了命令行工具<code>xl-meta</code>用来查看<code>xl.meta</code>文件</p>
