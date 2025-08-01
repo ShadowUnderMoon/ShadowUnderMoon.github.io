@@ -1,14 +1,14 @@
 <rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
     <channel>
         <title>Spark - Category - 爱吃芒果</title>
-        <link>http://example.org/categories/spark/</link>
+        <link>http://localhost:1313/categories/spark/</link>
         <description>Spark - Category - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 07 Jun 2025 19:05:49 &#43;0800</lastBuildDate><atom:link href="http://example.org/categories/spark/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 07 Jun 2025 19:05:49 &#43;0800</lastBuildDate><atom:link href="http://localhost:1313/categories/spark/" rel="self" type="application/rss+xml" /><item>
     <title>Spark错误容忍机制</title>
-    <link>http://example.org/posts/spark_fault_tolerance/</link>
+    <link>http://localhost:1313/posts/spark_fault_tolerance/</link>
     <pubDate>Sat, 07 Jun 2025 19:05:49 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://example.org/posts/spark_fault_tolerance/</guid>
+    <guid>http://localhost:1313/posts/spark_fault_tolerance/</guid>
     <description><![CDATA[<p>Spark的错误容忍机制的核心方法主要有两种：</p>
 <ol>
 <li>通过重新执行计算任务来容忍错误，当job抛出异常不能继续执行时，重新启动计算任务，再次执行</li>
@@ -18,10 +18,10 @@
 </item>
 <item>
     <title>Spark Job执行流程</title>
-    <link>http://example.org/posts/spark_job_execution/</link>
+    <link>http://localhost:1313/posts/spark_job_execution/</link>
     <pubDate>Sat, 07 Jun 2025 10:16:21 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://example.org/posts/spark_job_execution/</guid>
+    <guid>http://localhost:1313/posts/spark_job_execution/</guid>
     <description><![CDATA[<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
@@ -40,27 +40,27 @@
 </item>
 <item>
     <title>Spark Shuffle机制</title>
-    <link>http://example.org/posts/spark_shuffle/</link>
+    <link>http://localhost:1313/posts/spark_shuffle/</link>
     <pubDate>Sun, 01 Jun 2025 09:18:40 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://example.org/posts/spark_shuffle/</guid>
+    <guid>http://localhost:1313/posts/spark_shuffle/</guid>
     <description><![CDATA[<p>运行在不同stage、不同节点上的task见通过shuffle机制传递数据，shuffle解决的问题是如何将数据进行重新组织，使其能够在上游和下游task之间进行传递和计算。如果只是单纯的数据传递，则只需要将数据进行分区、通过网络传输即可，没有太大的难度，但shuffle机制还需要进行各种类型的计算（如聚合、排序），而且数据量一般会很大，如果支持这些不同类型的计算，如果提高shuffle的性能都是shuffle机制设计的难点。</p>]]></description>
 </item>
 <item>
     <title>Spark物理执行计划</title>
-    <link>http://example.org/posts/spark_physical_plan/</link>
+    <link>http://localhost:1313/posts/spark_physical_plan/</link>
     <pubDate>Sun, 25 May 2025 11:16:21 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://example.org/posts/spark_physical_plan/</guid>
+    <guid>http://localhost:1313/posts/spark_physical_plan/</guid>
     <description><![CDATA[<h2 id="spark物理执行计划生成方法">Spark物理执行计划生成方法</h2>
 <p>Spark具体采用3个步骤来生成物理执行计划，首先根据action操作顺序将应用划分为作业（job），然后根据每个job的逻辑处理流程中的ShuffleDependency依赖关系，将job划分为执行阶段（stage）。最后在每个stage中，根据最后生成的RDD的分区个数生成多个计算任务（task）。</p>]]></description>
 </item>
 <item>
     <title>Spark逻辑处理流程</title>
-    <link>http://example.org/posts/spark_logical_plan/</link>
+    <link>http://localhost:1313/posts/spark_logical_plan/</link>
     <pubDate>Sun, 11 May 2025 15:20:27 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://example.org/posts/spark_logical_plan/</guid>
+    <guid>http://localhost:1313/posts/spark_logical_plan/</guid>
     <description><![CDATA[<p>Spark应用程序需要先转化为逻辑处理流程，逻辑处理流程主要包括：</p>
 <ul>
 <li>RDD数据模型</li>
@@ -71,28 +71,28 @@
 </item>
 <item>
     <title>Spark基础知识</title>
-    <link>http://example.org/posts/spark-base/</link>
+    <link>http://localhost:1313/posts/spark-base/</link>
     <pubDate>Sat, 10 May 2025 11:51:10 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://example.org/posts/spark-base/</guid>
+    <guid>http://localhost:1313/posts/spark-base/</guid>
     <description><![CDATA[<h2 id="rdd数据模型">RDD数据模型</h2>
 <p>RDD （Resilient Distributed DataSet)是spark对计算过程中输入输出数据以及中间数据的抽象，表示不可变、分区的集合数据，可以被并行处理。</p>]]></description>
 </item>
 <item>
     <title>Spark开发环境搭建</title>
-    <link>http://example.org/posts/spark_developement_envrionment/</link>
+    <link>http://localhost:1313/posts/spark_developement_envrionment/</link>
     <pubDate>Sat, 05 Apr 2025 22:05:09 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://example.org/posts/spark_developement_envrionment/</guid>
+    <guid>http://localhost:1313/posts/spark_developement_envrionment/</guid>
     <description><![CDATA[<p>通过如下的方法在idea中配置spark开发环境，最后和一般的java项目一样，使用maven面板的 clean和package进行编译。</p>
 <p>我实际使用的编译器为java17，idea会提示配置scala编译器。</p>]]></description>
 </item>
 <item>
     <title>Spark内存管理</title>
-    <link>http://example.org/posts/spark_memory_manager/</link>
+    <link>http://localhost:1313/posts/spark_memory_manager/</link>
     <pubDate>Sun, 09 Mar 2025 22:32:09 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://example.org/posts/spark_memory_manager/</guid>
+    <guid>http://localhost:1313/posts/spark_memory_manager/</guid>
     <description><![CDATA[<h2 id="关键问题">关键问题</h2>
 <ol>
 <li>

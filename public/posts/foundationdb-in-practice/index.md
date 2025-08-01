@@ -104,6 +104,40 @@ FoundationDB支持根据不断变化的需求动态添加或移除硬件资源�
 
 ## FoundationDB的架构
 
+FoundationDB让你的架构更具有灵活性，且易于运维，你的应用程序可以将数据直接发送到FoundationDB，或发送到一个层Layer中，这是用户编写的模块，可提供新的数据模型、与现有系统的兼容性，甚至作为完整的框架使用，无论那种方式，所有数据都会通过一个有序地、事务性的键值API存储到同一个地方。FoundationDB的架构采用了解耦式设计，其中每个进程被分配不同的异构角色（例如Coordinator、Storage Server、Master等），集群在运行时会尝试将不同的角色分别招募为独立的进程，然而为了满足集群的招募目标，也有可能将多个无状态角色合并部署在同一个进程上，通过为不同角色水平扩展进程数量，可以实现数据库的扩展。
+
+### Coordinator
+
+所有客户端和服务器通过一个cluster file连接到FoundationDB集群，该文件中包含Coordinator的IP:PORT信息，客户端和服务器都会使用Coordinator与ClusterController建立连接，如果当前没有集群控制器，服务器会尝试竞选称为控制器，并在选举完成后向其注册，客户端则通过集群控制器获取最新的GRV代理（GRV proxies）和提交代理（commit proxies）列表。
+
+### Cluster Controller
+
+集群控制器是一个由多数协调者选举产生的单例角色，它是整个集群中所有进程的入口，负责以下任务：判断某个进程是否故障、告知各个进程应承担的角色，在所有进程之间传递系统信息
+
+### Master
+
+Master负责协调写子系统（write sub-system）从一个代（generation）过渡到下一个代的过程，写子系统包括Master、GRV代理、提交代理、解析器以及事务日志，这三个角色（指Master、GRV proxy、commit Proxy）被视为一个整体，如果其中任何一个失败，将会同时重新招募这三个角色的替代进程。Master还负责为一批mutation（变更操作）提供提交版本号，将其分发给commit proxies，在早期的版本中，Ratekeeper和Data Distributor是与Master运行在同一个进程中，但从6.2版本开始，它们都成为了集群中的单例角色，其生命周期不再依赖于Master
+
+### GRV Proxies
+
+GRV代理负责提供读取版本（read version），并与Ratekeeper通信以控制读取版本的发放速率，为了提供一个读取版本，GRV代理会向所有Master查询当前为止最大的已提交版本（commited version），同时检查事务日志（transaction log）是否仍在正常运行（未停止），Ratekeeper会人为地减慢GRV代理提供读取版本的速率，以控制系统负载。
+
+### Commit Proxies
+
+提交代理负责提交事务、向Master汇报已提交的版本，并追踪每个键范围所对应的存储服务器，提交事务的过程包含以下步骤：
+
+- 向Master获取一个提交版本（commit version）
+- 使用解析器（resolvers）判断当前事务是否与之前已提交的事务冲突
+- 将事务写入事务日志，以保证其持久性
+
+以`\xff`字节开头的键空间是保留的系统元数据区域，所有写入该区域的mutation（变更操作）都会通过解析器分发到所有提交代理，这个系统元数据包含一个键范围到存储服务器的映射关系，即每个键区间是由哪些存储服务器负责存储的。提交代理会按需将这些映射信息提供给客户端，客户端会缓存这份映射表，如果客户端向某个存储服务器请求一个该服务器没有的数据键，会清楚缓存并从提交代理获取一份最新的服务器列表。
+
+### Transaction Logs
+
+
+
+
+
 
 
 
