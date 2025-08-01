@@ -1,16 +1,2 @@
-<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
-    <channel>
-        <title>FoundationDB - Tag - 爱吃芒果</title>
-        <link>http://example.org/tags/foundationdb/</link>
-        <description>FoundationDB - Tag - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 26 Jul 2025 17:05:57 &#43;0800</lastBuildDate><atom:link href="http://example.org/tags/foundationdb/" rel="self" type="application/rss+xml" /><item>
-    <title>FoundationDB in Practice</title>
-    <link>http://example.org/posts/foundationdb-in-practice/</link>
-    <pubDate>Sat, 26 Jul 2025 17:05:57 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/foundationdb-in-practice/</guid>
-    <description><![CDATA[<h3 id="mac上运行foundationdb">mac上运行FoundationDB</h3>
-<p>fdb_java的java包没有打包fdb_c的动态链接库，所以需要通过<code>-DFDB_LIBRARY_PATH_FDB_C=/usr/local/lib/libfdb_c.dylib</code>指定对应的动态链接库位置。</p>]]></description>
-</item>
-</channel>
-</rss>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0"><channel><title>FoundationDB - Tag - 爱吃芒果</title><link>http://example.org/tags/foundationdb/</link><description>FoundationDB - Tag - 爱吃芒果</description><generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 26 Jul 2025 17:05:57 +0800</lastBuildDate><atom:link href="http://example.org/tags/foundationdb/" rel="self" type="application/rss+xml"/><item><title>FoundationDB in Practice</title><link>http://example.org/posts/foundationdb-in-practice/</link><pubDate>Sat, 26 Jul 2025 17:05:57 +0800</pubDate><author>爱吃芒果</author><guid>http://example.org/posts/foundationdb-in-practice/</guid><description><![CDATA[<h3 id="mac上运行foundationdb">mac上运行FoundationDB</h3>
+<p>fdb_java的java包没有打包fdb_c的动态链接库，所以需要通过<code>-DFDB_LIBRARY_PATH_FDB_C=/usr/local/lib/libfdb_c.dylib</code>指定对应的动态链接库位置。</p>]]></description></item></channel></rss>

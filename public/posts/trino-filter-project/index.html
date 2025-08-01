@@ -1,364 +1,110 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="robots" content="noodp" />
-        <title>Presto数据过滤和投影 - 爱吃芒果</title><meta name="Description" content="This is my cool site"><meta property="og:url" content="http://example.org/posts/trino-filter-project/">
-  <meta property="og:site_name" content="爱吃芒果">
-  <meta property="og:title" content="Presto数据过滤和投影">
-  <meta property="og:description" content="简单拉取数据查询的实现原理 SELECT ss_item_sk, ss_sales_price FROM store_sales; 执行计划的生成和优化 初始逻辑执行计划 TableScan节点：负责从数据源连接器拉取数据
+<!doctype html><html lang=zh-CN><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=robots content="noodp"><title>Presto数据过滤和投影 - 爱吃芒果</title><meta name=Description content="This is my cool site"><meta property="og:url" content="http://example.org/posts/trino-filter-project/">
+<meta property="og:site_name" content="爱吃芒果"><meta property="og:title" content="Presto数据过滤和投影"><meta property="og:description" content="简单拉取数据查询的实现原理 SELECT ss_item_sk, ss_sales_price FROM store_sales; 执行计划的生成和优化 初始逻辑执行计划 TableScan节点：负责从数据源连接器拉取数据
 Output节点：逻辑执行计划的根节点，表示输出计算结果，其自身没有计算逻辑
-public class TableScanNode extends PlanNode { // TableHandle表示的是与当前TableScanNode对应的是数据源存储中的那个类 private final TableHandle table; // outputSymbols: TableScanNode输出的symbols列表，在Presto中使用Symbol表示要输出哪些列 private final List&lt;Symbol&gt; outputSymbols; // assignments：对于outputSymbols中的每个Symbol，明确其来源于数据源Connector的那个Column（用ColumnHandle表示） private final Map&lt;Symbol, ColumnHandle&gt; assignments; // symbol -&gt; column private final TupleDomain&lt;ColumnHandle&gt; enforcedConstraint; private final boolean forDelete; 查询执行时，只要将TableHandle、ColumnHandl交给数据源连接器，它就知道拉取那些表、哪些列的数据，这是一个基本抽象，在考虑到各种下推优化时，这两个概念将发挥更大的作用">
-  <meta property="og:locale" content="zh_CN">
-  <meta property="og:type" content="article">
-    <meta property="article:section" content="posts">
-    <meta property="article:published_time" content="2025-07-20T09:12:14+08:00">
-    <meta property="article:modified_time" content="2025-07-20T09:12:14+08:00">
-    <meta property="article:tag" content="Presto">
-
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Presto数据过滤和投影">
-  <meta name="twitter:description" content="简单拉取数据查询的实现原理 SELECT ss_item_sk, ss_sales_price FROM store_sales; 执行计划的生成和优化 初始逻辑执行计划 TableScan节点：负责从数据源连接器拉取数据
+public class TableScanNode extends PlanNode { // TableHandle表示的是与当前TableScanNode对应的是数据源存储中的那个类 private final TableHandle table; // outputSymbols: TableScanNode输出的symbols列表，在Presto中使用Symbol表示要输出哪些列 private final List<Symbol> outputSymbols; // assignments：对于outputSymbols中的每个Symbol，明确其来源于数据源Connector的那个Column（用ColumnHandle表示） private final Map<Symbol, ColumnHandle> assignments; // symbol -> column private final TupleDomain<ColumnHandle> enforcedConstraint; private final boolean forDelete; 查询执行时，只要将TableHandle、ColumnHandl交给数据源连接器，它就知道拉取那些表、哪些列的数据，这是一个基本抽象，在考虑到各种下推优化时，这两个概念将发挥更大的作用"><meta property="og:locale" content="zh_CN"><meta property="og:type" content="article"><meta property="article:section" content="posts"><meta property="article:published_time" content="2025-07-20T09:12:14+08:00"><meta property="article:modified_time" content="2025-07-20T09:12:14+08:00"><meta property="article:tag" content="Presto"><meta name=twitter:card content="summary"><meta name=twitter:title content="Presto数据过滤和投影"><meta name=twitter:description content="简单拉取数据查询的实现原理 SELECT ss_item_sk, ss_sales_price FROM store_sales; 执行计划的生成和优化 初始逻辑执行计划 TableScan节点：负责从数据源连接器拉取数据
 Output节点：逻辑执行计划的根节点，表示输出计算结果，其自身没有计算逻辑
-public class TableScanNode extends PlanNode { // TableHandle表示的是与当前TableScanNode对应的是数据源存储中的那个类 private final TableHandle table; // outputSymbols: TableScanNode输出的symbols列表，在Presto中使用Symbol表示要输出哪些列 private final List&lt;Symbol&gt; outputSymbols; // assignments：对于outputSymbols中的每个Symbol，明确其来源于数据源Connector的那个Column（用ColumnHandle表示） private final Map&lt;Symbol, ColumnHandle&gt; assignments; // symbol -&gt; column private final TupleDomain&lt;ColumnHandle&gt; enforcedConstraint; private final boolean forDelete; 查询执行时，只要将TableHandle、ColumnHandl交给数据源连接器，它就知道拉取那些表、哪些列的数据，这是一个基本抽象，在考虑到各种下推优化时，这两个概念将发挥更大的作用">
-<meta name="application-name" content="My cool site">
-<meta name="apple-mobile-web-app-title" content="My cool site">
-<meta name="referrer" content="no-referrer" /><meta name="theme-color" content="#ffffff"><meta name="msapplication-TileColor" content="#da532c"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/trino-filter-project/" /><link rel="prev" href="http://example.org/posts/trino-practice/" /><link rel="next" href="http://example.org/posts/java-log-in-practice/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css"></noscript><link rel="preload" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css"></noscript><script type="application/ld+json">
-    {
-        "@context": "http://schema.org",
-        "@type": "BlogPosting",
-        "headline": "Presto数据过滤和投影",
-        "inLanguage": "zh-CN",
-        "mainEntityOfPage": {
-            "@type": "WebPage",
-            "@id": "http:\/\/example.org\/posts\/trino-filter-project\/"
-        },"genre": "posts","keywords": "Presto","wordcount":  4731 ,
-        "url": "http:\/\/example.org\/posts\/trino-filter-project\/","datePublished": "2025-07-20T09:12:14+08:00","dateModified": "2025-07-20T09:12:14+08:00","publisher": {
-            "@type": "Organization",
-            "name": ""},"author": {
-                "@type": "Person",
-                "name": "爱吃芒果"
-            },"description": ""
-    }
-    </script></head>
-    <body data-header-desktop="fixed" data-header-mobile="auto"><script>(window.localStorage && localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : ('auto' === 'auto' ? window.matchMedia('(prefers-color-scheme: dark)').matches : 'auto' === 'dark')) && document.body.setAttribute('theme', 'dark');</script>
-
-        <div id="mask"></div><div class="wrapper"><header class="desktop" id="header-desktop">
-    <div class="header-wrapper">
-        <div class="header-title">
-            <a href="/" title="爱吃芒果">My cool site</a>
-        </div>
-        <div class="menu">
-            <div class="menu-inner"><a class="menu-item" href="/posts/"> 文章 </a><a class="menu-item" href="/page/archives/" title="Archives"> Archives </a><a class="menu-item" href="/tags/"> 标签 </a><a class="menu-item" href="/page/search/" title="Search"> Search </a><a class="menu-item" href="/categories/"> 分类 </a><span class="menu-item delimiter"></span><span class="menu-item search" id="search-desktop">
-                        <input type="text" placeholder="Search titles or contents..." id="search-input-desktop">
-                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-desktop" title="Search">
-                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
-                        </a>
-                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-desktop" title="Clear">
-                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
-                        </a>
-                        <span class="search-button search-loading" id="search-loading-desktop">
-                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
-                        </span>
-                    </span><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
-                    <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
-                </a></div>
-        </div>
-    </div>
-</header><header class="mobile" id="header-mobile">
-    <div class="header-container">
-        <div class="header-wrapper">
-            <div class="header-title">
-                <a href="/" title="爱吃芒果">My cool site</a>
-            </div>
-            <div class="menu-toggle" id="menu-toggle-mobile">
-                <span></span><span></span><span></span>
-            </div>
-        </div>
-        <div class="menu" id="menu-mobile"><div class="search-wrapper">
-                    <div class="search mobile" id="search-mobile">
-                        <input type="text" placeholder="Search titles or contents..." id="search-input-mobile">
-                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-mobile" title="Search">
-                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
-                        </a>
-                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-mobile" title="Clear">
-                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
-                        </a>
-                        <span class="search-button search-loading" id="search-loading-mobile">
-                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
-                        </span>
-                    </div>
-                    <a href="javascript:void(0);" class="search-cancel" id="search-cancel-mobile">
-                        Cancel
-                    </a>
-                </div><a class="menu-item" href="/posts/" title="">文章</a><a class="menu-item" href="/page/archives/" title="Archives">Archives</a><a class="menu-item" href="/tags/" title="">标签</a><a class="menu-item" href="/page/search/" title="Search">Search</a><a class="menu-item" href="/categories/" title="">分类</a><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
-                <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
-            </a></div>
-    </div>
-</header><div class="search-dropdown desktop">
-        <div id="search-dropdown-desktop"></div>
-    </div>
-    <div class="search-dropdown mobile">
-        <div id="search-dropdown-mobile"></div>
-    </div><main class="main">
-                <div class="container"><div class="toc" id="toc-auto">
-            <h2 class="toc-title">Contents</h2>
-            <div class="toc-content" id="toc-content-auto"></div>
-        </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Presto数据过滤和投影</h1><div class="post-meta">
-            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/presto/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Presto</a></span></div>
-            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-07-20">2025-07-20</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;4731 words&nbsp;
-                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;10 minutes&nbsp;</div>
-        </div><div class="details toc" id="toc-static"  data-kept="">
-                <div class="details-summary toc-title">
-                    <span>Contents</span>
-                    <span><i class="details-icon fas fa-angle-right" aria-hidden="true"></i></span>
-                </div>
-                <div class="details-content toc-content" id="toc-content-static"><nav id="TableOfContents">
-  <ul>
-    <li><a href="#简单拉取数据查询的实现原理">简单拉取数据查询的实现原理</a>
-      <ul>
-        <li><a href="#执行计划的生成和优化">执行计划的生成和优化</a></li>
-        <li><a href="#分布式调度与执行的设计实现">分布式调度与执行的设计实现</a></li>
-      </ul>
-    </li>
-    <li><a href="#数据过滤与数据投影的实现原理">数据过滤与数据投影的实现原理</a>
-      <ul>
-        <li><a href="#执行计划的生成和优化-1">执行计划的生成和优化</a></li>
-        <li><a href="#分布式调度与执行的设计实现-1">分布式调度与执行的设计实现</a></li>
-      </ul>
-    </li>
-  </ul>
-</nav></div>
-            </div><div class="content" id="content"><h2 id="简单拉取数据查询的实现原理">简单拉取数据查询的实现原理</h2>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-sql">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="line"><span class="cl"><span class="k">SELECT</span><span class="w"> </span><span class="n">ss_item_sk</span><span class="p">,</span><span class="w"> </span><span class="n">ss_sales_price</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">FROM</span><span class="w"> </span><span class="n">store_sales</span><span class="p">;</span></span></span></code></pre></div></div>
-<h3 id="执行计划的生成和优化">执行计划的生成和优化</h3>
-<h4 id="初始逻辑执行计划">初始逻辑执行计划</h4>
-<div class="mermaid" id="id-1"></div><p>TableScan节点：负责从数据源连接器拉取数据</p>
-<p>Output节点：逻辑执行计划的根节点，表示输出计算结果，其自身没有计算逻辑</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
-    <div class="code-header language-java">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">TableScanNode</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="kd">extends</span><span class="w"> </span><span class="n">PlanNode</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">{</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  	</span><span class="c1">// TableHandle表示的是与当前TableScanNode对应的是数据源存储中的那个类</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">TableHandle</span><span class="w"> </span><span class="n">table</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  	</span><span class="c1">// outputSymbols: TableScanNode输出的symbols列表，在Presto中使用Symbol表示要输出哪些列</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">Symbol</span><span class="o">&gt;</span><span class="w"> </span><span class="n">outputSymbols</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  	</span><span class="c1">// assignments：对于outputSymbols中的每个Symbol，明确其来源于数据源Connector的那个Column（用ColumnHandle表示）</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">Map</span><span class="o">&lt;</span><span class="n">Symbol</span><span class="p">,</span><span class="w"> </span><span class="n">ColumnHandle</span><span class="o">&gt;</span><span class="w"> </span><span class="n">assignments</span><span class="p">;</span><span class="w"> </span><span class="c1">// symbol -&gt; column</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">TupleDomain</span><span class="o">&lt;</span><span class="n">ColumnHandle</span><span class="o">&gt;</span><span class="w"> </span><span class="n">enforcedConstraint</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kt">boolean</span><span class="w"> </span><span class="n">forDelete</span><span class="p">;</span></span></span></code></pre></div></div>
-<p>查询执行时，只要将TableHandle、ColumnHandl交给数据源连接器，它就知道拉取那些表、哪些列的数据，这是一个基本抽象，在考虑到各种下推优化时，这两个概念将发挥更大的作用</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-java">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">OutputNode</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="kd">extends</span><span class="w"> </span><span class="n">PlanNode</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">{</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  	</span><span class="c1">// 上游PlanNode节点</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">PlanNode</span><span class="w"> </span><span class="n">source</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  	</span><span class="c1">// SELECT语句最终要输出结果的列名称</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="n">columnNames</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  	</span><span class="c1">// OutputNode输出的Symbol表示，与ColumnNames--对应</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">Symbol</span><span class="o">&gt;</span><span class="w"> </span><span class="n">outputs</span><span class="p">;</span><span class="w"> </span></span></span></code></pre></div></div>
-<h4 id="优化后的逻辑执行计划">优化后的逻辑执行计划</h4>
-<div class="mermaid" id="id-1"></div><p>为了提升从数据源拉取数据的并发度，可将TableScanNode设计为多个任务并分别放置在多个节点上以并发拉取数据，对于OutputNode来说，其并行度只能是1，因为它需要将上游TableScanNode拉取的数据合并到一起，给到查询发起者。由于执行TableScanNode与OutputNode的并行度不同，在OutputNode与TableScanNode中间需要插入一个ExchangeNode来实现数据交换，改变并行度。</p>
-<h4 id="查询执行阶段划分">查询执行阶段划分</h4>
-<p>Presto的AddExchange优化器基于逻辑执行计划的ExchangeNode划分逻辑执行计划的PlanFragment，每个PlanFragment对应生成一个查询执行阶段，。简而言之，凡是上游节点和下游节点要求的数据分布不一致，就需要做一次数据交换（无论是REPARTITION还是GATHER方式），两侧需要划分到不同的查询执行阶段。逻辑执行计划由AddExchanges优化器划分为2个PlanFragment，对应分布式执行时的2个查询执行阶段。</p>
-<div class="mermaid" id="id-2"></div><p>stage1：从数据源连接器拉取数据，stage1的输出数据会放到OutputBuffer中，等待下游stage0的任务来拉取。</p>
-<p>stage0：从上游stage1拉取数据，输出结果给到集群协调节点，stage0输出的数据会放到OutputBuffer中，等待集群协调节点来取</p>
-<h3 id="分布式调度与执行的设计实现">分布式调度与执行的设计实现</h3>
-<p>stage1的任务执行时会按照PlanFragment的PlanNode子树，创建两个算子，TableScanOperator和TaskOutputOperator。TableScanOperator负责从存储系统中拉取数据后输出给TaskOutputOperator，TaskOutputOperator负责将待输出的数据放到当前任务的OutputBuffer中，等待下游Stage0的任务来拉取。</p>
-<p>stage0的任务执行时会按照PlanFragment的PlanNode子树，创建两个算子，ExchangeOperator和TaskOutputOperator，ExchangeOperator负责从上游stage1的任务中拉取数据，而TaskOutputOperator则负责将待输出的数据放置到当前任务的OutputBuffer中等待集群协调节点来拉取。</p>
-<h2 id="数据过滤与数据投影的实现原理">数据过滤与数据投影的实现原理</h2>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-sql">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="line"><span class="cl"><span class="k">SELECT</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">	</span><span class="n">i_category_id</span><span class="p">,</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">	</span><span class="k">upper</span><span class="p">(</span><span class="n">i_category</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">upper_category</span><span class="p">,</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">	</span><span class="n">concat</span><span class="p">(</span><span class="n">i_category</span><span class="p">,</span><span class="w"> </span><span class="n">i_color</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">cname</span><span class="p">,</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">	</span><span class="n">i_category_id</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">3</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">m_category</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">	</span><span class="n">icategory_id</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">i_brand_id</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">a_num</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">FROM</span><span class="w">  </span><span class="n">item</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">WHERE</span><span class="w"> </span><span class="n">i_item_sk</span><span class="w"> </span><span class="k">IN</span><span class="w"> </span><span class="p">(</span><span class="mi">13631</span><span class="p">,</span><span class="w"> </span><span class="mi">13283</span><span class="p">)</span><span class="w"> </span><span class="k">OR</span><span class="w"> </span><span class="n">i_category_id</span><span class="w"> </span><span class="k">BETWEEN</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span></span></span></code></pre></div></div>
-<h3 id="执行计划的生成和优化-1">执行计划的生成和优化</h3>
-<h4 id="初始逻辑执行计划-1">初始逻辑执行计划</h4>
-<div class="mermaid" id="id-3"></div><div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-java">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">FilterNode</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="kd">extends</span><span class="w"> </span><span class="n">PlanNode</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">{</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">PlanNode</span><span class="w"> </span><span class="n">source</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  	</span><span class="c1">// 数据过滤的表达式，类型是Expression</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">Expression</span><span class="w"> </span><span class="n">predicate</span><span class="p">;</span></span></span></code></pre></div></div>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-java">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">ProjectNode</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="kd">extends</span><span class="w"> </span><span class="n">PlanNode</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">{</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">PlanNode</span><span class="w"> </span><span class="n">source</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  	</span><span class="c1">// Assignments可以理解为Map&lt;Symbol, Expression&gt;，表示的是所有要输出的表达式</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">Assignments</span><span class="w"> </span><span class="n">assignments</span><span class="p">;</span></span></span></code></pre></div></div>
-<h4 id="优化后的逻辑执行计划-1">优化后的逻辑执行计划</h4>
-<div class="mermaid" id="id-4"></div><h4 id="查询执行阶段划分-1">查询执行阶段划分</h4>
-<p>也是从ExchangeNode划分成两个stage。</p>
-<h3 id="分布式调度与执行的设计实现-1">分布式调度与执行的设计实现</h3>
-<p>值得引起注意的是，执行计划树中的PlanNode并不是总与算子一一对应，例如ProjectNode、FilterNode实际上不存在对应的算子，这两种PlanNode都对应了FilterAndProjectOperator，而TableScanNode可能对应多个算子：TableScanOperator、ScanFilterAndProjectOperator，从PlanNode树生成OperatorChain的阶段，将根据不同的PlanNode组合生成不同的算子。</p>
-<p>虽然数据过滤和数据投影在查询的功能上看是不同的，但是在OLAP引擎的底层设计上都可以归为表达式的执行。</p>
-<ul>
-<li>数据过滤：给定某行数据作为过滤表达式的输入，执行此表达式并输出布尔型结果，只有结果是true时才会输出此数据行</li>
-<li>数据投影：给定某行数据作为投影表达式的输入，执行此表达式并输出表达式执行结果</li>
-</ul>
-<p>我们从表达式的视角看看从Presto接收包含表达式的sql到查询执行完成，都经历了哪些过程：</p>
-<ul>
-<li>SQL解析及语义分析阶段：SQL字符串转换为抽象语法树，其中表达式用Expression节点及其子类表示</li>
-<li>生成逻辑执行计划阶段：将抽象语法树转换为PlanNode树，其中FilterNode的predicate字段属性对应数据过滤的表达式，ProjectNode的assignment字段属性对应所有数据投影字段的表达式</li>
-<li>任务执行时的代码生成阶段：首先Expression转换为RowExpression（RowExpression所表示的表达式与Expression所表示的表达式在逻辑上完全等价），然后利用代码生成技术将RowExpression转换为可直接执行的代码。数据过滤表达式的代码生成逻辑及其周边逻辑被进一步封装为PageFilter这个java接口的实现类，数据投影表达式的代码生成逻辑及其周边逻辑被进一步封装为PageProjection这个java接口的实现类。最终自动生成的PageFilter、PageProjection的实现将被封装到一个PageProcessor的实例中。</li>
-<li>任务执行时的遍历数据阶段：由ScanFilterAndProjectOperator或FilterAndProjectOperator驱动PageProcessor中的PageFilter、PageProjection遍历从存储拉取的所有数据行，逐行完成表达式的执行，为后续算子输出计算完成后封装的Page数据。</li>
-</ul>
-<h4 id="表示表达式的两种形式">表示表达式的两种形式</h4>
-<p>Expression和RowExpression是两种表达式。</p>
-<p>Expression是在SQL抽象语法树、逻辑执行计划PlanNode树中用于表示表达式的形式，它的基类Expression继承自抽象语法树的基类Node节点，Expresssion有几十个子类来表示更具体的某个表达式逻辑，比如：</p>
-<ul>
-<li>SymbolReference表示对某个字段的引用</li>
-<li>FunctionCall表示对函数的调用</li>
-<li>ArithmeticBinaryExpression表示基本的二元算数运算，比如 x + y, x * y</li>
-<li>Cast表示将某个字面意思的字符串转换为具体的类型，比如CAST(3 AS BIGINT)</li>
-</ul>
-<p>在将要利用代码生成技术生成特定的PageFilter、PageProjection实现类时，RowExpression将几十种Expression的表示简化为6种相同含义的表达，它们分别如下：</p>
-<ul>
-<li>ConstantExpression 表示某个字面常量，例如 i_category_id * 3中的3</li>
-<li>InputReferenceExpression 表示对某个字段的引用</li>
-<li>CallExpression 表示函数或者运算符调用</li>
-<li>SpecialForm 可用于表示多种负责的逻辑，包括但不限于IN、BETWEEN、IF、AND、OR</li>
-<li>LambdaDefinitionExpression 表示SQL中Lambda函数定义</li>
-<li>VariableReferenceExpression 表示对变量的引用</li>
-</ul>
-<p>之所以要先用Expression及其子类作为表达式的结构，其后在算子执行时又将表达式转换为RowExpression结构，是因为在算子执行阶段自动生成数据处理代码时，RowExpression种类更少，对应的表达式树形结构更容易遍历。</p>
-<h4 id="pageprocessorpagefilterpageprojection">PageProcessor、PageFilter、PageProjection</h4>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-java">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">PageProcessor</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">{</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">MAX_BATCH_SIZE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">1024</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">MAX_PAGE_SIZE_IN_BYTES</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">4</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">1024</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">1024</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">MIN_PAGE_SIZE_IN_BYTES</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">1024</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">1024</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">ExpressionProfiler</span><span class="w"> </span><span class="n">expressionProfiler</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">DictionarySourceIdFunction</span><span class="w"> </span><span class="n">dictionarySourceIdFunction</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">DictionarySourceIdFunction</span><span class="p">();</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">Optional</span><span class="o">&lt;</span><span class="n">PageFilter</span><span class="o">&gt;</span><span class="w"> </span><span class="n">filter</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">PageProjection</span><span class="o">&gt;</span><span class="w"> </span><span class="n">projections</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">projectBatchSize</span><span class="p">;</span></span></span></code></pre></div></div>
-<p>给定某个page的数据，PageProcessor可以利用它持有的PageFilter、PageProjection实例完成这个Page数据的过滤和投影操作。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-java">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="kd">public</span><span class="w"> </span><span class="kd">interface</span> <span class="nc">PageFilter</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">{</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kt">boolean</span><span class="w"> </span><span class="nf">isDeterministic</span><span class="p">();</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">		</span><span class="c1">// 参与过滤的输入Page的所有列的channel ID</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">InputChannels</span><span class="w"> </span><span class="nf">getInputChannels</span><span class="p">();</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">SelectedPositions</span><span class="w"> </span><span class="nf">filter</span><span class="p">(</span><span class="n">ConnectorSession</span><span class="w"> </span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="n">Page</span><span class="w"> </span><span class="n">page</span><span class="p">);</span></span></span></code></pre></div></div>
-<p>为了避免数据过滤完成后立即创建新的Page再去做数据投影计算（这样可能导致在内存中物化中间过程的数据开销比较大），Presto利用SelectedPositions这样的数据结构记录数据过滤完成后被筛选出来的行的ID（row id）列表，PageProjection的数据投影操作只对SelectedPositions中记录的数据过滤保留下来的行做投影操作，并最终创建Page结果数据。</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-java">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="kd">public</span><span class="w"> </span><span class="kd">interface</span> <span class="nc">PageProjection</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">{</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">Type</span><span class="w"> </span><span class="nf">getType</span><span class="p">();</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kt">boolean</span><span class="w"> </span><span class="nf">isDeterministic</span><span class="p">();</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">		</span><span class="c1">// 给定某个Page，InputChannels指定的blocks给到PageProjection，计算并输出Projection后的一个Block</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">InputChannels</span><span class="w"> </span><span class="nf">getInputChannels</span><span class="p">();</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">Work</span><span class="o">&lt;</span><span class="n">Block</span><span class="o">&gt;</span><span class="w"> </span><span class="nf">project</span><span class="p">(</span><span class="n">ConnectorSession</span><span class="w"> </span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="n">DriverYieldSignal</span><span class="w"> </span><span class="n">yieldSignal</span><span class="p">,</span><span class="w"> </span><span class="n">Page</span><span class="w"> </span><span class="n">page</span><span class="p">,</span><span class="w"> </span><span class="n">SelectedPositions</span><span class="w"> </span><span class="n">selectedPositions</span><span class="p">);</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
-<h4 id="利用代码生成技术生成表达式执行代码">利用代码生成技术生成表达式执行代码</h4>
-<p>首先需要生成表达式执行代码，数据过滤代码的生成流程是从PageFunctionCompiler::compileFilter到RowExpressionCompiler::compile，数据投影代码的生成流程是从PageFunctionCompiler::compileProjection到RowExpressionCompiler::compile，它们最后都是利用RowExpressionCompiler中的RowExpressionVisitor以深度优先的方式遍历用RowExpression树形结构表示的表达式执行逻辑，以生成表达式的执行代码。可以理解为生成了一个可调用的函数。实际上经过airlift bytecode代码库的包装，代码生成技术已经被大大简化了，可读性也很高。其次，PageFilter、PageProjection在遍历待计算Page数据的每一行时，会调用上述流程生成的表达式执行代码，并传入Page中需要参与表达式计算的所有列（对应为Block）。</p>
-<p>整体的思想是将树形结构的RowExpression结构拍平为层层嵌套的执行逻辑，在这个过程中会直接将表达式的执行逻辑自动生成在一个函数的方法体中，以减少函数调用的开销。</p>
-<p>表达式计算的优化</p>
-<ul>
-<li>常量折叠（Constant Fold）：例如SELECT c1 + 2 + 3 FROM 这样的查询，为了避免在查询执行时迭代每行数据都需要做2 + 3这样的常量计算，所以在执行计划生成阶段直接将其优化为SELECT c1 + 5 FROM</li>
-<li>相同子表达式优化（Common Sub Expression）：例如<code>SELECT strpos(upper(a)), 'FOO') &gt; 0 OR strpos(upper(a), &quot;BAR&quot;) &gt; 0 FROM</code>这样的查询，可识别出upper(a)这个表达式被多次用到，不需要重复计算，可缓存器结果以实现多次复用。</li>
-<li>子表达式计算动态重排序：例如，在做数据过滤时，如果发现先执行某些子表达式能显著减少过滤后的数据量，那么可在执行过程中动态地调整子表达式执行的顺序，将这些子表达式放在前面执行，这样可以减少那些过滤效果不好的子表达式的执行次数（Presto未实现此功能，Velox支持了此能力）</li>
-</ul>
-</div><div class="post-footer" id="post-footer">
-    <div class="post-info">
-        <div class="post-info-line">
-            <div class="post-info-mod">
-                <span>Updated on 2025-07-20</span>
-            </div></div>
-        <div class="post-info-line">
-            <div class="post-info-md"><span>
-                            <a class="link-to-markdown" href="/posts/trino-filter-project/index.md" target="_blank">Read Markdown</a>
-                        </span></div>
-            <div class="post-info-share">
-                <span><a href="javascript:void(0);" title="Share on X" data-sharer="x" data-url="http://example.org/posts/trino-filter-project/" data-title="Presto数据过滤和投影" data-hashtags="Presto"><i class="fab fa-x-twitter fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Threads" data-sharer="threads" data-url="http://example.org/posts/trino-filter-project/" data-title="Presto数据过滤和投影"><i class="fab fa-threads fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Facebook" data-sharer="facebook" data-url="http://example.org/posts/trino-filter-project/" data-hashtag="Presto"><i class="fab fa-facebook-square fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Hacker News" data-sharer="hackernews" data-url="http://example.org/posts/trino-filter-project/" data-title="Presto数据过滤和投影"><i class="fab fa-hacker-news fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Line" data-sharer="line" data-url="http://example.org/posts/trino-filter-project/" data-title="Presto数据过滤和投影"><i data-svg-src="https://cdn.jsdelivr.net/npm/simple-icons@14.9.0/icons/line.svg" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on 微博" data-sharer="weibo" data-url="http://example.org/posts/trino-filter-project/" data-title="Presto数据过滤和投影"><i class="fab fa-weibo fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Diaspora" data-sharer="diaspora" data-url="http://example.org/posts/trino-filter-project/" data-title="Presto数据过滤和投影" data-description=""><i class="fab fa-diaspora fa-fw" aria-hidden="true"></i></a><a href="https://t.me/share/url?url=http%3a%2f%2fexample.org%2fposts%2ftrino-filter-project%2f&amp;text=Presto%e6%95%b0%e6%8d%ae%e8%bf%87%e6%bb%a4%e5%92%8c%e6%8a%95%e5%bd%b1" target="_blank" title="Share on Telegram"><i class="fab fa-telegram fa-fw" aria-hidden="true"></i></a></span>
-            </div>
-        </div>
-    </div>
-
-    <div class="post-info-more">
-        <section class="post-tags"><i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/presto/">Presto</a></section>
-        <section>
-            <span><a href="javascript:void(0);" onclick="window.history.back();">Back</a></span>&nbsp;|&nbsp;<span><a href="/">Home</a></span>
-        </section>
-    </div>
-
-    <div class="post-nav"><a href="/posts/trino-practice/" class="prev" rel="prev" title="Presto的计算流程"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>Presto的计算流程</a>
-            <a href="/posts/java-log-in-practice/" class="next" rel="next" title="Java日志实战">Java日志实战<i class="fas fa-angle-right fa-fw" aria-hidden="true"></i></a></div>
-</div>
-<div id="comments"><div id="utterances" class="comment"></div><noscript>
-                Please enable JavaScript to view the comments powered by <a href="https://utteranc.es/">utterances</a>.
-            </noscript></div></article></div>
-            </main><footer class="footer">
-        <div class="footer-container"><div class="footer-line">Powered by <a href="https://gohugo.io/" target="_blank" rel="noopener noreffer" title="Hugo 0.140.2">Hugo</a> | Theme - <a href="https://github.com/dillonzq/LoveIt" target="_blank" rel="noopener noreffer" title="LoveIt 0.3.1-DEV"><i class="far fa-kiss-wink-heart fa-fw" aria-hidden="true"></i> LoveIt</a>
-                </div><div class="footer-line" itemscope itemtype="http://schema.org/CreativeWork"><i class="far fa-copyright fa-fw" aria-hidden="true"></i><span itemprop="copyrightYear">2022 - 2025</span><span class="author" itemprop="copyrightHolder">&nbsp;<a href="/" target="_blank">xxxx</a></span></div>
-        </div>
-    </footer></div>
-
-        <div id="fixed-buttons"><a href="#" id="back-to-top" class="fixed-button" title="Back to Top">
-                <i class="fas fa-arrow-up fa-fw" aria-hidden="true"></i>
-            </a>
-        </div>
-
-        <div id="fixed-buttons-hidden"><a href="#" id="view-comments" class="fixed-button" title="View Comments">
-                <i class="fas fa-comment fa-fw" aria-hidden="true"></i>
-            </a>
-        </div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css"><script src="https://cdn.jsdelivr.net/npm/autocomplete.js@0.38.1/dist/autocomplete.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lunr@2.3.9/lunr.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lazysizes@5.3.2/lazysizes.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js"></script><script src="https://cdn.jsdelivr.net/npm/sharer.js@0.5.2/sharer.min.js"></script><script src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script><script src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"></script><script src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/copy-tex.min.js"></script><script src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/mhchem.min.js"></script><script src="https://cdn.jsdelivr.net/npm/mermaid@11.5.0/dist/mermaid.min.js"></script><script>window.config={"comment":{"utterances":{"darkTheme":"github-dark","issueTerm":"pathname","label":"","lightTheme":"github-light","repo":"ShadowUnderMoon/ShadowUnderMoon.github.io"}},"data":{"id-1":"graph TD\n\tOutput --\u003e ExchangeNode --\u003e TableScan","id-2":"graph LR\n    subgraph stage0\n    Output --\u003e ExchangeNode\n    end\n    subgraph stage1\n    TableScan\n    end\n    stage0 --\u003e stage1","id-3":"graph TD\n\tOutput --\u003e Project --\u003e Filter --\u003e TableScan","id-4":"graph TD\n\tOutput --\u003e ExchangeNode --\u003e ProjectNode --\u003e FilterNode --\u003e TableScan"},"math":{"delimiters":[{"display":true,"left":"$$","right":"$$"},{"display":true,"left":"\\[","right":"\\]"},{"display":true,"left":"\\begin{equation}","right":"\\end{equation}"},{"display":true,"left":"\\begin{equation*}","right":"\\end{equation*}"},{"display":true,"left":"\\begin{align}","right":"\\end{align}"},{"display":true,"left":"\\begin{align*}","right":"\\end{align*}"},{"display":true,"left":"\\begin{alignat}","right":"\\end{alignat}"},{"display":true,"left":"\\begin{alignat*}","right":"\\end{alignat*}"},{"display":true,"left":"\\begin{gather}","right":"\\end{gather}"},{"display":true,"left":"\\begin{CD}","right":"\\end{CD}"},{"display":false,"left":"$","right":"$"},{"display":false,"left":"\\(","right":"\\)"}],"strict":false},"search":{"highlightTag":"em","lunrIndexURL":"/index.json","maxResultLength":10,"noResultsFound":"No results found","snippetLength":50,"type":"lunr"}};</script><script src="/js/theme.min.js"></script></body>
-</html>
+public class TableScanNode extends PlanNode { // TableHandle表示的是与当前TableScanNode对应的是数据源存储中的那个类 private final TableHandle table; // outputSymbols: TableScanNode输出的symbols列表，在Presto中使用Symbol表示要输出哪些列 private final List<Symbol> outputSymbols; // assignments：对于outputSymbols中的每个Symbol，明确其来源于数据源Connector的那个Column（用ColumnHandle表示） private final Map<Symbol, ColumnHandle> assignments; // symbol -> column private final TupleDomain<ColumnHandle> enforcedConstraint; private final boolean forDelete; 查询执行时，只要将TableHandle、ColumnHandl交给数据源连接器，它就知道拉取那些表、哪些列的数据，这是一个基本抽象，在考虑到各种下推优化时，这两个概念将发挥更大的作用"><meta name=application-name content="My cool site"><meta name=apple-mobile-web-app-title content="My cool site"><meta name=referrer content="no-referrer"><meta name=theme-color content="#ffffff"><meta name=msapplication-TileColor content="#da532c"><link rel="shortcut icon" type=image/x-icon href=/favicon.ico><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=mask-icon href=/safari-pinned-tab.svg color=#5bbad5><link rel=manifest href=/site.webmanifest><link rel=canonical href=http://example.org/posts/trino-filter-project/><link rel=prev href=http://example.org/posts/trino-practice/><link rel=next href=http://example.org/posts/java-log-in-practice/><link rel=stylesheet href=/css/style.min.css><link rel=preload href=https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css as=style onload='this.onload=null,this.rel="stylesheet"'><noscript><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css></noscript><link rel=preload href=https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css as=style onload='this.onload=null,this.rel="stylesheet"'><noscript><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css></noscript><script type=application/ld+json>{"@context":"http://schema.org","@type":"BlogPosting","headline":"Presto数据过滤和投影","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"http:\/\/example.org\/posts\/trino-filter-project\/"},"genre":"posts","keywords":"Presto","wordcount":4731,"url":"http:\/\/example.org\/posts\/trino-filter-project\/","datePublished":"2025-07-20T09:12:14+08:00","dateModified":"2025-07-20T09:12:14+08:00","publisher":{"@type":"Organization","name":""},"author":{"@type":"Person","name":"爱吃芒果"},"description":""}</script></head><body data-header-desktop=fixed data-header-mobile=auto><script>(window.localStorage&&localStorage.getItem("theme")?localStorage.getItem("theme")==="dark":"auto"==="auto"?window.matchMedia("(prefers-color-scheme: dark)").matches:"auto"==="dark")&&document.body.setAttribute("theme","dark")</script><div id=mask></div><div class=wrapper><header class=desktop id=header-desktop><div class=header-wrapper><div class=header-title><a href=/ title=爱吃芒果>My cool site</a></div><div class=menu><div class=menu-inner><a class=menu-item href=/posts/>文章 </a><a class=menu-item href=/page/archives/ title=Archives>Archives </a><a class=menu-item href=/tags/>标签 </a><a class=menu-item href=/page/search/ title=Search>Search </a><a class=menu-item href=/categories/>分类 </a><span class="menu-item delimiter"></span><span class="menu-item search" id=search-desktop>
+<input type=text placeholder="Search titles or contents..." id=search-input-desktop>
+<a href=javascript:void(0); class="search-button search-toggle" id=search-toggle-desktop title=Search><i class="fas fa-search fa-fw" aria-hidden=true></i>
+</a><a href=javascript:void(0); class="search-button search-clear" id=search-clear-desktop title=Clear><i class="fas fa-times-circle fa-fw" aria-hidden=true></i>
+</a><span class="search-button search-loading" id=search-loading-desktop><i class="fas fa-spinner fa-fw fa-spin" aria-hidden=true></i>
+</span></span><a href=javascript:void(0); class="menu-item theme-switch" title="Switch Theme"><i class="fas fa-adjust fa-fw" aria-hidden=true></i></a></div></div></div></header><header class=mobile id=header-mobile><div class=header-container><div class=header-wrapper><div class=header-title><a href=/ title=爱吃芒果>My cool site</a></div><div class=menu-toggle id=menu-toggle-mobile><span></span><span></span><span></span></div></div><div class=menu id=menu-mobile><div class=search-wrapper><div class="search mobile" id=search-mobile><input type=text placeholder="Search titles or contents..." id=search-input-mobile>
+<a href=javascript:void(0); class="search-button search-toggle" id=search-toggle-mobile title=Search><i class="fas fa-search fa-fw" aria-hidden=true></i>
+</a><a href=javascript:void(0); class="search-button search-clear" id=search-clear-mobile title=Clear><i class="fas fa-times-circle fa-fw" aria-hidden=true></i>
+</a><span class="search-button search-loading" id=search-loading-mobile><i class="fas fa-spinner fa-fw fa-spin" aria-hidden=true></i></span></div><a href=javascript:void(0); class=search-cancel id=search-cancel-mobile>Cancel</a></div><a class=menu-item href=/posts/ title>文章</a><a class=menu-item href=/page/archives/ title=Archives>Archives</a><a class=menu-item href=/tags/ title>标签</a><a class=menu-item href=/page/search/ title=Search>Search</a><a class=menu-item href=/categories/ title>分类</a><a href=javascript:void(0); class="menu-item theme-switch" title="Switch Theme">
+<i class="fas fa-adjust fa-fw" aria-hidden=true></i></a></div></div></header><div class="search-dropdown desktop"><div id=search-dropdown-desktop></div></div><div class="search-dropdown mobile"><div id=search-dropdown-mobile></div></div><main class=main><div class=container><div class=toc id=toc-auto><h2 class=toc-title>Contents</h2><div class=toc-content id=toc-content-auto></div></div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Presto数据过滤和投影</h1><div class=post-meta><div class=post-meta-line><span class=post-author><a href=/ title=Author rel=author class=author><i class="fas fa-user-circle fa-fw" aria-hidden=true></i>爱吃芒果</a></span>&nbsp;<span class=post-category>included in <a href=/categories/presto/><i class="far fa-folder fa-fw" aria-hidden=true></i>Presto</a></span></div><div class=post-meta-line><i class="far fa-calendar-alt fa-fw" aria-hidden=true></i>&nbsp;<time datetime=2025-07-20>2025-07-20</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden=true></i>&nbsp;4731 words&nbsp;
+<i class="far fa-clock fa-fw" aria-hidden=true></i>&nbsp;10 minutes&nbsp;</div></div><div class="details toc" id=toc-static data-kept><div class="details-summary toc-title"><span>Contents</span>
+<span><i class="details-icon fas fa-angle-right" aria-hidden=true></i></span></div><div class="details-content toc-content" id=toc-content-static><nav id=TableOfContents><ul><li><a href=#简单拉取数据查询的实现原理>简单拉取数据查询的实现原理</a><ul><li><a href=#执行计划的生成和优化>执行计划的生成和优化</a></li><li><a href=#分布式调度与执行的设计实现>分布式调度与执行的设计实现</a></li></ul></li><li><a href=#数据过滤与数据投影的实现原理>数据过滤与数据投影的实现原理</a><ul><li><a href=#执行计划的生成和优化-1>执行计划的生成和优化</a></li><li><a href=#分布式调度与执行的设计实现-1>分布式调度与执行的设计实现</a></li></ul></li></ul></nav></div></div><div class=content id=content><h2 id=简单拉取数据查询的实现原理>简单拉取数据查询的实现原理</h2><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-sql"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
+<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
+<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-sql data-lang=sql><span class=line><span class=cl><span class=k>SELECT</span><span class=w> </span><span class=n>ss_item_sk</span><span class=p>,</span><span class=w> </span><span class=n>ss_sales_price</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>FROM</span><span class=w> </span><span class=n>store_sales</span><span class=p>;</span></span></span></code></pre></div></div><h3 id=执行计划的生成和优化>执行计划的生成和优化</h3><h4 id=初始逻辑执行计划>初始逻辑执行计划</h4><div class=mermaid id=id-1></div><p>TableScan节点：负责从数据源连接器拉取数据</p><p>Output节点：逻辑执行计划的根节点，表示输出计算结果，其自身没有计算逻辑</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
+<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
+<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=kd>public</span><span class=w> </span><span class=kd>class</span> <span class=nc>TableScanNode</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=kd>extends</span><span class=w> </span><span class=n>PlanNode</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>{</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  	</span><span class=c1>// TableHandle表示的是与当前TableScanNode对应的是数据源存储中的那个类</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>TableHandle</span><span class=w> </span><span class=n>table</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  	</span><span class=c1>// outputSymbols: TableScanNode输出的symbols列表，在Presto中使用Symbol表示要输出哪些列</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>List</span><span class=o>&lt;</span><span class=n>Symbol</span><span class=o>&gt;</span><span class=w> </span><span class=n>outputSymbols</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  	</span><span class=c1>// assignments：对于outputSymbols中的每个Symbol，明确其来源于数据源Connector的那个Column（用ColumnHandle表示）</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>Map</span><span class=o>&lt;</span><span class=n>Symbol</span><span class=p>,</span><span class=w> </span><span class=n>ColumnHandle</span><span class=o>&gt;</span><span class=w> </span><span class=n>assignments</span><span class=p>;</span><span class=w> </span><span class=c1>// symbol -&gt; column</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>TupleDomain</span><span class=o>&lt;</span><span class=n>ColumnHandle</span><span class=o>&gt;</span><span class=w> </span><span class=n>enforcedConstraint</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=kt>boolean</span><span class=w> </span><span class=n>forDelete</span><span class=p>;</span></span></span></code></pre></div></div><p>查询执行时，只要将TableHandle、ColumnHandl交给数据源连接器，它就知道拉取那些表、哪些列的数据，这是一个基本抽象，在考虑到各种下推优化时，这两个概念将发挥更大的作用</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
+<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
+<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=kd>public</span><span class=w> </span><span class=kd>class</span> <span class=nc>OutputNode</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=kd>extends</span><span class=w> </span><span class=n>PlanNode</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>{</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  	</span><span class=c1>// 上游PlanNode节点</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>PlanNode</span><span class=w> </span><span class=n>source</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  	</span><span class=c1>// SELECT语句最终要输出结果的列名称</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>List</span><span class=o>&lt;</span><span class=n>String</span><span class=o>&gt;</span><span class=w> </span><span class=n>columnNames</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  	</span><span class=c1>// OutputNode输出的Symbol表示，与ColumnNames--对应</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>List</span><span class=o>&lt;</span><span class=n>Symbol</span><span class=o>&gt;</span><span class=w> </span><span class=n>outputs</span><span class=p>;</span><span class=w> </span></span></span></code></pre></div></div><h4 id=优化后的逻辑执行计划>优化后的逻辑执行计划</h4><div class=mermaid id=id-2></div><p>为了提升从数据源拉取数据的并发度，可将TableScanNode设计为多个任务并分别放置在多个节点上以并发拉取数据，对于OutputNode来说，其并行度只能是1，因为它需要将上游TableScanNode拉取的数据合并到一起，给到查询发起者。由于执行TableScanNode与OutputNode的并行度不同，在OutputNode与TableScanNode中间需要插入一个ExchangeNode来实现数据交换，改变并行度。</p><h4 id=查询执行阶段划分>查询执行阶段划分</h4><p>Presto的AddExchange优化器基于逻辑执行计划的ExchangeNode划分逻辑执行计划的PlanFragment，每个PlanFragment对应生成一个查询执行阶段，。简而言之，凡是上游节点和下游节点要求的数据分布不一致，就需要做一次数据交换（无论是REPARTITION还是GATHER方式），两侧需要划分到不同的查询执行阶段。逻辑执行计划由AddExchanges优化器划分为2个PlanFragment，对应分布式执行时的2个查询执行阶段。</p><div class=mermaid id=id-3></div><p>stage1：从数据源连接器拉取数据，stage1的输出数据会放到OutputBuffer中，等待下游stage0的任务来拉取。</p><p>stage0：从上游stage1拉取数据，输出结果给到集群协调节点，stage0输出的数据会放到OutputBuffer中，等待集群协调节点来取</p><h3 id=分布式调度与执行的设计实现>分布式调度与执行的设计实现</h3><p>stage1的任务执行时会按照PlanFragment的PlanNode子树，创建两个算子，TableScanOperator和TaskOutputOperator。TableScanOperator负责从存储系统中拉取数据后输出给TaskOutputOperator，TaskOutputOperator负责将待输出的数据放到当前任务的OutputBuffer中，等待下游Stage0的任务来拉取。</p><p>stage0的任务执行时会按照PlanFragment的PlanNode子树，创建两个算子，ExchangeOperator和TaskOutputOperator，ExchangeOperator负责从上游stage1的任务中拉取数据，而TaskOutputOperator则负责将待输出的数据放置到当前任务的OutputBuffer中等待集群协调节点来拉取。</p><h2 id=数据过滤与数据投影的实现原理>数据过滤与数据投影的实现原理</h2><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-sql"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
+<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
+<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-sql data-lang=sql><span class=line><span class=cl><span class=k>SELECT</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>	</span><span class=n>i_category_id</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>	</span><span class=k>upper</span><span class=p>(</span><span class=n>i_category</span><span class=p>)</span><span class=w> </span><span class=k>AS</span><span class=w> </span><span class=n>upper_category</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>	</span><span class=n>concat</span><span class=p>(</span><span class=n>i_category</span><span class=p>,</span><span class=w> </span><span class=n>i_color</span><span class=p>)</span><span class=w> </span><span class=k>AS</span><span class=w> </span><span class=n>cname</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>	</span><span class=n>i_category_id</span><span class=w> </span><span class=o>*</span><span class=w> </span><span class=mi>3</span><span class=w> </span><span class=k>AS</span><span class=w> </span><span class=n>m_category</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>	</span><span class=n>icategory_id</span><span class=w> </span><span class=o>+</span><span class=w> </span><span class=n>i_brand_id</span><span class=w> </span><span class=k>AS</span><span class=w> </span><span class=n>a_num</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>FROM</span><span class=w>  </span><span class=n>item</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>WHERE</span><span class=w> </span><span class=n>i_item_sk</span><span class=w> </span><span class=k>IN</span><span class=w> </span><span class=p>(</span><span class=mi>13631</span><span class=p>,</span><span class=w> </span><span class=mi>13283</span><span class=p>)</span><span class=w> </span><span class=k>OR</span><span class=w> </span><span class=n>i_category_id</span><span class=w> </span><span class=k>BETWEEN</span><span class=w> </span><span class=mi>2</span><span class=w> </span><span class=k>AND</span><span class=w> </span><span class=mi>10</span><span class=p>;</span></span></span></code></pre></div></div><h3 id=执行计划的生成和优化-1>执行计划的生成和优化</h3><h4 id=初始逻辑执行计划-1>初始逻辑执行计划</h4><div class=mermaid id=id-4></div><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
+<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
+<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=kd>public</span><span class=w> </span><span class=kd>class</span> <span class=nc>FilterNode</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=kd>extends</span><span class=w> </span><span class=n>PlanNode</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>{</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>PlanNode</span><span class=w> </span><span class=n>source</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  	</span><span class=c1>// 数据过滤的表达式，类型是Expression</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>Expression</span><span class=w> </span><span class=n>predicate</span><span class=p>;</span></span></span></code></pre></div></div><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
+<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
+<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=kd>public</span><span class=w> </span><span class=kd>class</span> <span class=nc>ProjectNode</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=kd>extends</span><span class=w> </span><span class=n>PlanNode</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>{</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>PlanNode</span><span class=w> </span><span class=n>source</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  	</span><span class=c1>// Assignments可以理解为Map&lt;Symbol, Expression&gt;，表示的是所有要输出的表达式</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>Assignments</span><span class=w> </span><span class=n>assignments</span><span class=p>;</span></span></span></code></pre></div></div><h4 id=优化后的逻辑执行计划-1>优化后的逻辑执行计划</h4><div class=mermaid id=id-5></div><h4 id=查询执行阶段划分-1>查询执行阶段划分</h4><p>也是从ExchangeNode划分成两个stage。</p><h3 id=分布式调度与执行的设计实现-1>分布式调度与执行的设计实现</h3><p>值得引起注意的是，执行计划树中的PlanNode并不是总与算子一一对应，例如ProjectNode、FilterNode实际上不存在对应的算子，这两种PlanNode都对应了FilterAndProjectOperator，而TableScanNode可能对应多个算子：TableScanOperator、ScanFilterAndProjectOperator，从PlanNode树生成OperatorChain的阶段，将根据不同的PlanNode组合生成不同的算子。</p><p>虽然数据过滤和数据投影在查询的功能上看是不同的，但是在OLAP引擎的底层设计上都可以归为表达式的执行。</p><ul><li>数据过滤：给定某行数据作为过滤表达式的输入，执行此表达式并输出布尔型结果，只有结果是true时才会输出此数据行</li><li>数据投影：给定某行数据作为投影表达式的输入，执行此表达式并输出表达式执行结果</li></ul><p>我们从表达式的视角看看从Presto接收包含表达式的sql到查询执行完成，都经历了哪些过程：</p><ul><li>SQL解析及语义分析阶段：SQL字符串转换为抽象语法树，其中表达式用Expression节点及其子类表示</li><li>生成逻辑执行计划阶段：将抽象语法树转换为PlanNode树，其中FilterNode的predicate字段属性对应数据过滤的表达式，ProjectNode的assignment字段属性对应所有数据投影字段的表达式</li><li>任务执行时的代码生成阶段：首先Expression转换为RowExpression（RowExpression所表示的表达式与Expression所表示的表达式在逻辑上完全等价），然后利用代码生成技术将RowExpression转换为可直接执行的代码。数据过滤表达式的代码生成逻辑及其周边逻辑被进一步封装为PageFilter这个java接口的实现类，数据投影表达式的代码生成逻辑及其周边逻辑被进一步封装为PageProjection这个java接口的实现类。最终自动生成的PageFilter、PageProjection的实现将被封装到一个PageProcessor的实例中。</li><li>任务执行时的遍历数据阶段：由ScanFilterAndProjectOperator或FilterAndProjectOperator驱动PageProcessor中的PageFilter、PageProjection遍历从存储拉取的所有数据行，逐行完成表达式的执行，为后续算子输出计算完成后封装的Page数据。</li></ul><h4 id=表示表达式的两种形式>表示表达式的两种形式</h4><p>Expression和RowExpression是两种表达式。</p><p>Expression是在SQL抽象语法树、逻辑执行计划PlanNode树中用于表示表达式的形式，它的基类Expression继承自抽象语法树的基类Node节点，Expresssion有几十个子类来表示更具体的某个表达式逻辑，比如：</p><ul><li>SymbolReference表示对某个字段的引用</li><li>FunctionCall表示对函数的调用</li><li>ArithmeticBinaryExpression表示基本的二元算数运算，比如 x + y, x * y</li><li>Cast表示将某个字面意思的字符串转换为具体的类型，比如CAST(3 AS BIGINT)</li></ul><p>在将要利用代码生成技术生成特定的PageFilter、PageProjection实现类时，RowExpression将几十种Expression的表示简化为6种相同含义的表达，它们分别如下：</p><ul><li>ConstantExpression 表示某个字面常量，例如 i_category_id * 3中的3</li><li>InputReferenceExpression 表示对某个字段的引用</li><li>CallExpression 表示函数或者运算符调用</li><li>SpecialForm 可用于表示多种负责的逻辑，包括但不限于IN、BETWEEN、IF、AND、OR</li><li>LambdaDefinitionExpression 表示SQL中Lambda函数定义</li><li>VariableReferenceExpression 表示对变量的引用</li></ul><p>之所以要先用Expression及其子类作为表达式的结构，其后在算子执行时又将表达式转换为RowExpression结构，是因为在算子执行阶段自动生成数据处理代码时，RowExpression种类更少，对应的表达式树形结构更容易遍历。</p><h4 id=pageprocessorpagefilterpageprojection>PageProcessor、PageFilter、PageProjection</h4><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
+<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
+<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=kd>public</span><span class=w> </span><span class=kd>class</span> <span class=nc>PageProcessor</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>{</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>public</span><span class=w> </span><span class=kd>static</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=kt>int</span><span class=w> </span><span class=n>MAX_BATCH_SIZE</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>8</span><span class=w> </span><span class=o>*</span><span class=w> </span><span class=n>1024</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>static</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=kt>int</span><span class=w> </span><span class=n>MAX_PAGE_SIZE_IN_BYTES</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>4</span><span class=w> </span><span class=o>*</span><span class=w> </span><span class=n>1024</span><span class=w> </span><span class=o>*</span><span class=w> </span><span class=n>1024</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>static</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=kt>int</span><span class=w> </span><span class=n>MIN_PAGE_SIZE_IN_BYTES</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>1024</span><span class=w> </span><span class=o>*</span><span class=w> </span><span class=n>1024</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>ExpressionProfiler</span><span class=w> </span><span class=n>expressionProfiler</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>DictionarySourceIdFunction</span><span class=w> </span><span class=n>dictionarySourceIdFunction</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>new</span><span class=w> </span><span class=n>DictionarySourceIdFunction</span><span class=p>();</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>Optional</span><span class=o>&lt;</span><span class=n>PageFilter</span><span class=o>&gt;</span><span class=w> </span><span class=n>filter</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>List</span><span class=o>&lt;</span><span class=n>PageProjection</span><span class=o>&gt;</span><span class=w> </span><span class=n>projections</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kd>private</span><span class=w> </span><span class=kt>int</span><span class=w> </span><span class=n>projectBatchSize</span><span class=p>;</span></span></span></code></pre></div></div><p>给定某个page的数据，PageProcessor可以利用它持有的PageFilter、PageProjection实例完成这个Page数据的过滤和投影操作。</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
+<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
+<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=kd>public</span><span class=w> </span><span class=kd>interface</span> <span class=nc>PageFilter</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>{</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kt>boolean</span><span class=w> </span><span class=nf>isDeterministic</span><span class=p>();</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>		</span><span class=c1>// 参与过滤的输入Page的所有列的channel ID</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>InputChannels</span><span class=w> </span><span class=nf>getInputChannels</span><span class=p>();</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>SelectedPositions</span><span class=w> </span><span class=nf>filter</span><span class=p>(</span><span class=n>ConnectorSession</span><span class=w> </span><span class=n>session</span><span class=p>,</span><span class=w> </span><span class=n>Page</span><span class=w> </span><span class=n>page</span><span class=p>);</span></span></span></code></pre></div></div><p>为了避免数据过滤完成后立即创建新的Page再去做数据投影计算（这样可能导致在内存中物化中间过程的数据开销比较大），Presto利用SelectedPositions这样的数据结构记录数据过滤完成后被筛选出来的行的ID（row id）列表，PageProjection的数据投影操作只对SelectedPositions中记录的数据过滤保留下来的行做投影操作，并最终创建Page结果数据。</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
+<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
+<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=kd>public</span><span class=w> </span><span class=kd>interface</span> <span class=nc>PageProjection</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>{</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>Type</span><span class=w> </span><span class=nf>getType</span><span class=p>();</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=kt>boolean</span><span class=w> </span><span class=nf>isDeterministic</span><span class=p>();</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>		</span><span class=c1>// 给定某个Page，InputChannels指定的blocks给到PageProjection，计算并输出Projection后的一个Block</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>InputChannels</span><span class=w> </span><span class=nf>getInputChannels</span><span class=p>();</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>Work</span><span class=o>&lt;</span><span class=n>Block</span><span class=o>&gt;</span><span class=w> </span><span class=nf>project</span><span class=p>(</span><span class=n>ConnectorSession</span><span class=w> </span><span class=n>session</span><span class=p>,</span><span class=w> </span><span class=n>DriverYieldSignal</span><span class=w> </span><span class=n>yieldSignal</span><span class=p>,</span><span class=w> </span><span class=n>Page</span><span class=w> </span><span class=n>page</span><span class=p>,</span><span class=w> </span><span class=n>SelectedPositions</span><span class=w> </span><span class=n>selectedPositions</span><span class=p>);</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>}</span></span></span></code></pre></div></div><h4 id=利用代码生成技术生成表达式执行代码>利用代码生成技术生成表达式执行代码</h4><p>首先需要生成表达式执行代码，数据过滤代码的生成流程是从PageFunctionCompiler::compileFilter到RowExpressionCompiler::compile，数据投影代码的生成流程是从PageFunctionCompiler::compileProjection到RowExpressionCompiler::compile，它们最后都是利用RowExpressionCompiler中的RowExpressionVisitor以深度优先的方式遍历用RowExpression树形结构表示的表达式执行逻辑，以生成表达式的执行代码。可以理解为生成了一个可调用的函数。实际上经过airlift bytecode代码库的包装，代码生成技术已经被大大简化了，可读性也很高。其次，PageFilter、PageProjection在遍历待计算Page数据的每一行时，会调用上述流程生成的表达式执行代码，并传入Page中需要参与表达式计算的所有列（对应为Block）。</p><p>整体的思想是将树形结构的RowExpression结构拍平为层层嵌套的执行逻辑，在这个过程中会直接将表达式的执行逻辑自动生成在一个函数的方法体中，以减少函数调用的开销。</p><p>表达式计算的优化</p><ul><li>常量折叠（Constant Fold）：例如SELECT c1 + 2 + 3 FROM 这样的查询，为了避免在查询执行时迭代每行数据都需要做2 + 3这样的常量计算，所以在执行计划生成阶段直接将其优化为SELECT c1 + 5 FROM</li><li>相同子表达式优化（Common Sub Expression）：例如<code>SELECT strpos(upper(a)), 'FOO') > 0 OR strpos(upper(a), "BAR") > 0 FROM</code>这样的查询，可识别出upper(a)这个表达式被多次用到，不需要重复计算，可缓存器结果以实现多次复用。</li><li>子表达式计算动态重排序：例如，在做数据过滤时，如果发现先执行某些子表达式能显著减少过滤后的数据量，那么可在执行过程中动态地调整子表达式执行的顺序，将这些子表达式放在前面执行，这样可以减少那些过滤效果不好的子表达式的执行次数（Presto未实现此功能，Velox支持了此能力）</li></ul></div><div class=post-footer id=post-footer><div class=post-info><div class=post-info-line><div class=post-info-mod><span>Updated on 2025-07-20</span></div></div><div class=post-info-line><div class=post-info-md><span><a class=link-to-markdown href=/posts/trino-filter-project/index.md target=_blank>Read Markdown</a></span></div><div class=post-info-share><span><a href=javascript:void(0); title="Share on X" data-sharer=x data-url=http://example.org/posts/trino-filter-project/ data-title=Presto数据过滤和投影 data-hashtags=Presto><i class="fab fa-x-twitter fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Threads" data-sharer=threads data-url=http://example.org/posts/trino-filter-project/ data-title=Presto数据过滤和投影><i class="fab fa-threads fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Facebook" data-sharer=facebook data-url=http://example.org/posts/trino-filter-project/ data-hashtag=Presto><i class="fab fa-facebook-square fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Hacker News" data-sharer=hackernews data-url=http://example.org/posts/trino-filter-project/ data-title=Presto数据过滤和投影><i class="fab fa-hacker-news fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Line" data-sharer=line data-url=http://example.org/posts/trino-filter-project/ data-title=Presto数据过滤和投影><i data-svg-src=https://cdn.jsdelivr.net/npm/simple-icons@14.9.0/icons/line.svg aria-hidden=true></i></a><a href=javascript:void(0); title="Share on 微博" data-sharer=weibo data-url=http://example.org/posts/trino-filter-project/ data-title=Presto数据过滤和投影><i class="fab fa-weibo fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Diaspora" data-sharer=diaspora data-url=http://example.org/posts/trino-filter-project/ data-title=Presto数据过滤和投影 data-description><i class="fab fa-diaspora fa-fw" aria-hidden=true></i></a><a href="https://t.me/share/url?url=http%3a%2f%2fexample.org%2fposts%2ftrino-filter-project%2f&amp;text=Presto%e6%95%b0%e6%8d%ae%e8%bf%87%e6%bb%a4%e5%92%8c%e6%8a%95%e5%bd%b1" target=_blank title="Share on Telegram"><i class="fab fa-telegram fa-fw" aria-hidden=true></i></a></span></div></div></div><div class=post-info-more><section class=post-tags><i class="fas fa-tags fa-fw" aria-hidden=true></i>&nbsp;<a href=/tags/presto/>Presto</a></section><section><span><a href=javascript:void(0); onclick=window.history.back()>Back</a></span>&nbsp;|&nbsp;<span><a href=/>Home</a></span></section></div><div class=post-nav><a href=/posts/trino-practice/ class=prev rel=prev title=Presto的计算流程><i class="fas fa-angle-left fa-fw" aria-hidden=true></i>Presto的计算流程</a>
+<a href=/posts/java-log-in-practice/ class=next rel=next title=Java日志实战>Java日志实战<i class="fas fa-angle-right fa-fw" aria-hidden=true></i></a></div></div><div id=comments><div id=utterances class=comment></div><noscript>Please enable JavaScript to view the comments powered by <a href=https://utteranc.es/>utterances</a>.</noscript></div></article></div></main><footer class=footer><div class=footer-container><div class=footer-line>Powered by <a href=https://gohugo.io/ target=_blank rel="noopener noreffer" title="Hugo 0.140.2">Hugo</a> | Theme - <a href=https://github.com/dillonzq/LoveIt target=_blank rel="noopener noreffer" title="LoveIt 0.3.1-DEV"><i class="far fa-kiss-wink-heart fa-fw" aria-hidden=true></i> LoveIt</a></div><div class=footer-line itemscope itemtype=http://schema.org/CreativeWork><i class="far fa-copyright fa-fw" aria-hidden=true></i><span itemprop=copyrightYear>2022 - 2025</span><span class=author itemprop=copyrightHolder>&nbsp;<a href=/ target=_blank>xxxx</a></span></div></div></footer></div><div id=fixed-buttons><a href=# id=back-to-top class=fixed-button title="Back to Top"><i class="fas fa-arrow-up fa-fw" aria-hidden=true></i></a></div><div id=fixed-buttons-hidden><a href=# id=view-comments class=fixed-button title="View Comments"><i class="fas fa-comment fa-fw" aria-hidden=true></i></a></div><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css><script src=https://cdn.jsdelivr.net/npm/autocomplete.js@0.38.1/dist/autocomplete.min.js></script><script src=https://cdn.jsdelivr.net/npm/lunr@2.3.9/lunr.min.js></script><script src=https://cdn.jsdelivr.net/npm/lazysizes@5.3.2/lazysizes.min.js></script><script src=https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js></script><script src=https://cdn.jsdelivr.net/npm/sharer.js@0.5.2/sharer.min.js></script><script src=https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js></script><script src=https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js></script><script src=https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/copy-tex.min.js></script><script src=https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/mhchem.min.js></script><script src=https://cdn.jsdelivr.net/npm/mermaid@11.5.0/dist/mermaid.min.js></script><script>window.config={comment:{utterances:{darkTheme:"github-dark",issueTerm:"pathname",label:"",lightTheme:"github-light",repo:"ShadowUnderMoon/ShadowUnderMoon.github.io"}},data:{"id-1":`graph TD
+    Output --> TableScan`,"id-2":`graph TD
+	Output --> ExchangeNode --> TableScan`,"id-3":`graph LR
+    subgraph stage0
+    Output --> ExchangeNode
+    end
+    subgraph stage1
+    TableScan
+    end
+    stage0 --> stage1`,"id-4":`graph TD
+	Output --> Project --> Filter --> TableScan`,"id-5":`graph TD
+	Output --> ExchangeNode --> ProjectNode --> FilterNode --> TableScan`},math:{delimiters:[{display:!0,left:"$$",right:"$$"},{display:!0,left:"\\[",right:"\\]"},{display:!0,left:"\\begin{equation}",right:"\\end{equation}"},{display:!0,left:"\\begin{equation*}",right:"\\end{equation*}"},{display:!0,left:"\\begin{align}",right:"\\end{align}"},{display:!0,left:"\\begin{align*}",right:"\\end{align*}"},{display:!0,left:"\\begin{alignat}",right:"\\end{alignat}"},{display:!0,left:"\\begin{alignat*}",right:"\\end{alignat*}"},{display:!0,left:"\\begin{gather}",right:"\\end{gather}"},{display:!0,left:"\\begin{CD}",right:"\\end{CD}"},{display:!1,left:"$",right:"$"},{display:!1,left:"\\(",right:"\\)"}],strict:!1},search:{highlightTag:"em",lunrIndexURL:"/index.json",maxResultLength:10,noResultsFound:"No results found",snippetLength:50,type:"lunr"}}</script><script src=/js/theme.min.js></script></body></html>

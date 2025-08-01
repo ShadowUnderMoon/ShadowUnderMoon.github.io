@@ -1,15 +1,4 @@
-<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
-    <channel>
-        <title>Java - Tag - 爱吃芒果</title>
-        <link>http://example.org/tags/java/</link>
-        <description>Java - Tag - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Tue, 22 Jul 2025 14:42:40 &#43;0800</lastBuildDate><atom:link href="http://example.org/tags/java/" rel="self" type="application/rss+xml" /><item>
-    <title>Java日志实战</title>
-    <link>http://example.org/posts/java-log-in-practice/</link>
-    <pubDate>Tue, 22 Jul 2025 14:42:40 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/java-log-in-practice/</guid>
-    <description><![CDATA[<p>主要其实是学习<a href="https://mp.weixin.qq.com/s/eIiu08fVk194E0BgGL5gow" target="_blank" rel="noopener noreffer ">Java日志通关</a>系列文章，大佬太强了</p>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0"><channel><title>Java - Tag - 爱吃芒果</title><link>http://example.org/tags/java/</link><description>Java - Tag - 爱吃芒果</description><generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Tue, 22 Jul 2025 14:42:40 +0800</lastBuildDate><atom:link href="http://example.org/tags/java/" rel="self" type="application/rss+xml"/><item><title>Java日志实战</title><link>http://example.org/posts/java-log-in-practice/</link><pubDate>Tue, 22 Jul 2025 14:42:40 +0800</pubDate><author>爱吃芒果</author><guid>http://example.org/posts/java-log-in-practice/</guid><description><![CDATA[<p>主要其实是学习<a href="https://mp.weixin.qq.com/s/eIiu08fVk194E0BgGL5gow" target="_blank" rel="noopener noreffer ">Java日志通关</a>系列文章，大佬太强了</p>
 <p></p>
 <p>日志发展到今天，被抽象成了三层，接口层、实现层、适配层。</p>
 <ul>
@@ -17,24 +6,8 @@
 <li>实现层：真正干活的，能够把日志内存记录下来的工具，但请注意它不是上面接口实现，因为它不感知也不直接实现接口，仅仅是独立的实现</li>
 <li>适配层：一般称为adapter，因为接口层和适配层并非都出自一家之手，它们之间无法直接匹配</li>
 </ul>
-<p>适配层有可以分为绑定（binding）和桥接（bridging）两种能力：</p>]]></description>
-</item>
-<item>
-    <title>java Size Of Engine</title>
-    <link>http://example.org/posts/size_of_engine/</link>
-    <pubDate>Sun, 22 Jun 2025 20:20:36 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/size_of_engine/</guid>
-    <description><![CDATA[<p>ehcache3提供了限制缓存容量的选择，如果堆上存储的容量超过了指定的大小，则会驱逐缓存中的元素，直到有空间可以容纳为止。</p>
-<p>自己实现的sizeOfEngine应该实现ehcache3提供的引擎接口。</p>]]></description>
-</item>
-<item>
-    <title>Java线程池源码分析</title>
-    <link>http://example.org/posts/java_thread_pool/</link>
-    <pubDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/java_thread_pool/</guid>
-    <description><![CDATA[<h2 id="阅前提示">阅前提示</h2>
+<p>适配层有可以分为绑定（binding）和桥接（bridging）两种能力：</p>]]></description></item><item><title>java Size Of Engine</title><link>http://example.org/posts/size_of_engine/</link><pubDate>Sun, 22 Jun 2025 20:20:36 +0800</pubDate><author>爱吃芒果</author><guid>http://example.org/posts/size_of_engine/</guid><description>&lt;p>ehcache3提供了限制缓存容量的选择，如果堆上存储的容量超过了指定的大小，则会驱逐缓存中的元素，直到有空间可以容纳为止。&lt;/p>
+&lt;p>自己实现的sizeOfEngine应该实现ehcache3提供的引擎接口。&lt;/p></description></item><item><title>Java线程池源码分析</title><link>http://example.org/posts/java_thread_pool/</link><pubDate>Sat, 26 Apr 2025 09:47:55 +0800</pubDate><author>爱吃芒果</author><guid>http://example.org/posts/java_thread_pool/</guid><description><![CDATA[<h2 id="阅前提示">阅前提示</h2>
 <p>参考文献中的文章非常的好，基本看完了就能理解很多东西，推荐阅读</p>
 <p>源码中也提供了很多注释文本，推荐对照源码学习。</p>
 <h2 id="重要概念和接口">重要概念和接口</h2>
@@ -48,7 +21,4 @@
 </span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="kd">public</span><span class="w"> </span><span class="kd">interface</span> <span class="nc">Runnable</span><span class="w"> </span><span class="p">{</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kd">abstract</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">run</span><span class="p">();</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
-<p>线程可以接受一个实现 Runnable 接口的对象，并执行对应的逻辑。</p>]]></description>
-</item>
-</channel>
-</rss>
+<p>线程可以接受一个实现 Runnable 接口的对象，并执行对应的逻辑。</p>]]></description></item></channel></rss>

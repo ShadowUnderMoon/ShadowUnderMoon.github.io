@@ -1,27 +1,5 @@
-<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
-    <channel>
-        <title>Grpc - Tag - 爱吃芒果</title>
-        <link>http://example.org/tags/grpc/</link>
-        <description>Grpc - Tag - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Tue, 13 May 2025 22:33:46 &#43;0800</lastBuildDate><atom:link href="http://example.org/tags/grpc/" rel="self" type="application/rss+xml" /><item>
-    <title>Grpc Metric</title>
-    <link>http://example.org/posts/grpc-metric/</link>
-    <pubDate>Tue, 13 May 2025 22:33:46 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/grpc-metric/</guid>
-    <description><![CDATA[<h2 id="opentelemetry">OpenTelemetry</h2>
-<p>OpenTelemetry是CNCF孵化的开源观测框架，用于创建和管理遥测数据（telemetry），比如metrics, tracing, logs。这一项目的核心目标是避免依赖于vendor，从而可以更好地集成和拓展。</p>]]></description>
-</item>
-<item>
-    <title>Grpc源码分析</title>
-    <link>http://example.org/posts/grpc-in-practice/</link>
-    <pubDate>Fri, 02 May 2025 13:26:57 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/grpc-in-practice/</guid>
-    <description><![CDATA[<h2 id="gprc流程概括">gprc流程概括</h2>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0"><channel><title>Grpc - Tag - 爱吃芒果</title><link>http://example.org/tags/grpc/</link><description>Grpc - Tag - 爱吃芒果</description><generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Tue, 13 May 2025 22:33:46 +0800</lastBuildDate><atom:link href="http://example.org/tags/grpc/" rel="self" type="application/rss+xml"/><item><title>Grpc Metric</title><link>http://example.org/posts/grpc-metric/</link><pubDate>Tue, 13 May 2025 22:33:46 +0800</pubDate><author>爱吃芒果</author><guid>http://example.org/posts/grpc-metric/</guid><description>&lt;h2 id="opentelemetry">OpenTelemetry&lt;/h2>
+&lt;p>OpenTelemetry是CNCF孵化的开源观测框架，用于创建和管理遥测数据（telemetry），比如metrics, tracing, logs。这一项目的核心目标是避免依赖于vendor，从而可以更好地集成和拓展。&lt;/p></description></item><item><title>Grpc源码分析</title><link>http://example.org/posts/grpc-in-practice/</link><pubDate>Fri, 02 May 2025 13:26:57 +0800</pubDate><author>爱吃芒果</author><guid>http://example.org/posts/grpc-in-practice/</guid><description><![CDATA[<h2 id="gprc流程概括">gprc流程概括</h2>
 <p></p>
 <p>grpc的流程可以大致分成两个阶段，分别为grpc连接阶段和grpc交互阶段，如图所示（此图来自后面的参考文献）。</p>
-<p>在RPC连接阶段，client和server之间建立起TCP连接，grpc底层依赖于HTTP2，因此client和server还需要协调frame的相关设置，例如frame的大小，滑动窗口的大小等。</p>]]></description>
-</item>
-</channel>
-</rss>
+<p>在RPC连接阶段，client和server之间建立起TCP连接，grpc底层依赖于HTTP2，因此client和server还需要协调frame的相关设置，例如frame的大小，滑动窗口的大小等。</p>]]></description></item></channel></rss>
