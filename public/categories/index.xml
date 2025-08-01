@@ -1,1 +1,87 @@
-<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0"><channel><title>Categories - Category - 爱吃芒果</title><link>http://example.org/categories/</link><description>Categories - Category - 爱吃芒果</description><generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 26 Jul 2025 17:05:57 +0800</lastBuildDate><atom:link href="http://example.org/categories/" rel="self" type="application/rss+xml"/><item><title>FoundationDB</title><link>http://example.org/categories/foundationdb/</link><pubDate>Sat, 26 Jul 2025 17:05:57 +0800</pubDate><author>xxxx</author><guid>http://example.org/categories/foundationdb/</guid><description></description></item><item><title>Java</title><link>http://example.org/categories/java/</link><pubDate>Tue, 22 Jul 2025 14:42:40 +0800</pubDate><author>xxxx</author><guid>http://example.org/categories/java/</guid><description></description></item><item><title>Presto</title><link>http://example.org/categories/presto/</link><pubDate>Sun, 20 Jul 2025 09:12:14 +0800</pubDate><author>xxxx</author><guid>http://example.org/categories/presto/</guid><description></description></item><item><title>Ehcache3</title><link>http://example.org/categories/ehcache3/</link><pubDate>Sat, 07 Jun 2025 22:40:41 +0800</pubDate><author>xxxx</author><guid>http://example.org/categories/ehcache3/</guid><description></description></item><item><title>Spark</title><link>http://example.org/categories/spark/</link><pubDate>Sat, 07 Jun 2025 19:05:49 +0800</pubDate><author>xxxx</author><guid>http://example.org/categories/spark/</guid><description></description></item><item><title>Grpc</title><link>http://example.org/categories/grpc/</link><pubDate>Tue, 13 May 2025 22:33:46 +0800</pubDate><author>xxxx</author><guid>http://example.org/categories/grpc/</guid><description></description></item><item><title>JDK11</title><link>http://example.org/categories/jdk11/</link><pubDate>Sat, 26 Apr 2025 09:47:55 +0800</pubDate><author>xxxx</author><guid>http://example.org/categories/jdk11/</guid><description></description></item><item><title>JVM</title><link>http://example.org/categories/jvm/</link><pubDate>Sat, 26 Apr 2025 09:47:55 +0800</pubDate><author>xxxx</author><guid>http://example.org/categories/jvm/</guid><description></description></item><item><title>线程池</title><link>http://example.org/categories/%E7%BA%BF%E7%A8%8B%E6%B1%A0/</link><pubDate>Sat, 26 Apr 2025 09:47:55 +0800</pubDate><author>xxxx</author><guid>http://example.org/categories/%E7%BA%BF%E7%A8%8B%E6%B1%A0/</guid><description></description></item><item><title>内存管理</title><link>http://example.org/categories/%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/</link><pubDate>Sun, 09 Mar 2025 22:32:09 +0800</pubDate><author>xxxx</author><guid>http://example.org/categories/%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/</guid><description></description></item></channel></rss>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+    <channel>
+        <title>Categories - Category - 爱吃芒果</title>
+        <link>http://localhost:1313/categories/</link>
+        <description>Categories - Category - 爱吃芒果</description>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 26 Jul 2025 17:05:57 &#43;0800</lastBuildDate><atom:link href="http://localhost:1313/categories/" rel="self" type="application/rss+xml" /><item>
+    <title>FoundationDB</title>
+    <link>http://localhost:1313/categories/foundationdb/</link>
+    <pubDate>Sat, 26 Jul 2025 17:05:57 &#43;0800</pubDate>
+    <author>xxxx</author>
+    <guid>http://localhost:1313/categories/foundationdb/</guid>
+    <description><![CDATA[]]></description>
+</item>
+<item>
+    <title>Java</title>
+    <link>http://localhost:1313/categories/java/</link>
+    <pubDate>Tue, 22 Jul 2025 14:42:40 &#43;0800</pubDate>
+    <author>xxxx</author>
+    <guid>http://localhost:1313/categories/java/</guid>
+    <description><![CDATA[]]></description>
+</item>
+<item>
+    <title>Presto</title>
+    <link>http://localhost:1313/categories/presto/</link>
+    <pubDate>Sun, 20 Jul 2025 09:12:14 &#43;0800</pubDate>
+    <author>xxxx</author>
+    <guid>http://localhost:1313/categories/presto/</guid>
+    <description><![CDATA[]]></description>
+</item>
+<item>
+    <title>Ehcache3</title>
+    <link>http://localhost:1313/categories/ehcache3/</link>
+    <pubDate>Sat, 07 Jun 2025 22:40:41 &#43;0800</pubDate>
+    <author>xxxx</author>
+    <guid>http://localhost:1313/categories/ehcache3/</guid>
+    <description><![CDATA[]]></description>
+</item>
+<item>
+    <title>Spark</title>
+    <link>http://localhost:1313/categories/spark/</link>
+    <pubDate>Sat, 07 Jun 2025 19:05:49 &#43;0800</pubDate>
+    <author>xxxx</author>
+    <guid>http://localhost:1313/categories/spark/</guid>
+    <description><![CDATA[]]></description>
+</item>
+<item>
+    <title>Grpc</title>
+    <link>http://localhost:1313/categories/grpc/</link>
+    <pubDate>Tue, 13 May 2025 22:33:46 &#43;0800</pubDate>
+    <author>xxxx</author>
+    <guid>http://localhost:1313/categories/grpc/</guid>
+    <description><![CDATA[]]></description>
+</item>
+<item>
+    <title>JDK11</title>
+    <link>http://localhost:1313/categories/jdk11/</link>
+    <pubDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</pubDate>
+    <author>xxxx</author>
+    <guid>http://localhost:1313/categories/jdk11/</guid>
+    <description><![CDATA[]]></description>
+</item>
+<item>
+    <title>JVM</title>
+    <link>http://localhost:1313/categories/jvm/</link>
+    <pubDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</pubDate>
+    <author>xxxx</author>
+    <guid>http://localhost:1313/categories/jvm/</guid>
+    <description><![CDATA[]]></description>
+</item>
+<item>
+    <title>线程池</title>
+    <link>http://localhost:1313/categories/%E7%BA%BF%E7%A8%8B%E6%B1%A0/</link>
+    <pubDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</pubDate>
+    <author>xxxx</author>
+    <guid>http://localhost:1313/categories/%E7%BA%BF%E7%A8%8B%E6%B1%A0/</guid>
+    <description><![CDATA[]]></description>
+</item>
+<item>
+    <title>内存管理</title>
+    <link>http://localhost:1313/categories/%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/</link>
+    <pubDate>Sun, 09 Mar 2025 22:32:09 &#43;0800</pubDate>
+    <author>xxxx</author>
+    <guid>http://localhost:1313/categories/%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/</guid>
+    <description><![CDATA[]]></description>
+</item>
+</channel>
+</rss>
