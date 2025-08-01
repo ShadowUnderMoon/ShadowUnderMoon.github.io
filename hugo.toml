@@ -207,3 +207,7 @@ hasCJKLanguage = true
   goat = true
   mermaid = true
 
+[params.chart]
+  enable = true
+  use = "mermaid"
+  cdn = false
