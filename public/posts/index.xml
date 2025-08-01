@@ -1,23 +1,23 @@
 <rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
     <channel>
         <title>All Posts - 爱吃芒果</title>
-        <link>http://localhost:1313/posts/</link>
+        <link>http://example.org/posts/</link>
         <description>All Posts | 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 26 Jul 2025 17:05:57 &#43;0800</lastBuildDate><atom:link href="http://localhost:1313/posts/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 26 Jul 2025 17:05:57 &#43;0800</lastBuildDate><atom:link href="http://example.org/posts/" rel="self" type="application/rss+xml" /><item>
     <title>FoundationDB in Practice</title>
-    <link>http://localhost:1313/posts/foundationdb-in-practice/</link>
+    <link>http://example.org/posts/foundationdb-in-practice/</link>
     <pubDate>Sat, 26 Jul 2025 17:05:57 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/foundationdb-in-practice/</guid>
+    <guid>http://example.org/posts/foundationdb-in-practice/</guid>
     <description><![CDATA[<h3 id="mac上运行foundationdb">mac上运行FoundationDB</h3>
 <p>fdb_java的java包没有打包fdb_c的动态链接库，所以需要通过<code>-DFDB_LIBRARY_PATH_FDB_C=/usr/local/lib/libfdb_c.dylib</code>指定对应的动态链接库位置。</p>]]></description>
 </item>
 <item>
     <title>Java日志实战</title>
-    <link>http://localhost:1313/posts/java-log-in-practice/</link>
+    <link>http://example.org/posts/java-log-in-practice/</link>
     <pubDate>Tue, 22 Jul 2025 14:42:40 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/java-log-in-practice/</guid>
+    <guid>http://example.org/posts/java-log-in-practice/</guid>
     <description><![CDATA[<p>主要其实是学习<a href="https://mp.weixin.qq.com/s/eIiu08fVk194E0BgGL5gow" target="_blank" rel="noopener noreffer ">Java日志通关</a>系列文章，大佬太强了</p>
 <p></p>
 <p>日志发展到今天，被抽象成了三层，接口层、实现层、适配层。</p>
@@ -30,10 +30,10 @@
 </item>
 <item>
     <title>Presto数据过滤和投影</title>
-    <link>http://localhost:1313/posts/trino-filter-project/</link>
+    <link>http://example.org/posts/trino-filter-project/</link>
     <pubDate>Sun, 20 Jul 2025 09:12:14 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/trino-filter-project/</guid>
+    <guid>http://example.org/posts/trino-filter-project/</guid>
     <description><![CDATA[<h2 id="简单拉取数据查询的实现原理">简单拉取数据查询的实现原理</h2>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-sql">
@@ -67,18 +67,18 @@
 </item>
 <item>
     <title>Presto的计算流程</title>
-    <link>http://localhost:1313/posts/trino-practice/</link>
+    <link>http://example.org/posts/trino-practice/</link>
     <pubDate>Wed, 09 Jul 2025 22:27:56 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/trino-practice/</guid>
+    <guid>http://example.org/posts/trino-practice/</guid>
     <description><![CDATA[<p>直接从maven仓库下载对应版本的<code>presto-cli</code>作为客户端，记得下载<code>presto-cli-350-executable.jar</code>版本，否则可能不能直接运行</p>]]></description>
 </item>
 <item>
     <title>文件锁</title>
-    <link>http://localhost:1313/posts/file_lock/</link>
+    <link>http://example.org/posts/file_lock/</link>
     <pubDate>Tue, 24 Jun 2025 21:39:19 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/file_lock/</guid>
+    <guid>http://example.org/posts/file_lock/</guid>
     <description><![CDATA[<p>在ehcache3中看到ehcache3通过文件锁来保证对目录的唯一拥有</p>
 <div class="code-block code-line-numbers" style="counter-reset: code-block 0">
     <div class="code-header language-java">
@@ -167,44 +167,44 @@
 </item>
 <item>
     <title>java Size Of Engine</title>
-    <link>http://localhost:1313/posts/size_of_engine/</link>
+    <link>http://example.org/posts/size_of_engine/</link>
     <pubDate>Sun, 22 Jun 2025 20:20:36 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/size_of_engine/</guid>
+    <guid>http://example.org/posts/size_of_engine/</guid>
     <description><![CDATA[<p>ehcache3提供了限制缓存容量的选择，如果堆上存储的容量超过了指定的大小，则会驱逐缓存中的元素，直到有空间可以容纳为止。</p>
 <p>自己实现的sizeOfEngine应该实现ehcache3提供的引擎接口。</p>]]></description>
 </item>
 <item>
     <title>缓存实践</title>
-    <link>http://localhost:1313/posts/cache-in-practice/</link>
+    <link>http://example.org/posts/cache-in-practice/</link>
     <pubDate>Sat, 21 Jun 2025 14:01:54 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/cache-in-practice/</guid>
+    <guid>http://example.org/posts/cache-in-practice/</guid>
     <description><![CDATA[<p>提醒；</p>
 <p>本文是对<a href="https://juejin.cn/column/7140852038258147358" target="_blank" rel="noopener noreffer ">深入理解缓存原理与实战设计</a>的学习</p>]]></description>
 </item>
 <item>
     <title>Spark Standalone</title>
-    <link>http://localhost:1313/posts/spark_standalone/</link>
+    <link>http://example.org/posts/spark_standalone/</link>
     <pubDate>Sun, 08 Jun 2025 22:02:52 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/spark_standalone/</guid>
+    <guid>http://example.org/posts/spark_standalone/</guid>
     <description><![CDATA[<p>Spark集群可以使用不同的方式进行部署，比如Standalone、Mesos, YARN和Kubernetes，这几个版本的主要区别在于：Standalone版本的资源管理和任务调度器由Spark系统本身提供，其他版本的资源管理和任务调度器依赖于第三方框架，如YARN可以同时管理Spark任务和Hadoop MapReduce任务。</p>]]></description>
 </item>
 <item>
     <title>Ehcache3</title>
-    <link>http://localhost:1313/posts/ehcache3/</link>
+    <link>http://example.org/posts/ehcache3/</link>
     <pubDate>Sat, 07 Jun 2025 22:40:41 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/ehcache3/</guid>
+    <guid>http://example.org/posts/ehcache3/</guid>
     <description><![CDATA[]]></description>
 </item>
 <item>
     <title>Spark错误容忍机制</title>
-    <link>http://localhost:1313/posts/spark_fault_tolerance/</link>
+    <link>http://example.org/posts/spark_fault_tolerance/</link>
     <pubDate>Sat, 07 Jun 2025 19:05:49 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/spark_fault_tolerance/</guid>
+    <guid>http://example.org/posts/spark_fault_tolerance/</guid>
     <description><![CDATA[<p>Spark的错误容忍机制的核心方法主要有两种：</p>
 <ol>
 <li>通过重新执行计算任务来容忍错误，当job抛出异常不能继续执行时，重新启动计算任务，再次执行</li>

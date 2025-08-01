@@ -1,14 +1,14 @@
 <rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
     <channel>
         <title>Presto - Category - 爱吃芒果</title>
-        <link>http://localhost:1313/categories/presto/</link>
+        <link>http://example.org/categories/presto/</link>
         <description>Presto - Category - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 20 Jul 2025 09:12:14 &#43;0800</lastBuildDate><atom:link href="http://localhost:1313/categories/presto/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 20 Jul 2025 09:12:14 &#43;0800</lastBuildDate><atom:link href="http://example.org/categories/presto/" rel="self" type="application/rss+xml" /><item>
     <title>Presto数据过滤和投影</title>
-    <link>http://localhost:1313/posts/trino-filter-project/</link>
+    <link>http://example.org/posts/trino-filter-project/</link>
     <pubDate>Sun, 20 Jul 2025 09:12:14 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/trino-filter-project/</guid>
+    <guid>http://example.org/posts/trino-filter-project/</guid>
     <description><![CDATA[<h2 id="简单拉取数据查询的实现原理">简单拉取数据查询的实现原理</h2>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-sql">
@@ -42,10 +42,10 @@
 </item>
 <item>
     <title>Presto的计算流程</title>
-    <link>http://localhost:1313/posts/trino-practice/</link>
+    <link>http://example.org/posts/trino-practice/</link>
     <pubDate>Wed, 09 Jul 2025 22:27:56 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/trino-practice/</guid>
+    <guid>http://example.org/posts/trino-practice/</guid>
     <description><![CDATA[<p>直接从maven仓库下载对应版本的<code>presto-cli</code>作为客户端，记得下载<code>presto-cli-350-executable.jar</code>版本，否则可能不能直接运行</p>]]></description>
 </item>
 </channel>

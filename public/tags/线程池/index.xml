@@ -1,14 +1,14 @@
 <rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
     <channel>
         <title>线程池 - Tag - 爱吃芒果</title>
-        <link>http://localhost:1313/tags/%E7%BA%BF%E7%A8%8B%E6%B1%A0/</link>
+        <link>http://example.org/tags/%E7%BA%BF%E7%A8%8B%E6%B1%A0/</link>
         <description>线程池 - Tag - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</lastBuildDate><atom:link href="http://localhost:1313/tags/%E7%BA%BF%E7%A8%8B%E6%B1%A0/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</lastBuildDate><atom:link href="http://example.org/tags/%E7%BA%BF%E7%A8%8B%E6%B1%A0/" rel="self" type="application/rss+xml" /><item>
     <title>Java线程池源码分析</title>
-    <link>http://localhost:1313/posts/java_thread_pool/</link>
+    <link>http://example.org/posts/java_thread_pool/</link>
     <pubDate>Sat, 26 Apr 2025 09:47:55 &#43;0800</pubDate>
     <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/java_thread_pool/</guid>
+    <guid>http://example.org/posts/java_thread_pool/</guid>
     <description><![CDATA[<h2 id="阅前提示">阅前提示</h2>
 <p>参考文献中的文章非常的好，基本看完了就能理解很多东西，推荐阅读</p>
 <p>源码中也提供了很多注释文本，推荐对照源码学习。</p>
