@@ -1,15 +1,4 @@
-<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
-    <channel>
-        <title>Prometheus - Tag - 爱吃芒果</title>
-        <link>http://localhost:1313/tags/prometheus/</link>
-        <description>Prometheus - Tag - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 01 Feb 2025 19:42:56 &#43;0800</lastBuildDate><atom:link href="http://localhost:1313/tags/prometheus/" rel="self" type="application/rss+xml" /><item>
-    <title>Prometheus_and_grafana</title>
-    <link>http://localhost:1313/posts/prometheus_and_grafana/</link>
-    <pubDate>Sat, 01 Feb 2025 19:42:56 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/prometheus_and_grafana/</guid>
-    <description><![CDATA[<h2 id="prometheus">Prometheus</h2>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0"><channel><title>Prometheus - Tag - 爱吃芒果</title><link>http://example.org/tags/prometheus/</link><description>Prometheus - Tag - 爱吃芒果</description><generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 01 Feb 2025 19:42:56 +0800</lastBuildDate><atom:link href="http://example.org/tags/prometheus/" rel="self" type="application/rss+xml"/><item><title>Prometheus_and_grafana</title><link>http://example.org/posts/prometheus_and_grafana/</link><pubDate>Sat, 01 Feb 2025 19:42:56 +0800</pubDate><author>爱吃芒果</author><guid>http://example.org/posts/prometheus_and_grafana/</guid><description><![CDATA[<h2 id="prometheus">Prometheus</h2>
 <p><a href="https://www.youtube.com/watch?v=h4Sl21AKiDg" target="_blank" rel="noopener noreffer ">https://www.youtube.com/watch?v=h4Sl21AKiDg</a></p>
 <p></p>
 <p></p>
@@ -20,7 +9,4 @@
 <p>Prometheus Server, Pushgateway, Alertmanager</p>
 <p><a href="https://prometheus.io/docs/concepts/metric_types/" target="_blank" rel="noopener noreffer ">https://prometheus.io/docs/concepts/metric_types/</a></p>
 <p><a href="https://itnext.io/prometheus-for-beginners-5f20c2e89b6c" target="_blank" rel="noopener noreffer ">https://itnext.io/prometheus-for-beginners-5f20c2e89b6c</a></p>
-<p><strong>Prometheus is essentially just another metrics collection and analysis tool,</strong> and at its core it is made up of 3 components:</p>]]></description>
-</item>
-</channel>
-</rss>
+<p><strong>Prometheus is essentially just another metrics collection and analysis tool,</strong> and at its core it is made up of 3 components:</p>]]></description></item></channel></rss>

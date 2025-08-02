@@ -1,17 +1,3 @@
-<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
-    <channel>
-        <title>Kubernetes - Category - 爱吃芒果</title>
-        <link>http://localhost:1313/categories/kubernetes/</link>
-        <description>Kubernetes - Category - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Fri, 07 Feb 2025 10:49:01 &#43;0800</lastBuildDate><atom:link href="http://localhost:1313/categories/kubernetes/" rel="self" type="application/rss+xml" /><item>
-    <title>k8s 存储</title>
-    <link>http://localhost:1313/posts/k8s_storage/</link>
-    <pubDate>Fri, 07 Feb 2025 10:49:01 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/k8s_storage/</guid>
-    <description><![CDATA[<h2 id="pods">Pods</h2>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0"><channel><title>Kubernetes - Category - 爱吃芒果</title><link>http://example.org/categories/kubernetes/</link><description>Kubernetes - Category - 爱吃芒果</description><generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Fri, 07 Feb 2025 10:49:01 +0800</lastBuildDate><atom:link href="http://example.org/categories/kubernetes/" rel="self" type="application/rss+xml"/><item><title>k8s 存储</title><link>http://example.org/posts/k8s_storage/</link><pubDate>Fri, 07 Feb 2025 10:49:01 +0800</pubDate><author>爱吃芒果</author><guid>http://example.org/posts/k8s_storage/</guid><description><![CDATA[<h2 id="pods">Pods</h2>
 <p>Pod 是 Kubernetes 中最小的可部署计算单元，你可以创建和管理它们。</p>
-<p><strong>Pod（类似于一群鲸鱼的“pod”或豌豆荚“pea pod”）</strong> 是一组一个或多个容器，这些容器共享存储和网络资源，并且有一个规范来定义如何运行它们。Pod 内部的内容始终是 <strong>共同调度（co-scheduled）并在相同的上下文中运行</strong> 的。Pod 充当一个特定应用的“<strong>逻辑主机</strong>”（logical host）：它包含一个或多个 <strong>相对紧密耦合的应用容器</strong>。在非云环境下，运行在同一台物理机或虚拟机上的应用程序，可以类比于在 Kubernetes 中运行在同一逻辑主机上的应用。</p>]]></description>
-</item>
-</channel>
-</rss>
+<p><strong>Pod（类似于一群鲸鱼的“pod”或豌豆荚“pea pod”）</strong> 是一组一个或多个容器，这些容器共享存储和网络资源，并且有一个规范来定义如何运行它们。Pod 内部的内容始终是 <strong>共同调度（co-scheduled）并在相同的上下文中运行</strong> 的。Pod 充当一个特定应用的“<strong>逻辑主机</strong>”（logical host）：它包含一个或多个 <strong>相对紧密耦合的应用容器</strong>。在非云环境下，运行在同一台物理机或虚拟机上的应用程序，可以类比于在 Kubernetes 中运行在同一逻辑主机上的应用。</p>]]></description></item></channel></rss>

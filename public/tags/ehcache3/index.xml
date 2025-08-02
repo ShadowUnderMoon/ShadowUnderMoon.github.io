@@ -1,15 +1,1 @@
-<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
-    <channel>
-        <title>Ehcache3 - Tag - 爱吃芒果</title>
-        <link>http://localhost:1313/tags/ehcache3/</link>
-        <description>Ehcache3 - Tag - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 07 Jun 2025 22:40:41 &#43;0800</lastBuildDate><atom:link href="http://localhost:1313/tags/ehcache3/" rel="self" type="application/rss+xml" /><item>
-    <title>Ehcache3</title>
-    <link>http://localhost:1313/posts/ehcache3/</link>
-    <pubDate>Sat, 07 Jun 2025 22:40:41 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://localhost:1313/posts/ehcache3/</guid>
-    <description><![CDATA[]]></description>
-</item>
-</channel>
-</rss>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0"><channel><title>Ehcache3 - Tag - 爱吃芒果</title><link>http://example.org/tags/ehcache3/</link><description>Ehcache3 - Tag - 爱吃芒果</description><generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 07 Jun 2025 22:40:41 +0800</lastBuildDate><atom:link href="http://example.org/tags/ehcache3/" rel="self" type="application/rss+xml"/><item><title>Ehcache3</title><link>http://example.org/posts/ehcache3/</link><pubDate>Sat, 07 Jun 2025 22:40:41 +0800</pubDate><author>爱吃芒果</author><guid>http://example.org/posts/ehcache3/</guid><description></description></item></channel></rss>
