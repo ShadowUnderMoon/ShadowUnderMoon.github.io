@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noodp" />
+        <title>Grpc Keepalive - 爱吃芒果</title><meta name="Description" content="This is my cool site"><meta property="og:url" content="http://example.org/posts/grpc-keepalive/">
+  <meta property="og:site_name" content="爱吃芒果">
+  <meta property="og:title" content="Grpc Keepalive">
+  <meta property="og:description" content="TCP KeepAlive TCP KeepAlive机制理解与实践小结中详细介绍了TCP KeepAlive的机制，这里重点提一下涉及到的参数:
+tcp_keepalive_time 在TCP保活打开的情况下，最后一次数据交换到TCP发送第一个保活探测包的间隔，即允许的空闲时长，默认为2h tcp_keepalive_probes 最大允许发送保活探测包的次数，达到此次数后直接放弃尝试，并关闭连接，默认为9次 tcp_keepalive_intvl 发送保活探测包的间隔，默认为75s 所以如果开启了TCP KeepAlive并保持默认参数，则空闲连接会在大约 2h 11min之后被断开">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-10-19T09:08:02+08:00">
+    <meta property="article:modified_time" content="2025-10-19T09:08:02+08:00">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Grpc Keepalive">
+  <meta name="twitter:description" content="TCP KeepAlive TCP KeepAlive机制理解与实践小结中详细介绍了TCP KeepAlive的机制，这里重点提一下涉及到的参数:
+tcp_keepalive_time 在TCP保活打开的情况下，最后一次数据交换到TCP发送第一个保活探测包的间隔，即允许的空闲时长，默认为2h tcp_keepalive_probes 最大允许发送保活探测包的次数，达到此次数后直接放弃尝试，并关闭连接，默认为9次 tcp_keepalive_intvl 发送保活探测包的间隔，默认为75s 所以如果开启了TCP KeepAlive并保持默认参数，则空闲连接会在大约 2h 11min之后被断开">
+<meta name="application-name" content="My cool site">
+<meta name="apple-mobile-web-app-title" content="My cool site">
+<meta name="referrer" content="no-referrer" /><meta name="theme-color" content="#ffffff"><meta name="msapplication-TileColor" content="#da532c"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/grpc-keepalive/" /><link rel="prev" href="http://example.org/posts/grpc-client-connection/" /><link rel="next" href="http://example.org/posts/presto-high-memory-task-killer/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css"></noscript><link rel="preload" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css"></noscript><script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "headline": "Grpc Keepalive",
+        "inLanguage": "zh-CN",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "http:\/\/example.org\/posts\/grpc-keepalive\/"
+        },"genre": "posts","wordcount":  1191 ,
+        "url": "http:\/\/example.org\/posts\/grpc-keepalive\/","datePublished": "2025-10-19T09:08:02+08:00","dateModified": "2025-10-19T09:08:02+08:00","publisher": {
+            "@type": "Organization",
+            "name": ""},"author": {
+                "@type": "Person",
+                "name": "爱吃芒果"
+            },"description": ""
+    }
+    </script></head>
+    <body data-header-desktop="fixed" data-header-mobile="auto"><script>(window.localStorage && localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : ('auto' === 'auto' ? window.matchMedia('(prefers-color-scheme: dark)').matches : 'auto' === 'dark')) && document.body.setAttribute('theme', 'dark');</script>
+
+        <div id="mask"></div><div class="wrapper"><header class="desktop" id="header-desktop">
+    <div class="header-wrapper">
+        <div class="header-title">
+            <a href="/" title="爱吃芒果">My cool site</a>
+        </div>
+        <div class="menu">
+            <div class="menu-inner"><a class="menu-item" href="/posts/"> 文章 </a><a class="menu-item" href="/page/archives/" title="Archives"> Archives </a><a class="menu-item" href="/tags/"> 标签 </a><a class="menu-item" href="/page/search/" title="Search"> Search </a><a class="menu-item" href="/categories/"> 分类 </a><span class="menu-item delimiter"></span><span class="menu-item search" id="search-desktop">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-desktop">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-desktop" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-desktop" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-desktop">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </span><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                    <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+                </a></div>
+        </div>
+    </div>
+</header><header class="mobile" id="header-mobile">
+    <div class="header-container">
+        <div class="header-wrapper">
+            <div class="header-title">
+                <a href="/" title="爱吃芒果">My cool site</a>
+            </div>
+            <div class="menu-toggle" id="menu-toggle-mobile">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div class="menu" id="menu-mobile"><div class="search-wrapper">
+                    <div class="search mobile" id="search-mobile">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-mobile">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-mobile" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-mobile" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-mobile">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </div>
+                    <a href="javascript:void(0);" class="search-cancel" id="search-cancel-mobile">
+                        Cancel
+                    </a>
+                </div><a class="menu-item" href="/posts/" title="">文章</a><a class="menu-item" href="/page/archives/" title="Archives">Archives</a><a class="menu-item" href="/tags/" title="">标签</a><a class="menu-item" href="/page/search/" title="Search">Search</a><a class="menu-item" href="/categories/" title="">分类</a><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+            </a></div>
+    </div>
+</header><div class="search-dropdown desktop">
+        <div id="search-dropdown-desktop"></div>
+    </div>
+    <div class="search-dropdown mobile">
+        <div id="search-dropdown-mobile"></div>
+    </div><main class="main">
+                <div class="container"><div class="toc" id="toc-auto">
+            <h2 class="toc-title">Contents</h2>
+            <div class="toc-content" id="toc-content-auto"></div>
+        </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Grpc Keepalive</h1><div class="post-meta">
+            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span></div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-10-19">2025-10-19</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;1191 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;3 minutes&nbsp;</div>
+        </div><div class="details toc" id="toc-static"  data-kept="">
+                <div class="details-summary toc-title">
+                    <span>Contents</span>
+                    <span><i class="details-icon fas fa-angle-right" aria-hidden="true"></i></span>
+                </div>
+                <div class="details-content toc-content" id="toc-content-static"><nav id="TableOfContents">
+  <ul>
+    <li><a href="#tcp-keepalive">TCP KeepAlive</a></li>
+    <li><a href="#tcp_user_timeout">TCP_USER_TIMEOUT</a></li>
+    <li><a href="#tcp超时重传">TCP超时重传</a></li>
+  </ul>
+</nav></div>
+            </div><div class="content" id="content"><h2 id="tcp-keepalive">TCP KeepAlive</h2>
+<p><a href="https://www.cnblogs.com/hueyxu/p/15759819.html" target="_blank" rel="noopener noreffer ">TCP KeepAlive机制理解与实践小结</a>中详细介绍了TCP KeepAlive的机制，这里重点提一下涉及到的参数:</p>
+<ul>
+<li><code>tcp_keepalive_time</code> 在TCP保活打开的情况下，最后一次数据交换到TCP发送第一个保活探测包的间隔，即允许的空闲时长，默认为2h</li>
+<li><code>tcp_keepalive_probes</code> 最大允许发送保活探测包的次数，达到此次数后直接放弃尝试，并关闭连接，默认为9次</li>
+<li><code>tcp_keepalive_intvl</code> 发送保活探测包的间隔，默认为75s</li>
+</ul>
+<p>所以如果开启了TCP KeepAlive并保持默认参数，则空闲连接会在大约 2h 11min之后被断开</p>
+<h2 id="tcp_user_timeout">TCP_USER_TIMEOUT</h2>
+<p><code>TCP_USER_TIMEOUT</code>表示等待传输数据未被<code>ack</code>或者由于没有发送窗口导致未被传输的数据的最长时间，超过该时间，TCP连接会被强制关闭，并且返回<code>ETIMEDOUT</code>给应用。</p>
+<p>如果将<code>TCP_USER_TIMEOUT</code>和 TCP KeepAlive同时使用，根据cloudflare的文章<a href="https://blog.cloudflare.com/when-tcp-sockets-refuse-to-die/" target="_blank" rel="noopener noreffer ">When TCP sockets refuse to die</a>，<code>tcp_keepalive_probes</code>会被忽略，每次尝试发送keepAlive报文时，都会检查是否超过了<code>TCP_USER_TIMEOUT</code>，如果超过则直接关闭连接。</p>
+<p>类似的，如果发生超时重传，<code>TCP_USER_TIMEOUT</code>决定了最终的超时关闭时间，<code>tcp_retries2</code>会被忽略，对于零发送窗口的连接，发送端会定期发送窗口探测报文，在发送之前之后检查超过了<code>TCP_USER_TIMEOUT</code>。</p>
+<h2 id="tcp超时重传">TCP超时重传</h2>
+<p>tcp超时重试包含很多机制，这里只讨论最基础的情况，某个TCP报文发送后一直没有收到响应导致重传，重传会采用指数退避的方式，也就是每次重传的间隔都是上次的2倍，重传间隔的下限为200ms，上限为120s，主要有以下参数控制重传过程：</p>
+<ul>
+<li><code> </code>/proc/sys/net/ipv4/tcp_retries1``，默认为3，在3次重传后，会尝试通知ip层更改路由</li>
+<li><code>/proc/sys/net/ipv4/tcp_retries2</code>，默认为15，用来计算重传超时时间，超过重传超时时间，大约对应13~30min，连接会被关闭</li>
+<li><code> tcp_syn_retries</code>，默认为6，初始SYN报文被重传的最大次数，由于RTO默认为1s，对应127s左右的重传耗时</li>
+<li><code>tcp_syncack_retries</code>，默认为5，初始SYN/ACK报文被重传的最大次数</li>
+</ul>
+<p>这里多解释一下<code>tcp_retries</code>的意义，根据 <a href="https://pracucci.com/linux-tcp-rto-min-max-and-tcp-retries2.html" target="_blank" rel="noopener noreffer ">Linux TCP_RTO_MIN, TCP_RTO_MAX and the tcp_retries2 sysctl</a>，初始的重试时间间隔就是RTO (Retransmission TimeOut)，对于正在建立的连接( <a href="http://arthurchiao.art/blog/tcp-retransmission-may-be-misleading/" target="_blank" rel="noopener noreffer ">TCP Retransmission May Be Misleading (2023)</a> )，RTO的初始值为1s，对于已经建立完成的连接，RTO会通过RTT的历史信息计算得到，对于内网环境，可以认为初始的RTO为200ms，最终重传超时总共需要15min左右，如果网络环境很差，最高可能需要30min左右。显然对于客户端而言，这个超时时间太长了，如果指定<code>TCP_USER_TIMEOUT</code>则可以在更短的时间内检测到网络不可达，从而快速关闭连接并重连。</p>
+<p>todo:
+<a href="https://codearcana.com/posts/2015/08/28/tcp-keepalive-is-a-lie.html" target="_blank" rel="noopener noreffer ">https://codearcana.com/posts/2015/08/28/tcp-keepalive-is-a-lie.html</a></p>
+<p><a href="https://groups.google.com/g/grpc-io/c/6VZYCFZpyTI" target="_blank" rel="noopener noreffer ">https://groups.google.com/g/grpc-io/c/6VZYCFZpyTI</a></p>
+<p><a href="https://github.com/grpc/grpc-java/issues/11517" target="_blank" rel="noopener noreffer ">https://github.com/grpc/grpc-java/issues/11517</a></p>
+<p><a href="https://github.com/apache/brpc/issues/1154" target="_blank" rel="noopener noreffer ">https://github.com/apache/brpc/issues/1154</a></p>
+<p><a href="https://lukexng.medium.com/grpc-keepalive-maxconnectionage-maxconnectionagegrace-6352909c57b8" target="_blank" rel="noopener noreffer ">https://lukexng.medium.com/grpc-keepalive-maxconnectionage-maxconnectionagegrace-6352909c57b8</a></p>
+<p><a href="https://pandaychen.github.io/2020/09/01/GRPC-CLIENT-CONN-LASTING/" target="_blank" rel="noopener noreffer ">https://pandaychen.github.io/2020/09/01/GRPC-CLIENT-CONN-LASTING/</a></p>
+</div><div class="post-footer" id="post-footer">
+    <div class="post-info">
+        <div class="post-info-line">
+            <div class="post-info-mod">
+                <span>Updated on 2025-10-19</span>
+            </div></div>
+        <div class="post-info-line">
+            <div class="post-info-md"><span>
+                            <a class="link-to-markdown" href="/posts/grpc-keepalive/index.md" target="_blank">Read Markdown</a>
+                        </span></div>
+            <div class="post-info-share">
+                <span><a href="javascript:void(0);" title="Share on X" data-sharer="x" data-url="http://example.org/posts/grpc-keepalive/" data-title="Grpc Keepalive"><i class="fab fa-x-twitter fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Threads" data-sharer="threads" data-url="http://example.org/posts/grpc-keepalive/" data-title="Grpc Keepalive"><i class="fab fa-threads fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Facebook" data-sharer="facebook" data-url="http://example.org/posts/grpc-keepalive/"><i class="fab fa-facebook-square fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Hacker News" data-sharer="hackernews" data-url="http://example.org/posts/grpc-keepalive/" data-title="Grpc Keepalive"><i class="fab fa-hacker-news fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Line" data-sharer="line" data-url="http://example.org/posts/grpc-keepalive/" data-title="Grpc Keepalive"><i data-svg-src="https://cdn.jsdelivr.net/npm/simple-icons@14.9.0/icons/line.svg" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on 微博" data-sharer="weibo" data-url="http://example.org/posts/grpc-keepalive/" data-title="Grpc Keepalive"><i class="fab fa-weibo fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Diaspora" data-sharer="diaspora" data-url="http://example.org/posts/grpc-keepalive/" data-title="Grpc Keepalive" data-description=""><i class="fab fa-diaspora fa-fw" aria-hidden="true"></i></a><a href="https://t.me/share/url?url=http%3a%2f%2fexample.org%2fposts%2fgrpc-keepalive%2f&amp;text=Grpc%20Keepalive" target="_blank" title="Share on Telegram"><i class="fab fa-telegram fa-fw" aria-hidden="true"></i></a></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="post-info-more">
+        <section class="post-tags"></section>
+        <section>
+            <span><a href="javascript:void(0);" onclick="window.history.back();">Back</a></span>&nbsp;|&nbsp;<span><a href="/">Home</a></span>
+        </section>
+    </div>
+
+    <div class="post-nav"><a href="/posts/grpc-client-connection/" class="prev" rel="prev" title="Grpc Client Connection"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>Grpc Client Connection</a>
+            <a href="/posts/presto-high-memory-task-killer/" class="next" rel="next" title="Presto worker高负载查杀任务">Presto worker高负载查杀任务<i class="fas fa-angle-right fa-fw" aria-hidden="true"></i></a></div>
+</div>
+<div id="comments"><div id="utterances" class="comment"></div><noscript>
+                Please enable JavaScript to view the comments powered by <a href="https://utteranc.es/">utterances</a>.
+            </noscript></div></article></div>
+            </main><footer class="footer">
+        <div class="footer-container"><div class="footer-line">Powered by <a href="https://gohugo.io/" target="_blank" rel="noopener noreffer" title="Hugo 0.140.2">Hugo</a> | Theme - <a href="https://github.com/dillonzq/LoveIt" target="_blank" rel="noopener noreffer" title="LoveIt 0.3.1-DEV"><i class="far fa-kiss-wink-heart fa-fw" aria-hidden="true"></i> LoveIt</a>
+                </div><div class="footer-line" itemscope itemtype="http://schema.org/CreativeWork"><i class="far fa-copyright fa-fw" aria-hidden="true"></i><span itemprop="copyrightYear">2022 - 2026</span><span class="author" itemprop="copyrightHolder">&nbsp;<a href="/" target="_blank">xxxx</a></span></div>
+        </div>
+    </footer></div>
+
+        <div id="fixed-buttons"><a href="#" id="back-to-top" class="fixed-button" title="Back to Top">
+                <i class="fas fa-arrow-up fa-fw" aria-hidden="true"></i>
+            </a>
+        </div>
+
+        <div id="fixed-buttons-hidden"><a href="#" id="view-comments" class="fixed-button" title="View Comments">
+                <i class="fas fa-comment fa-fw" aria-hidden="true"></i>
+            </a>
+        </div><script src="https://cdn.jsdelivr.net/npm/autocomplete.js@0.38.1/dist/autocomplete.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lunr@2.3.9/lunr.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lazysizes@5.3.2/lazysizes.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js"></script><script src="https://cdn.jsdelivr.net/npm/sharer.js@0.5.2/sharer.min.js"></script><script>window.config={"comment":{"utterances":{"darkTheme":"github-dark","issueTerm":"pathname","label":"","lightTheme":"github-light","repo":"ShadowUnderMoon/ShadowUnderMoon.github.io"}},"search":{"highlightTag":"em","lunrIndexURL":"/index.json","maxResultLength":10,"noResultsFound":"No results found","snippetLength":50,"type":"lunr"}};</script><script src="/js/theme.min.js"></script></body>
+</html>

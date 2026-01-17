@@ -1,0 +1,24 @@
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+    <channel>
+        <title>Trino - Tag - 爱吃芒果</title>
+        <link>http://example.org/tags/trino/</link>
+        <description>Trino - Tag - 爱吃芒果</description>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 17 Jan 2026 15:11:35 &#43;0800</lastBuildDate><atom:link href="http://example.org/tags/trino/" rel="self" type="application/rss+xml" /><item>
+    <title>Presto环境搭建</title>
+    <link>http://example.org/posts/presto-environment-setup/</link>
+    <pubDate>Sat, 17 Jan 2026 15:11:35 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://example.org/posts/presto-environment-setup/</guid>
+    <description><![CDATA[<h2 id="前言">前言</h2>
+<p>Trino是从Presto分离出来的项目，在后面的文章中不会严格区分Presto和Trino，除非某些代码只在其中一个项目中存在，根据《OLAP引擎底层原理与设计实践》的推荐，后面基本会通过trino项目的v350版本为例分析presto的一些源码级的实现，希望能够比较系统地理解OLAP引擎的整体实现。</p>]]></description>
+</item>
+<item>
+    <title>Presto worker高负载查杀任务</title>
+    <link>http://example.org/posts/presto-high-memory-task-killer/</link>
+    <pubDate>Wed, 14 Jan 2026 16:26:01 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://example.org/posts/presto-high-memory-task-killer/</guid>
+    <description><![CDATA[<p>为了尽量避免worker发生OOM从而短暂不可用，Presto提供了在内存高负载下查杀任务的机制，代码很简单，在<code>com.facebook.presto.memory.HighMemoryTaskKiller</code>中。</p>]]></description>
+</item>
+</channel>
+</rss>

@@ -1,178 +1,858 @@
-<!doctype html><html lang=zh-CN><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=robots content="noodp"><title>Java日志实战 - 爱吃芒果</title><meta name=Description content="This is my cool site"><meta property="og:url" content="http://example.org/posts/java-log-in-practice/">
-<meta property="og:site_name" content="爱吃芒果"><meta property="og:title" content="Java日志实战"><meta property="og:description" content="主要其实是学习Java日志通关系列文章，大佬太强了
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noodp" />
+        <title>Java日志实战 - 爱吃芒果</title><meta name="Description" content="This is my cool site"><meta property="og:url" content="http://example.org/posts/java-log-in-practice/">
+  <meta property="og:site_name" content="爱吃芒果">
+  <meta property="og:title" content="Java日志实战">
+  <meta property="og:description" content="主要其实是学习Java日志通关系列文章，大佬太强了
 日志发展到今天，被抽象成了三层，接口层、实现层、适配层。
-接口层：或者叫日志门面（facade），就是interface，只定义接口，等别人实现 实现层：真正干活的，能够把日志内存记录下来的工具，但请注意它不是上面接口实现，因为它不感知也不直接实现接口，仅仅是独立的实现 适配层：一般称为adapter，因为接口层和适配层并非都出自一家之手，它们之间无法直接匹配 适配层有可以分为绑定（binding）和桥接（bridging）两种能力："><meta property="og:locale" content="zh_CN"><meta property="og:type" content="article"><meta property="article:section" content="posts"><meta property="article:published_time" content="2025-07-22T14:42:40+08:00"><meta property="article:modified_time" content="2025-07-22T14:42:40+08:00"><meta property="article:tag" content="Java"><meta name=twitter:card content="summary"><meta name=twitter:title content="Java日志实战"><meta name=twitter:description content="主要其实是学习Java日志通关系列文章，大佬太强了
+接口层：或者叫日志门面（facade），就是interface，只定义接口，等别人实现 实现层：真正干活的，能够把日志内存记录下来的工具，但请注意它不是上面接口实现，因为它不感知也不直接实现接口，仅仅是独立的实现 适配层：一般称为adapter，因为接口层和适配层并非都出自一家之手，它们之间无法直接匹配 适配层有可以分为绑定（binding）和桥接（bridging）两种能力：">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-07-22T14:42:40+08:00">
+    <meta property="article:modified_time" content="2025-07-22T14:42:40+08:00">
+    <meta property="article:tag" content="Java">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Java日志实战">
+  <meta name="twitter:description" content="主要其实是学习Java日志通关系列文章，大佬太强了
 日志发展到今天，被抽象成了三层，接口层、实现层、适配层。
-接口层：或者叫日志门面（facade），就是interface，只定义接口，等别人实现 实现层：真正干活的，能够把日志内存记录下来的工具，但请注意它不是上面接口实现，因为它不感知也不直接实现接口，仅仅是独立的实现 适配层：一般称为adapter，因为接口层和适配层并非都出自一家之手，它们之间无法直接匹配 适配层有可以分为绑定（binding）和桥接（bridging）两种能力："><meta name=application-name content="My cool site"><meta name=apple-mobile-web-app-title content="My cool site"><meta name=referrer content="no-referrer"><meta name=theme-color content="#ffffff"><meta name=msapplication-TileColor content="#da532c"><link rel="shortcut icon" type=image/x-icon href=/favicon.ico><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=mask-icon href=/safari-pinned-tab.svg color=#5bbad5><link rel=manifest href=/site.webmanifest><link rel=canonical href=http://example.org/posts/java-log-in-practice/><link rel=prev href=http://example.org/posts/trino-filter-project/><link rel=next href=http://example.org/posts/foundationdb-in-practice/><link rel=stylesheet href=/css/style.min.css><link rel=preload href=https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css as=style onload='this.onload=null,this.rel="stylesheet"'><noscript><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css></noscript><link rel=preload href=https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css as=style onload='this.onload=null,this.rel="stylesheet"'><noscript><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css></noscript><script type=application/ld+json>{"@context":"http://schema.org","@type":"BlogPosting","headline":"Java日志实战","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"http:\/\/example.org\/posts\/java-log-in-practice\/"},"genre":"posts","keywords":"Java","wordcount":11692,"url":"http:\/\/example.org\/posts\/java-log-in-practice\/","datePublished":"2025-07-22T14:42:40+08:00","dateModified":"2025-07-22T14:42:40+08:00","publisher":{"@type":"Organization","name":""},"author":{"@type":"Person","name":"爱吃芒果"},"description":""}</script></head><body data-header-desktop=fixed data-header-mobile=auto><script>(window.localStorage&&localStorage.getItem("theme")?localStorage.getItem("theme")==="dark":"auto"==="auto"?window.matchMedia("(prefers-color-scheme: dark)").matches:"auto"==="dark")&&document.body.setAttribute("theme","dark")</script><div id=mask></div><div class=wrapper><header class=desktop id=header-desktop><div class=header-wrapper><div class=header-title><a href=/ title=爱吃芒果>My cool site</a></div><div class=menu><div class=menu-inner><a class=menu-item href=/posts/>文章 </a><a class=menu-item href=/page/archives/ title=Archives>Archives </a><a class=menu-item href=/tags/>标签 </a><a class=menu-item href=/page/search/ title=Search>Search </a><a class=menu-item href=/categories/>分类 </a><span class="menu-item delimiter"></span><span class="menu-item search" id=search-desktop>
-<input type=text placeholder="Search titles or contents..." id=search-input-desktop>
-<a href=javascript:void(0); class="search-button search-toggle" id=search-toggle-desktop title=Search><i class="fas fa-search fa-fw" aria-hidden=true></i>
-</a><a href=javascript:void(0); class="search-button search-clear" id=search-clear-desktop title=Clear><i class="fas fa-times-circle fa-fw" aria-hidden=true></i>
-</a><span class="search-button search-loading" id=search-loading-desktop><i class="fas fa-spinner fa-fw fa-spin" aria-hidden=true></i>
-</span></span><a href=javascript:void(0); class="menu-item theme-switch" title="Switch Theme"><i class="fas fa-adjust fa-fw" aria-hidden=true></i></a></div></div></div></header><header class=mobile id=header-mobile><div class=header-container><div class=header-wrapper><div class=header-title><a href=/ title=爱吃芒果>My cool site</a></div><div class=menu-toggle id=menu-toggle-mobile><span></span><span></span><span></span></div></div><div class=menu id=menu-mobile><div class=search-wrapper><div class="search mobile" id=search-mobile><input type=text placeholder="Search titles or contents..." id=search-input-mobile>
-<a href=javascript:void(0); class="search-button search-toggle" id=search-toggle-mobile title=Search><i class="fas fa-search fa-fw" aria-hidden=true></i>
-</a><a href=javascript:void(0); class="search-button search-clear" id=search-clear-mobile title=Clear><i class="fas fa-times-circle fa-fw" aria-hidden=true></i>
-</a><span class="search-button search-loading" id=search-loading-mobile><i class="fas fa-spinner fa-fw fa-spin" aria-hidden=true></i></span></div><a href=javascript:void(0); class=search-cancel id=search-cancel-mobile>Cancel</a></div><a class=menu-item href=/posts/ title>文章</a><a class=menu-item href=/page/archives/ title=Archives>Archives</a><a class=menu-item href=/tags/ title>标签</a><a class=menu-item href=/page/search/ title=Search>Search</a><a class=menu-item href=/categories/ title>分类</a><a href=javascript:void(0); class="menu-item theme-switch" title="Switch Theme">
-<i class="fas fa-adjust fa-fw" aria-hidden=true></i></a></div></div></header><div class="search-dropdown desktop"><div id=search-dropdown-desktop></div></div><div class="search-dropdown mobile"><div id=search-dropdown-mobile></div></div><main class=main><div class=container><div class=toc id=toc-auto><h2 class=toc-title>Contents</h2><div class=toc-content id=toc-content-auto></div></div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Java日志实战</h1><div class=post-meta><div class=post-meta-line><span class=post-author><a href=/ title=Author rel=author class=author><i class="fas fa-user-circle fa-fw" aria-hidden=true></i>爱吃芒果</a></span>&nbsp;<span class=post-category>included in <a href=/categories/java/><i class="far fa-folder fa-fw" aria-hidden=true></i>Java</a></span></div><div class=post-meta-line><i class="far fa-calendar-alt fa-fw" aria-hidden=true></i>&nbsp;<time datetime=2025-07-22>2025-07-22</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden=true></i>&nbsp;11692 words&nbsp;
-<i class="far fa-clock fa-fw" aria-hidden=true></i>&nbsp;24 minutes&nbsp;</div></div><div class="details toc" id=toc-static data-kept><div class="details-summary toc-title"><span>Contents</span>
-<span><i class="details-icon fas fa-angle-right" aria-hidden=true></i></span></div><div class="details-content toc-content" id=toc-content-static><nav id=TableOfContents><ul><li><a href=#java日志的历史>Java日志的历史</a><ul><li><a href=#log4j-1999>Log4j (1999)</a></li><li><a href=#jul-20022>JUL (2002.2)</a></li><li><a href=#jcl-20028>JCL (2002.8)</a></li><li><a href=#slf4j-2005>Slf4j (2005)</a></li><li><a href=#logback-2006>Logback (2006)</a></li><li><a href=#log4j-22012>Log4j 2(2012)</a></li><li><a href=#spring-jcl>spring-jcl</a></li><li><a href=#总结>总结</a></li></ul></li><li><a href=#slf4j--logback整合和排包>Slf4j + Logback整合和排包</a><ul><li><a href=#基础依赖项>基础依赖项</a></li><li><a href=#适配spring-boot>适配Spring Boot</a></li><li><a href=#桥接其他实现层>桥接其他实现层</a></li><li><a href=#去除无用依赖>去除无用依赖</a></li><li><a href=#注意事项>注意事项</a></li></ul></li><li><a href=#slf4介绍>Slf4介绍</a><ul><li><a href=#创建logger实例>创建Logger实例</a></li><li><a href=#日志级别>日志级别</a></li><li><a href=#打印接口>打印接口</a></li></ul></li><li><a href=#logback介绍>Logback介绍</a><ul><li><a href=#配置入口>配置入口</a></li><li><a href=#配置文件介绍>配置文件介绍</a></li><li><a href=#java-api>Java API</a></li><li><a href=#mdb中的traceid>MDB中的traceId</a></li></ul></li><li><a href=#最佳实践>最佳实践</a><ul><li><a href=#总是使用接口层>总是使用接口层</a></li><li><a href=#不要打印分割线>不要打印分割线</a></li><li><a href=#避免因写日志而抛错>避免因写日志而抛错</a></li><li><a href=#两个fastjson参数>两个FastJson参数</a></li><li><a href=#不要遗漏异常堆栈>不要遗漏异常堆栈</a></li><li><a href=#限制日志输出长度>限制日志输出长度</a></li><li><a href=#将堆栈合并为一行>将堆栈合并为一行</a></li><li><a href=#不建议使用method和line>不建议使用%method和%line</a></li><li><a href=#不要将日志输出到console>不要将日志输出到Console</a></li><li><a href=#无用的logutil>无用的LogUtil</a></li><li><a href=#熟读日志规约>熟读《日志规约》</a></li></ul></li></ul></nav></div></div><div class=content id=content><p>主要其实是学习<a href=https://mp.weixin.qq.com/s/eIiu08fVk194E0BgGL5gow target=_blank rel="noopener noreffer">Java日志通关</a>系列文章，大佬太强了</p><p><img class=lazyload src=/svg/loading.min.svg data-src=/posts/java-log-in-practice/image-20250722145042812.png data-srcset="/posts/java-log-in-practice/image-20250722145042812.png, /posts/java-log-in-practice/image-20250722145042812.png 1.5x, /posts/java-log-in-practice/image-20250722145042812.png 2x" data-sizes=auto alt=/posts/java-log-in-practice/image-20250722145042812.png title=image-20250722145042812 width=807 height=492></p><p>日志发展到今天，被抽象成了三层，接口层、实现层、适配层。</p><ul><li>接口层：或者叫日志门面（facade），就是interface，只定义接口，等别人实现</li><li>实现层：真正干活的，能够把日志内存记录下来的工具，但请注意它不是上面接口实现，因为它不感知也不直接实现接口，仅仅是独立的实现</li><li>适配层：一般称为adapter，因为接口层和适配层并非都出自一家之手，它们之间无法直接匹配</li></ul><p>适配层有可以分为绑定（binding）和桥接（bridging）两种能力：</p><ul><li>绑定（binding）：将接口层绑定到某个实现层（实现一个接口层，并调用实现层的方法）</li><li>桥接（bridging）：将接口层桥接到另一个接口层（实现一个接口层，并调用另一个接口层的接口），主要作用是方便用户低成本的在各接口层和适配层之间迁移</li></ul><h2 id=java日志的历史>Java日志的历史</h2><h3 id=log4j-1999>Log4j (1999)</h3><p>大神Ceki开发，提供了以下能力</p><ul><li>日志可以输出到控制台、文件、数据库，甚至远程服务器和电子邮件（被称作Appender）</li><li>日志输出格式（被称作Layout）允许定制，比如错误日志和普通日志使用不同的展现方式</li><li>日志被分为5个级别（被称为Level），从低到高依次是debug、info、warn、error、fatal，输出前会校验配置的允许级别，小于此级别的日志将被忽略。除外之外还有all、off两个特殊级别，表示完全开放和完全关闭日志</li><li>可以在工程中随时指定不同的记录器（被称为Logger），可以为之配置独立的记录位置、日志级别</li><li>支持通过properties或者xml文件进行配置</li></ul><p>不同Log4j有比较明显的性能短板，在Logback和Log4j 2推出后逐渐式微，最终Apache在2015年宣布终止开发Log4j并全面迁移至Log4j2</p><h3 id=jul-20022>JUL (2002.2)</h3><p>Sun公司在2002年发布，这套系统称为Java Logging API，包路径是java.util.logging，简称JUL。</p><h3 id=jcl-20028>JCL (2002.8)</h3><p>对于独立且轻量的项目来说，开发者可以根据喜好使用某个日志方案即可，但更多的情况是一套业务系统依赖了大量的三方工具，而众多三方工具会各自使用不同的日志实现，当它们被集成在一起时，必然导致日志记录的混乱。</p><p>为此Apache在2002年推出了一套接口Jakarta Common Logging，简称JCL，它的主要作者仍然是Ceki，这套接口主动支持了Log4j、JUL等众多日志工具，开发者如果想打印日志，只需调用JCL的接口即可，至于最终使用的日志实现则由最上层的业务系统决定，我们可以看到，这其实就是典型的接口与实现分离的设计。</p><p><img class=lazyload src=/svg/loading.min.svg data-src="https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naKAIwp3hOt1o65w1O31YKYJqCFEH75mouFdF4iayGDQgZ65RzmHn4UTS5vIqaYo8icNgpMic4pRJmYIw/640?wx_fmt=png&amp;from=appmsg&amp;randomid=see8y0bf&amp;tp=webp&amp;wxfrom=5&amp;wx_lazy=1" data-srcset="https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naKAIwp3hOt1o65w1O31YKYJqCFEH75mouFdF4iayGDQgZ65RzmHn4UTS5vIqaYo8icNgpMic4pRJmYIw/640?wx_fmt=png&amp;from=appmsg&amp;randomid=see8y0bf&amp;tp=webp&amp;wxfrom=5&amp;wx_lazy=1, https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naKAIwp3hOt1o65w1O31YKYJqCFEH75mouFdF4iayGDQgZ65RzmHn4UTS5vIqaYo8icNgpMic4pRJmYIw/640?wx_fmt=png&amp;from=appmsg&amp;randomid=see8y0bf&amp;tp=webp&amp;wxfrom=5&amp;wx_lazy=1 1.5x, https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naKAIwp3hOt1o65w1O31YKYJqCFEH75mouFdF4iayGDQgZ65RzmHn4UTS5vIqaYo8icNgpMic4pRJmYIw/640?wx_fmt=png&amp;from=appmsg&amp;randomid=see8y0bf&amp;tp=webp&amp;wxfrom=5&amp;wx_lazy=1 2x" data-sizes=auto alt="https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naKAIwp3hOt1o65w1O31YKYJqCFEH75mouFdF4iayGDQgZ65RzmHn4UTS5vIqaYo8icNgpMic4pRJmYIw/640?wx_fmt=png&amp;from=appmsg&amp;randomid=see8y0bf&amp;tp=webp&amp;wxfrom=5&amp;wx_lazy=1" title=图片></p><p>简单介绍一下JCL自带的几个适配层、实现层：</p><ul><li>Jdk14Logger：用于绑定JUL（因为JUL从JDK 1.4开始提供）的适配层</li><li>Log4JLogger：用于绑定Log4j的适配层</li><li>NoOpLog：JCL自带的日志实现，但它是空实现，不做任何事情</li><li>SimpleLog：JCL自带的日志实现，让用户哪怕不依赖其他工具也能打印日志，只是功能非常简单</li></ul><p>当时项目前缀取名Jakarta，是因为它属于Apache和Sun共同推出的Jakarta项目，现在JCL作为Apache Commons的子项目，叫Apache Commons Logging，与我们常用的Commons lang、CLommons Collections等是师兄弟，但JCL的简写命名被保留下来，并没有改成ACL。</p><h3 id=slf4j-2005>Slf4j (2005)</h3><p>Log4j的作者Ceki看到了很多Log4j和JCL的不足，但又无力推动项目快速迭代，加上对Apache管理不满，认为自己失去了对Log4j项目的控制权，于是在2005年选择自立门户，并很快推出了一款新作品Simple Logging Facade for Java，简称Slf4j。</p><p>Slf4j也是一个接口层，接口设计与JCL非常接近（毕竟有师承关系），相比JCL有一个重要的区别是日志实现层的绑定方式：JCL是动态绑定，即在运行时执行日志记录时判定合适的日志实现，而Slf4j选择的是静态绑定，应用编译时已经确定日志实现，性能自然更好，这就是常被提到的classloader问题。</p><p>在推出Slf4j的时候，市面上已经有另一套接口JCL，为了将选择权交给用户，Slf4j推出了两个桥接层：</p><ul><li>jcl-over-slf4j：客户调用JCL接口，底层转到Slf4j接口</li><li>slf4j-jcl：客户调用slf4j接口，底层转到JCL接口</li></ul><p><img class=lazyload src=/svg/loading.min.svg data-src=/posts/java-log-in-practice/image-20250722152841289.png data-srcset="/posts/java-log-in-practice/image-20250722152841289.png, /posts/java-log-in-practice/image-20250722152841289.png 1.5x, /posts/java-log-in-practice/image-20250722152841289.png 2x" data-sizes=auto alt=/posts/java-log-in-practice/image-20250722152841289.png title=image-20250722152841289 width=678 height=509></p><p><img class=lazyload src=/svg/loading.min.svg data-src=/posts/java-log-in-practice/image-20250722153006591.png data-srcset="/posts/java-log-in-practice/image-20250722153006591.png, /posts/java-log-in-practice/image-20250722153006591.png 1.5x, /posts/java-log-in-practice/image-20250722153006591.png 2x" data-sizes=auto alt=/posts/java-log-in-practice/image-20250722153006591.png title=image-20250722153006591 width=673 height=401></p><p><img class=lazyload src=/svg/loading.min.svg data-src=/posts/java-log-in-practice/image-20250722153015876.png data-srcset="/posts/java-log-in-practice/image-20250722153015876.png, /posts/java-log-in-practice/image-20250722153015876.png 1.5x, /posts/java-log-in-practice/image-20250722153015876.png 2x" data-sizes=auto alt=/posts/java-log-in-practice/image-20250722153015876.png title=image-20250722153015876 width=677 height=448></p><p>这里解释一下<code>slf4j-log4j12</code>这个名字，它表示slf4j + log4j 1.2（Log4j的最后一个版本）的适配层。类似的，<code>slf4j-jdk14</code>表示slf4j + jdk1.4（就是JUL）的适配层。</p><h3 id=logback-2006>Logback (2006)</h3><p>Ceki在2006年又推出一款日志记录实现方案：Logback，无论是易用度、功能、还是性能，Logback都优于Log4j，在加上天然支持Slf4j而不需要额外的适配层，自然拥趸者众，目前Logback已经成为Java社区最被广泛接受的日志实现层。</p><p>相较于Log4j，Logback提供了很多我们现在看起来理所当然的新特性：</p><ul><li>支持日志文件切割滚动记录，支持异步写入</li><li>针对历史日志，既支持按时间或按硬盘占用自动清理，也支持自动压缩以节省硬盘空间</li><li>支持分支语法，通过<code>&lt;if></code>、<code>&lt;then></code>、<code>&lt;else></code>可以按条件配置不同的日志输出逻辑，比如判断仅在开发环境输出更详细的日志信息</li><li>大量的日志过滤器，甚至可以做到通过登陆用户Session识别每一位用户并输出独立的日志文件</li><li>异常堆栈支持打印jar信息，让我们不但知道调用出自哪个文件哪一行，也可以知道这个文件来自哪个jar包</li></ul><p>Logback主要由三个部分组成：</p><ul><li>logback-core：记录、输出日志的核心实现</li><li>logback-classic：适配层，完整实现了Slf4j接口</li><li>logback_access：用于将Logback集成到Servlet容器（Tomcat、Jetty）中，让这些容器的HTTP访问日志也可以经由强大的Logback输出</li></ul><h3 id=log4j-22012>Log4j 2(2012)</h3><p>Apache在2012年推出Apache Log4j 2，有以下亮点：</p><ul><li>插件化结构，用户可以自己开发插件，实现Appender、Logger、Filter完成扩展</li><li>基于LMAX Disruptor的异步话输出，在多线程场景下相比Logback有10倍左右的性能提升</li></ul><p>Log4j 2主要由两部分组成：</p><ul><li>log4j-core：核心实现，功能类似于logback-core</li><li>log4j-api：接口层，功能类似于Slf4j，里面只包含Log4j 2的接口定义</li></ul><p>Log4j 2提供JCL和Slf4j之外的第三个接口层（log4j-api，虽然只是自己的接口），不过目前大家一般把Log4j 2看做实现层看待，并引入JCL或Slf4j作为接口层，特别是JCL，在时隔近10年后，与2023年推出了1.3.0版，增加了对Log4j 2的适配。</p><p>虽然Log4j 2发布已经很久了，但它依然无法撼动Logbakc的江湖地方</p><ul><li>Log4j 2虽然顶着Log4j的名号，但却是一套完全重写的日志系统，无法只通过修改Log4j版本号完成升级，历史用户升级意愿低</li><li>Log4j 2比Logback晚面世6年，却没有提供足够两眼及差异化的能力，而Slf4j+Logback这套组合已经非常优秀，先发优势明显</li></ul><h3 id=spring-jcl>spring-jcl</h3><p>Spring Boot目前使用sprint-jcl + Logback这套方案，Spring曾在它的官方blog中提到，如果可以重来，Spring会选择Slf4j而不是JCL作为默认日志接口。Spring想要支持SLF4j，又要保证向前兼容JCL，于是从5.0 （Spring Boot 2.0）开始提供了spring-jcl这个包，它顶着Spring的名号，代码中报名却与JCL一致（<code>org.apache.commons.logging</code>），作用自然也与JCL一致，但它额外适配了Slf4j。并将Slf4j放在查找的第一顺位。</p><p><img class=lazyload src=/svg/loading.min.svg data-src=/posts/java-log-in-practice/image-20250722160501509.png data-srcset="/posts/java-log-in-practice/image-20250722160501509.png, /posts/java-log-in-practice/image-20250722160501509.png 1.5x, /posts/java-log-in-practice/image-20250722160501509.png 2x" data-sizes=auto alt=/posts/java-log-in-practice/image-20250722160501509.png title=image-20250722160501509 width=679 height=632></p><p>如果你是基于Spring Initialize新创建的应用，可以不必管这个包，它已经在背后默默工作了，如果你在项目开发过程中遇到包冲突，或者需要自己选择日志接口和实现，则可以把spring-jcl当做jcl对待，大胆排除即可。</p><h3 id=总结>总结</h3><p><img class=lazyload src=/svg/loading.min.svg data-src=/posts/java-log-in-practice/image-20250722160744558.png data-srcset="/posts/java-log-in-practice/image-20250722160744558.png, /posts/java-log-in-practice/image-20250722160744558.png 1.5x, /posts/java-log-in-practice/image-20250722160744558.png 2x" data-sizes=auto alt=/posts/java-log-in-practice/image-20250722160744558.png title=image-20250722160744558 width=1083 height=475></p><p>两个接口（JCL、Slf4j）和四个实现(Log4j、JUL、Logback、Log4j2)，再加上无数的适配层，组成了一张图。</p><ul><li>相同颜色的模块具有相同的<code>groupId</code></li><li>JCL的适配层是直接在它自己的包中提供的</li><li>要想使用Logback，就一定绕不开Slf4j（引用它的适配层也算）。同样的，要想使用Log4j 2，那它的<code>log4j-api</code>也绕不开。</li></ul><h2 id=slf4j--logback整合和排包>Slf4j + Logback整合和排包</h2><p>对<a href=https://mp.weixin.qq.com/s/jABbG4MKvEiWXwdYwUk8SA target=_blank rel="noopener noreffer">Java日志通关（二） - Slf4j+Logback 整合及排包</a>的学习</p><p>选择Slf4j + Logback的原因：</p><ul><li>Slf4j的API相较JCL更丰富，且得到Intellij IDEA编辑器的完整支持，这是核心优势</li><li>Slf4j支持日志内容惰性求值，相比JCL性能更好</li><li>在前边选定Slf4j的前提下，同一厂牌且表现优异的Logback自然中标</li><li>Slf4j + Logback是目前大部分开发者的选择（2021年Slf4j 76%,Logback 48%）</li></ul><h3 id=基础依赖项>基础依赖项</h3><p>根据前面的知识，我们很容易知道以下三个包是必须的：</p><ul><li>Slf4j是基本的日志门面，它的核心APi在<code>org.slf4j:slf4j-api</code>中</li><li>Logback的核心实现层在<code>ch.qos.logback:logback-core</code>中</li><li>Logback针对Slf4j的适配层在<code>ch.qos.logback:logback-classic</code>中</li></ul><p>其中logback-classic会直接依赖其他两项，而且它依赖的一定是它能够支持的最合适版本，所以为了避免歧义，我们可以在项目中仅显式依赖logback-classic即可。</p><p>另外要注意，Slf4j和Logback的版本并不完全向前兼容，他们之间也有对应关系</p><h4 id=slf4j版本兼容性>slf4j版本兼容性</h4><p>slfj4j 2.0.x版本有不小的改动，不再主动查找<code>org.slf4j.impl.StaticLoggerBinder</code>，而是改用JDK ServiceLoader（也就是SPI，Service Provider Interface）的方式来加载实现，这是JDK 8中的特性，所以Slf4j对JDK的依赖显而易见。</p><p><img class=lazyload src=/svg/loading.min.svg data-src=/posts/java-log-in-practice/image-20250722162953271.png data-srcset="/posts/java-log-in-practice/image-20250722162953271.png, /posts/java-log-in-practice/image-20250722162953271.png 1.5x, /posts/java-log-in-practice/image-20250722162953271.png 2x" data-sizes=auto alt=/posts/java-log-in-practice/image-20250722162953271.png title=image-20250722162953271 width=676 height=168></p><h4 id=logback版本兼容性>Logback版本兼容性</h4><p>因为Slf4j技术方案变化，导致logback-classic也需要分别作适配，如果使用了不匹配的版本将会报异常</p><p><img class=lazyload src=/svg/loading.min.svg data-src=/posts/java-log-in-practice/image-20250722163344515.png data-srcset="/posts/java-log-in-practice/image-20250722163344515.png, /posts/java-log-in-practice/image-20250722163344515.png 1.5x, /posts/java-log-in-practice/image-20250722163344515.png 2x" data-sizes=auto alt=/posts/java-log-in-practice/image-20250722163344515.png title=image-20250722163344515 width=675 height=202></p><p>其中logback 1.3.x和1.4.x是并行维护版本，每次更新都会同时发布1.3.n和1.4.n，用户需要根据项目的JDK版本进行选择，不过目前Logback已经全面升级1.5.x，且1.3.x和1.4.x不再维护。</p><h4 id=总结-1>总结</h4><p>从前面的版本兼容性我们可以知道：</p><ul><li>如果使用JDK8，建议选择Slf4j 2.0 + Logback 1.3</li><li>如果使用JDK 11及以上，建议选择Slf4j 2.0 + Logback 1.5</li></ul><h3 id=适配spring-boot>适配Spring Boot</h3><p>Spring Boot通过<code>spring-boot-starter-logging</code>包直接依赖了Logback（然后再间接依赖了Slf4j），它通过<code>org.springframework.boot.logging.LoggingSystem</code>查找日志接口并自动适配，所以我们使用Spring Boot时一般并不需要关系日志依赖，只管使用即可。但因为slf4j 2.0.x和1.7.x实现不一致，导致Spring Boot也会挑版本。</p><p><img class=lazyload src=/svg/loading.min.svg data-src=/posts/java-log-in-practice/image-20250722164225550.png data-srcset="/posts/java-log-in-practice/image-20250722164225550.png, /posts/java-log-in-practice/image-20250722164225550.png 1.5x, /posts/java-log-in-practice/image-20250722164225550.png 2x" data-sizes=auto alt=/posts/java-log-in-practice/image-20250722164225550.png title=image-20250722164225550 width=676 height=167></p><p>根据这个表格，以及前一节总结的版本兼容关系，最终可以得出结论：</p><ul><li>如果使用Spring Boot 2及以下，建议 Slf4j 1.7.x + Logback 1.2.x</li><li>如果使用Spring Boot 3，建议选择Slf4j 2.0.x + Logback 1.4.x（如果Spring做好了Logback 1.4.x的适配，估计就推荐1.5.x了）</li></ul><h3 id=桥接其他实现层>桥接其他实现层</h3><p>我们还要保证项目依赖的二方、三方包能够正常打印日志，而它们可能依赖的是JCL/Log4j/Log4j2/JUL，我们可以统一引入适配层做好桥接：</p><ul><li>通过<code>org.slf4j:jcl-over-slf4j</code>将JCL桥接到Slf4j上</li><li>通过<code>org.slf4j:log4j-over-slf4j</code>将Log4j桥接到Slf4j上</li><li>通过<code>org.slf4j:jul-to-slf4j</code>将JUL桥接到Slf4j上</li><li>通过<code>org.apache.logging.log4j:log4j-to-slf4j</code>将Log4j2桥接到Slf4j上</li></ul><p>注意，所有<code>org.slf4j</code>的包版本要完全一致，所以如果引入这些桥接包，要保证它们的版本与前面选择的slf4j-api版本对应，为此Slf4j从2.0.8开始提供bom包，省去维护每个包版本的烦恼（至于低版本就只能人肉保持版本一致性了）。<code>log4j-to-slf4j</code>这个包，对Sfl4j1和slf2j2都能支持。</p><h3 id=去除无用依赖>去除无用依赖</h3><p>桥接层使用与被桥接包一样的包结构，再将调用转到另一个接口上，所以如果同时引入桥接层以及被桥接的包，大概率会引起包冲突。</p><p>由于很多工具会在不经意间引入日志接口层、实现层，所以我们有必要从整个应用级别着眼，把那些无用的接口层、实现层排除掉，包括JCL、Log4j和Log4j 2</p><ul><li>排掉JCL：<code>commons-logging:commons-logging</code></li><li>排掉Log4j：<code>log4j:log4j</code></li><li>排掉Log4j2：<code>org.apache.logging.log4j:log4j-core</code></li></ul><p>以及，如果项目间接引入了其他的桥接包，也可能会引起和冲突，需要排掉。可以使用<code>maven-enforcer-plugin</code>插件标识那些包是要被排掉的，它只是一个校验，实际上你仍然需要在每个引入了错误包的依赖中进行排除。</p><h3 id=注意事项>注意事项</h3><p>根据前面的介绍，我们在实际项目中将主要做两类事情：</p><ul><li>引入期望的包，并指定版本</li><li>排除一些包（指定空版本）</li></ul><p>以上两个动作，一般我们都是在父POM的<code>&lt;dependencyManagement></code>中完成的，但这只是管理包版本，在项目没有实际引用之前，并不会真的加载。</p><p>在实际项目中，我们一般会按照这个思路来处理：</p><ul><li>有一个模块A，依赖Log4j打印日志，所以它依赖了<code>log4j:log4j</code>包</li><li>我们在父POM中把<code>log4j:log4j</code>排掉了，此时模块A调用<code>Log4j</code>会报错</li><li>我们在父POM中引入<code>log4j-over-slf4j</code>，目标是把`Log4j切换到Slf4j，让模块A不报错</li></ul><p>看起来很完美，项目也能正常启动，但当模块A需要打印日志是，我们却还是得到了一个错误<code>log4j:WARN No appenders could be found for logger</code>。这是因为<code>log4j-over-slf4j</code>并没有真的被引入我们的项目中（很少有哪一个二方包会引这个东西，会被骂的）。</p><p>解决方案也很简单，将<code>log4j-over-slf4j</code>通过<code>dependencies></code>引入即可，在父POM做这个也行，在实际有依赖的子POM也行。</p><h2 id=slf4介绍>Slf4介绍</h2><p>学习大佬<a href=https://mp.weixin.qq.com/s/Ys9LxsvmRhhwgtL4Kji_FQ target=_blank rel="noopener noreffer">Java日志通关（三） - Slf4j 介绍</a></p><h3 id=创建logger实例>创建Logger实例</h3><h4 id=工厂函数>工厂函数</h4><p>要使用Slf4j，需要先创建一个<code>org.slf4j.Logger</code>实例，可以使用它的工厂函数<code>org.slf4j.LoggerFactory.getLogger()</code>，参数可以是字符串或Class：</p><ul><li>如果是字符串，这个字符串会作为返回Logger实例的名字</li><li>如果是Class，会调用它的<code>getName</code>获取Class的全路径，作为Logger实例的名字</li></ul><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=kd>public</span><span class=w> </span><span class=kd>class</span> <span class=nc>ExampleService</span><span class=w> </span><span class=p>{</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=c1>// 传Class，一般都是传当前的Class</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=kd>private</span><span class=w> </span><span class=kd>static</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>Logger</span><span class=w> </span><span class=n>log</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>LoggerFactory</span><span class=p>.</span><span class=na>getLogger</span><span class=p>(</span><span class=n>ExampleService</span><span class=p>.</span><span class=na>class</span><span class=p>);</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=c1>// 相当于</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=kd>private</span><span class=w> </span><span class=kd>static</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>logger</span><span class=w> </span><span class=n>log</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>LoggerFactory</span><span class=p>.</span><span class=na>getLogger</span><span class=p>(</span><span class=s>&#34;com.example.service.ExampleService&#34;</span><span class=p>);</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=c1>// 你也可以指定任意字符串</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=kd>private</span><span class=w> </span><span class=kd>static</span><span class=w> </span><span class=kd>final</span><span class=w> </span><span class=n>Logger</span><span class=w> </span><span class=n>log</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>LoggerFactory</span><span class=p>.</span><span class=na>getLogger</span><span class=p>(</span><span class=s>&#34;service&#34;</span><span class=p>)</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>}</span></span></span></code></pre></div></div><p>这个字符串格式的实例名字可以称之为LoggerName，用于在日志实现层区分如何打印日志。</p><h4 id=lombook>Lombook</h4><p>Lombok提供了针对各种日志系统的支持，比如你只需要<code>@lombok.extern.slf4j.Slf4j</code>注解就可以得到一个静态的<code>log</code>字段，不用在手动调用工厂函数，默认的LoggerName即是被注解的Class，同时也支持字符串格式的<code>topic</code>字段指定LoggerName。</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=nd>@Slf4j</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=kd>public</span><span class=w> </span><span class=kd>class</span> <span class=nc>ExampleService</span><span class=w> </span><span class=p>{</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=c1>// 注解 @Slf4j 会帮你生成下边这行代码</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=c1>// private staitc final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExampleService.class)</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w> 
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>}</span></span></span></code></pre></div></div><h3 id=日志级别>日志级别</h3><p>通过<code>org.slf4j.event.Level</code>我们可以看到一共有五个等级，按优先级从低到高依次为：</p><ul><li><code>TRACE</code>：一般用于记录调用链路，比如方法进入时打印<code>xxx start</code></li><li><code>DEBUG</code>：类似于trace，可以用来打印方法的出入参</li><li><code>INFO</code>：默认级别，一般用于记录代码执行时的关键信息</li><li><code>WARN</code>：当代码执行遇到预期外场景，但它不影响后续执行时使用</li><li><code>ERROR</code>：出现异常，以及代码无法兜底时使用</li></ul><p>日志的实现层会决定那个等级的日志可以输出，这也是我们打印日志是需要区分等级的原因，在保证重要的日志不丢失的同时，仅在有需要时才打印用于Debug的日志。</p><h3 id=打印接口>打印接口</h3><p>通过<code>org.slf4j.Logger</code>可以看到有非常多的日志打印接口，打过定义的格式都类型，以<code>info</code>为例，一共有两大类</p><ul><li><code>public boolean info(...)</code></li><li><code>public boolean isInfoEnabled(...)</code></li></ul><h4 id=info方法>info方法</h4><p>这个方法有大量的重载，不过使用逻辑是一致的</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=nd>@Slf4j</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=kd>public</span><span class=w> </span><span class=kd>class</span> <span class=nc>ExampleService</span><span class=w> </span><span class=p>{</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=kd>public</span><span class=w> </span><span class=kt>void</span><span class=w> </span><span class=nf>querySomething</span><span class=p>(</span><span class=n>Long</span><span class=w> </span><span class=n>a</span><span class=p>,</span><span class=w> </span><span class=n>String</span><span class=w> </span><span class=n>b</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=c1>// 只传入一个String参数，String内容需要自己拼</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(</span><span class=s>&#34;request&#34;</span><span class=p>)</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(</span><span class=s>&#34;request a=&#34;</span><span class=w> </span><span class=o>+</span><span class=w> </span><span class=n>a</span><span class=w> </span><span class=o>+</span><span class=w> </span><span class=s>&#34;, b = &#34;</span><span class=w> </span><span class=o>+</span><span class=w> </span><span class=n>b</span><span class=p>);</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>    
-</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=c1>// 使用格式模板，通过{}插入占位符</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=c1>// Intellij IDEA会校验后续参数数量是否与占位符一致，不一致时会给出警告</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(</span><span class=s>&#34;request a={}&#34;</span><span class=p>);</span><span class=w> </span><span class=c1>// 警告：参数比占位符少</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(</span><span class=s>&#34;request a={}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>a</span><span class=p>);</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(</span><span class=s>&#34;request a={}, b={}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>a</span><span class=p>,</span><span class=w> </span><span class=n>b</span><span class=p>);</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>    
-</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=c1>// 所有参数的最后可以跟一个异常，它不占用占位符</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>Exception</span><span class=w> </span><span class=n>e</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>new</span><span class=w> </span><span class=n>RuntimeException</span><span class=p>();</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(</span><span class=s>&#34;request a={}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>a</span><span class=p>,</span><span class=w> </span><span class=n>e</span><span class=p>);</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=p>}</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>}</span></span></span></code></pre></div></div><h4 id=isinfoenabled方法>isInfoEnabled方法</h4><p>通过<code>isInfoEnabled</code>方法可以获取当前Logger实例是否开启了对应的日志级别，比如我们可能见过类似这样的代码：</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=k>if</span><span class=w> </span><span class=p>(</span><span class=n>log</span><span class=p>.</span><span class=na>isInfoEnabled</span><span class=p>())</span><span class=w> </span><span class=p>{</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(...)</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>}</span></span></span></code></pre></div></div><p>但其实日志实现层本身就会判断当前Logger实例的输出等级，低于此等级的日志并不会输出，所以一般不太需要这样的判断，但如果你的输出需要额外消耗资源，那么还是先判断一下为好</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=k>if</span><span class=w> </span><span class=p>(</span><span class=n>log</span><span class=p>.</span><span class=na>isIInfoEnabled</span><span class=p>())</span><span class=w> </span><span class=p>{</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=c1>// 有远程调用</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>String</span><span class=w> </span><span class=n>resource</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>rpcService</span><span class=p>.</span><span class=na>call</span><span class=p>();</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(</span><span class=s>&#34;resource={}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>resource</span><span class=p>)</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=c1>// 要解析大对象</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>Object</span><span class=w> </span><span class=n>result</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=p>...;</span><span class=w> </span><span class=c1>// 一个大对象</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(</span><span class=s>&#34;result={}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>JSON</span><span class=p>.</span><span class=na>toJSONString</span><span class=p>(</span><span class=n>result</span><span class=p>));</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>}</span></span></span></code></pre></div></div><h4 id=marker>Marker</h4><p>有些接口支持<code>org.slf4j.Marker</code>类型的入参，比如<code>log.info(Marker, ...)</code></p><p>我们可以通过工厂函数创建Marker并使用，比如</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=n>Marker</span><span class=w> </span><span class=n>marker</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>MarkerFactory</span><span class=p>.</span><span class=na>getMarker</span><span class=p>(</span><span class=s>&#34;foobar&#34;</span><span class=p>);</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(</span><span class=n>marker</span><span class=p>,</span><span class=w> </span><span class=s>&#34;test a={}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>1</span><span class=p>);</span></span></span></code></pre></div></div><p>这个Marker是一个标记，它会传递给日志实现层，由实现层决定Marker的处理方式，比如</p><ul><li>将Marker通过%marker打印出来</li><li>使用MarkerFilter过滤出（或过滤掉）带有某个Marker的日志，比如把需要Sunfire监控的日志都过滤出来写到一个单独的日志文件中。</li></ul><h4 id=mdc>MDC</h4><p>MDC的全称是Mapped Diagnostic Context，直译为映射调试上下文，说人话就是用来存储扩展字段的地方，而且它是线程安全的，比如OpenTelemetry的traceId就会被存到MDC中</p><p>而且MDC的使用也很简单，就像是一个<code>Map&lt;String, String></code>实例，常用方法<code>put/get/remove/clear</code>都有</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=c1>// 和Map&lt;String, String&gt; 相似的接口定义</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=n>MDC</span><span class=p>.</span><span class=na>put</span><span class=p>(</span><span class=s>&#34;key&#34;</span><span class=p>,</span><span class=w> </span><span class=s>&#34;value&#34;</span><span class=p>);</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=n>String</span><span class=w> </span><span class=n>valeu</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>MDC</span><span class=p>.</span><span class=na>get</span><span class=p>(</span><span class=s>&#34;key&#34;</span><span class=p>);</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=n>MDC</span><span class=p>.</span><span class=na>remove</span><span class=p>(</span><span class=s>&#34;key&#34;</span><span class=p>);</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=n>MDC</span><span class=p>.</span><span class=na>clear</span><span class=p>();</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=c1>// 获取MDC中的所有内容</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=n>Map</span><span class=o>&lt;</span><span class=n>String</span><span class=p>,</span><span class=w> </span><span class=n>String</span><span class=o>&gt;</span><span class=w> </span><span class=n>context</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>MDC</span><span class=p>.</span><span class=na>getCopyOfContextMap</span><span class=p>();</span></span></span></code></pre></div></div><h2 id=logback介绍>Logback介绍</h2><p>学习<a href=https://mp.weixin.qq.com/s/UR30lfp_Guu9d6f0jzWfJw target=_blank rel="noopener noreffer">Java日志通关（四） - Logback 介绍</a></p><h3 id=配置入口>配置入口</h3><p>Logback支持XML、Groovy的配置方式，以XML来说，它会默认查找resources目录下的<code>logback-test.xml</code>用于测试/<code>logback.xml</code>文件。</p><p>而如果你是使用Spring Boot，那么你还可以使用logback-spring.xml文件进行配置，这两者的区别是</p><ul><li><code>logback-spring.xml</code>是由Sprint Boot找到，插入自己的上下文信息并做进一步处理后再传递给Logback的，你可以在其中使用<code>&lt;springProfile></code>区分环境配置，也可以使用<code>&lt;springProperty></code>拿到Spring上下文信息（比如<code>spring.application.name</code>）。</li><li><code>logback.xml</code>是由logback自己找到，自然不会有Spring Boot相关的能力。</li></ul><h3 id=配置文件介绍>配置文件介绍</h3><p>接下来我们以<code>logback-spring.xml</code>为例进行介绍，一个Logback配置文件主要有以下几个标签：</p><ul><li><code>configuration</code>：最外层的父标签，其中有几个属性配置，但项目中较少使用</li><li><code>property</code>：定义变量</li><li><code>appender</code>：负责日志输出（一般是写到文件），我们可以通过它设置输出方案</li><li><code>logger</code>：用来设置某个LoggerNmae的打印级别</li><li><code>root</code>：logger的兜底配置，从而我们不必配置每个LoggerName</li><li>conversionRule：定义转换规则</li></ul><h4 id=springproperty和property>springProperty和property</h4><p>前文提到<code>&lt;springProperty></code>用来插入Spring上下文，那<code>&lt;property></code>就是Logback自己定义变量的标签</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-xml"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-xml data-lang=xml><span class=line><span class=cl><span class=nt>&lt;springProperty</span> <span class=na>scope=</span><span class=s>&#34;context&#34;</span> <span class=na>name=</span><span class=s>&#34;APP_NAME&#34;</span> <span class=na>source=</span><span class=s>&#34;spring.application.name&#34;</span><span class=nt>/&gt;</span>
-</span></span><span class=line><span class=cl>
-</span></span><span class=line><span class=cl><span class=nt>&lt;property</span> <span class=na>name=</span><span class=s>&#34;LOG_PATH&#34;</span> <span class=na>value=</span><span class=s>&#34;${user.home}/${APP_NAME}/logs&#34;</span><span class=nt>/&gt;</span>
-</span></span><span class=line><span class=cl><span class=nt>&lt;property</span> <span class=na>name=</span><span class=s>&#34;APP_LOG_FILE&#34;</span> <span class=na>value=</span><span class=s>&#34;${LOG_PATH}/application.log&#34;</span><span class=nt>/&gt;</span>
-</span></span><span class=line><span class=cl><span class=nt>&lt;property</span> <span class=na>name=</span><span class=s>&#34;APP_LOG_PATTERN&#34;</span> <span class=na>value=</span><span class=s>&#34;%date{yyyy-MM-dd HH:mm:ss.SSS}|%-5level|%X{trace_id}|%thread|%logger{20}|%message%n%exception&#34;</span><span class=nt>/&gt;</span></span></span></code></pre></div></div><p>我们首先使用<code>&lt;springProperty></code>插入<code>APP_NAME</code>这个变量来表示应用名，虽然用它拼出<code>LOG_PATH</code>变量，示例中还用到了<code>${user.home}</code>这个Logback内建支持的上下文变量，<code>APP_LOG_FILE</code>是log文件路径，<code>APP_LOG_PATTERN</code>是日志格式。</p><h4 id=appender>appender</h4><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-xml"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-xml data-lang=xml><span class=line><span class=cl><span class=nt>&lt;appender</span> <span class=na>name=</span><span class=s>&#34;APPLICATION&#34;</span> <span class=na>class=</span><span class=s>&#34;ch.qos.logback.core.rolliing.RollingFileAppender&#34;</span><span class=nt>&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;file&gt;</span>${APP_LOG_FILE}<span class=nt>&lt;/file&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;encoder&gt;</span>
-</span></span><span class=line><span class=cl>    <span class=nt>&lt;pattern&gt;</span>${APP_LOG_PATTERN}<span class=nt>&lt;/pattern&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;/encoder&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;rollingPolicy</span> <span class=na>class=</span><span class=s>&#34;ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy&#34;</span><span class=nt>&gt;</span>
-</span></span><span class=line><span class=cl>    <span class=nt>&lt;fileNamePolicy&gt;</span>${APP_LOG_FILE}.%d{yyyy-MM-dd}.%i<span class=nt>&lt;/fileNamePolicy&gt;</span>
-</span></span><span class=line><span class=cl>    <span class=nt>&lt;maxHistory&gt;</span>30<span class=nt>&lt;/maxHistory&gt;</span>
-</span></span><span class=line><span class=cl>    <span class=nt>&lt;maxFileSize&gt;</span>200MB<span class=nt>&lt;/maxFileSize&gt;</span>
-</span></span><span class=line><span class=cl>    <span class=nt>&lt;totalSizeCap&gt;</span>10GB<span class=nt>&lt;/totalSizeCap&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;/rollingPolicy&gt;</span>
-</span></span><span class=line><span class=cl><span class=nt>&lt;/appender&gt;</span>
-</span></span><span class=line><span class=cl>
-</span></span><span class=line><span class=cl><span class=nt>&lt;appender</span> <span class=na>name=</span><span class=s>&#34;APPLICATION-async&#34;</span> <span class=na>class=</span><span class=s>&#34;ch.qos.logback.classic.AsyncAppender&#34;</span><span class=nt>&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;queueSize&gt;</span>256<span class=nt>&lt;/queueSize&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;discardingThresold&gt;</span>0<span class=nt>&lt;/discardingThresold&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;nerverBlock&gt;</span>true<span class=nt>&lt;/nerverBlock&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;append-ref</span> <span class=na>ref=</span><span class=s>&#34;APPLICATION&#34;</span><span class=nt>/&gt;</span>
-</span></span><span class=line><span class=cl><span class=nt>&lt;/appender&gt;</span></span></span></code></pre></div></div><p><code>ch.qos.logback.core.rolling.RollingFileAppender</code>负责将日志滚动打印，避免单文件体积过大，具体的滚动策略在<code>&lt;rollingPolicy></code>中指定。</p><p><code>ch.qos.logback.classic.AsyncAppender</code>负责将日志异步打印，避免大量打印日志时阻塞线程</p><h4 id=logger和root>logger和root</h4><p><code>&lt;logger></code>用来设置某个LoggerName的打印级别，比如</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-xml"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-xml data-lang=xml><span class=line><span class=cl><span class=nt>&lt;logger</span> <span class=na>level=</span><span class=s>&#34;INFO&#34;</span> <span class=na>additivity=</span><span class=s>&#34;false&#34;</span> <span class=na>name=</span><span class=s>&#34;com.foo.bar&#34;</span><span class=nt>&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;appender-ref</span> <span class=na>ref=</span><span class=s>&#34;APPLICATION-async&#34;</span><span class=nt>/&gt;</span>
-</span></span><span class=line><span class=cl><span class=nt>&lt;/logger&gt;</span>
-</span></span><span class=line><span class=cl>
-</span></span><span class=line><span class=cl><span class=nt>&lt;root</span> <span class=na>level=</span><span class=s>&#34;INFO&#34;</span><span class=nt>&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;appender-ref</span> <span class=na>ref=</span><span class=s>&#34;APPLICATION-async&#34;</span><span class=nt>/&gt;</span>
-</span></span><span class=line><span class=cl><span class=nt>&lt;/root&gt;</span></span></span></code></pre></div></div><p>上面的配置指定所有LoggerName为<code>com.foo.bar</code>的日志以<code>INFO</code>级别进行打印，此配置绑定的输出器（appender）为<code>APPLICATION-async</code>。</p><p>其中LoggerName会以<code>.</code>为分隔符逐级向上匹配，比如实际LoggerName为<code>com.foo.bar.service.ExampleService</code>，那么它的查找过程依次为：</p><ol><li><code>com.foo.bar.service.ExampleSerivce</code></li><li><code>com.foo.bar.service</code></li><li><code>com.foo.bar</code>（此时命中了我们提供的logger，另外因为配置了additivity=&ldquo;false&rdquo;，所以停止继续向下查找</li><li><code>com.foo</code></li><li><code>com</code></li><li><code>&lt;root></code></li></ol><p>而<code>&lt;root></code>就是兜底配置了，当LoggerName没匹配到任何一项<code>&lt;logger></code>时，就会使用<code>&lt;root></code>，所以它没有<code>additivity</code>和<code>name</code>属性的。一般实际业务场景中，所有<code>&lt;logger></code>都建议加上<code>additivity=false</code>，否则日志就会因查找到多个<code>&lt;logger></code>（或<code>&lt;root></code>）而打印多份。</p><h4 id=springprofile>springProfile</h4><p>Spring还提供了<code>&lt;springProfile></code>标签，用来根据Spring Profiles（即<code>spring.profiles.active</code>的值）动态调整日志信息，比如我们希望线上环境使用INFO级别，而预发、日志使用TRACE级别。</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-xml"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-xml data-lang=xml><span class=line><span class=cl><span class=nt>&lt;springProfile</span> <span class=na>name=</span><span class=s>&#34;production&#34;</span><span class=nt>&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;root</span> <span class=na>level=</span><span class=s>&#34;INFO&#34;</span><span class=nt>&gt;</span>
-</span></span><span class=line><span class=cl>    <span class=nt>&lt;appender-ref</span> <span class=na>ref=</span><span class=s>&#34;APPLICATION-async&#34;</span><span class=nt>/&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;/root&gt;</span>
-</span></span><span class=line><span class=cl><span class=nt>&lt;/springProfile&gt;</span>
-</span></span><span class=line><span class=cl><span class=nt>&lt;springProfile</span> <span class=na>name=</span><span class=s>&#34;staging.testing&#34;</span><span class=nt>&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;root</span> <span class=na>level=</span><span class=s>&#34;TRACE&#34;</span><span class=nt>&gt;</span>
-</span></span><span class=line><span class=cl>    <span class=nt>&lt;appender-ref</span> <span class=na>ref=</span><span class=s>&#34;APPLICATION-async&#34;</span><span class=nt>/&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;/root&gt;</span>
-</span></span><span class=line><span class=cl><span class=nt>&lt;/springProfile&gt;</span></span></span></code></pre></div></div><h3 id=java-api>Java API</h3><p>除了使用XML配置文件外，Logback还提供了大量的Java API以支持更复杂的业务诉求，我们通过三个非常实用的场景来简单介绍一下：</p><ol><li>场景一：使用<code>log.info("obj={}", obj)</code>时，如何将obj统一转JSON String后输出</li><li>场景二：日志中涉及到的手机号、身份证号，如何脱敏后再记录日志</li><li>场景三：Logback配置基于XML，如何不改代码不发布，也可以动态修改日志级别</li></ol><p>其中前两个问题都可以通过MessageConverter实现，第三个问题可以借助LoggerContext及Logger实现。</p><h3 id=mdb中的traceid>MDB中的traceId</h3><p>手动记录traceId，比如</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(</span><span class=s>&#34;traceId={}, blah blah blah&#34;</span><span class=p>,</span><span class=w> </span><span class=n>Span</span><span class=p>.</span><span class=na>current</span><span class=p>().</span><span class=na>getSpanContext</span><span class=p>().</span><span class=na>getTraceId</span><span class=p>());</span></span></span></code></pre></div></div><p>其实OpenTelemetry已经自动将traceId加到了MDC，对应的Key是<code>trace_id</code>，使用<code>%mdc{trace_id}</code>即可打印出traceI。</p><h2 id=最佳实践>最佳实践</h2><p>学习<a href=https://mp.weixin.qq.com/s/KrJ1s1bCjOQLlnWeUaHJvg target=_blank rel="noopener noreffer">Java日志通关（五） - 最佳实践</a></p><h3 id=总是使用接口层>总是使用接口层</h3><p>无论是写代码还是实现一个三方工具，请只使用接口层记录日志</p><p>如果需要向外提供三方工具，记得在依赖中将日志的实现层及适配层标记为optional，比如：</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-xml"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-xml data-lang=xml><span class=line><span class=cl><span class=nt>&lt;dependency&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;groupId&gt;</span>ch.qos.logback<span class=nt>&lt;/groupId&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;artifactId&gt;</span>logback-core<span class=nt>&lt;/artifactId&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;version&gt;</span>${logback.version}<span class=nt>&lt;/version&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;scope&gt;</span>runtime<span class=nt>&lt;/scope&gt;</span>
-</span></span><span class=line><span class=cl>  <span class=nt>&lt;optional&gt;</span>true<span class=nt>&lt;/optional&gt;</span>
-</span></span><span class=line><span class=cl><span class=nt>&lt;/dependency&gt;</span></span></span></code></pre></div></div><ul><li><code>&lt;scope>runtime&lt;/scope></code>：runtime的包编译时会被忽略（认为运行环境已经有对应包了）</li><li><code>&lt;optional>true&lt;/optional></code>：依赖不会传递，maven不会自动安装此包</li></ul><h3 id=不要打印分割线>不要打印分割线</h3><p>不要打印类似这种只包含分割线的内容，<code>log.info("=========start========")</code>，因为在茫茫的日志中，这句日志的下一条很可能来自其他异步任务，如果使用SLS收集甚至来自另一台机器，这条分割线根本起不到任何作用。</p><p>正确的方式是通过关键字进行标记，比如：<code>log.info("FooBarProcessor start, request={}", request)</code>，之后就可以通过关键字<code>FooBarProcessor</code>快速过滤，这对于grep和SLS都适用。</p><p>另外，可以用Marker让日志语义更清晰，只是麻烦了点，看个人喜好。</p><h3 id=避免因写日志而抛错>避免因写日志而抛错</h3><p>比如没有判空就直接调用了它的方法：</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=n>Object</span><span class=w> </span><span class=n>result</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>rpcResource</span><span class=p>.</span><span class=na>call</span><span class=p>();</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(</span><span class=s>&#34;result.userId={}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>result</span><span class=p>.</span><span class=na>getUserId</span><span class=p>());</span></span></span></code></pre></div></div><h3 id=两个fastjson参数>两个FastJson参数</h3><h4 id=ignoreerrorgetter>IgnoreErrorGetter</h4><p>Fastjson的序列化其实是依赖于类中各个getter，如果某个getter抛异常则会阻断整个序列化，但其实有些getter异常并非严重问题，此时就可以使用SerializerFeature.IgnoreErrorGetter参数忽略getter中抛出的异常：</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=kd>public</span><span class=w> </span><span class=kd>class</span> <span class=nc>Foo</span><span class=w> </span><span class=p>{</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=kd>private</span><span class=w> </span><span class=n>Long</span><span class=w> </span><span class=n>userId</span><span class=p>;</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nd>@Deprecated</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=kd>private</span><span class=w> </span><span class=n>Long</span><span class=w> </span><span class=n>accountId</span><span class=p>;</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=kd>public</span><span class=w> </span><span class=kt>long</span><span class=w> </span><span class=nf>getAccountId</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=k>throw</span><span class=w> </span><span class=k>new</span><span class=w> </span><span class=n>RuntimeException</span><span class=p>(</span><span class=s>&#34;accountId deprecated&#34;</span><span class=p>);</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=p>}</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>}</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(</span><span class=s>&#34;foo={}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>JSON</span><span class=p>.</span><span class=na>toJSONString</span><span class=p>(</span><span class=n>foo</span><span class=p>,</span><span class=w> </span><span class=n>SerializerFeature</span><span class=p>.</span><span class=na>IgnoreErrorGetter</span><span class=p>));</span></span></span></code></pre></div></div><h4 id=ignorenonfieldgetter>IgnoreNonFieldGetter</h4><p>比如有个<code>Result</code>包装类如下，注意<code>isError</code>方法，当被Fastjson序列化时，会输出<code>"error":false</code>，如果希望忽略掉类似这种没有实体字段对应的getter方法，就可以追加<code>SerializerFeature.IgnoreNonFieldGetter</code>参数</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=nd>@Data</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=kd>public</span><span class=w> </span><span class=kd>class</span> <span class=nc>Result</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=kd>private</span><span class=w> </span><span class=kt>boolean</span><span class=w> </span><span class=n>success</span><span class=p>;</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=kd>private</span><span class=w> </span><span class=n>T</span><span class=w> </span><span class=n>data</span><span class=p>;</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=kd>public</span><span class=w> </span><span class=kt>boolean</span><span class=w> </span><span class=nf>isError</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=k>return</span><span class=w> </span><span class=o>!</span><span class=n>success</span><span class=p>;</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=p>}</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>}</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(</span><span class=s>&#34;result={}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>JSON</span><span class=p>.</span><span class=na>toJSONString</span><span class=p>(</span><span class=n>result</span><span class=p>,</span><span class=w> </span><span class=n>SerializerFeature</span><span class=p>.</span><span class=na>IgnoreNonFieldGetter</span><span class=p>))</span></span></span></code></pre></div></div><p>这个参数对于打印Result包装类非常有帮助，如果打印出<code>"error": false</code>，那当你希望使用<code>error</code>作为关键字查询错误时，就会匹配到很多包含<code>error</code>却并非错误的无效数据。</p><h3 id=不要遗漏异常堆栈>不要遗漏异常堆栈</h3><p>异常值参数是不占用字符模版的，如果你的参数数量不匹配，很可能打印结果与预期不符</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=n>Exception</span><span class=w> </span><span class=n>e</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>new</span><span class=w> </span><span class=n>RuntimeException</span><span class=p>(</span><span class=s>&#34;blahblashblash&#34;</span><span class=p>);</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=n>log</span><span class=p>.</span><span class=na>error</span><span class=p>(</span><span class=s>&#34;exception={}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>e</span><span class=p>);</span></span></span></code></pre></div></div><p>因为此时e和对应的<code>{}</code>位置匹配，Slf4j会尝试将异常转为字符串拼到日志模版中，最终这句相当于</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=n>log</span><span class=p>.</span><span class=na>error</span><span class=p>(</span><span class=s>&#34;exception={}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>e</span><span class=p>.</span><span class=na>toString</span><span class=p>());</span></span></span></code></pre></div></div><p>最终你只能得到<code>exception=blahblashblash</code>，而堆栈就丢掉了</p><p>正确的做法是要保证异常参数不占用字符模版</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=c1>// 用 e.getMessage()拼到日志信息后，通过有独立的e用于打印堆栈</span><span class=w>
-</span></span></span><span class=line><span class=cl><span class=w></span><span class=n>log</span><span class=p>.</span><span class=na>error</span><span class=p>(</span><span class=s>&#34;exception={}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>e</span><span class=p>.</span><span class=na>getMessage</span><span class=p>(),</span><span class=w> </span><span class=n>e</span><span class=p>);</span></span></span></code></pre></div></div><p>最终会输出</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-bash"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl><span class=nv>exception</span><span class=o>=</span>blashblashlbahs
-</span></span><span class=line><span class=cl>换行后会有堆栈信息</span></span></code></pre></div></div><h3 id=限制日志输出长度>限制日志输出长度</h3><h4 id=限制日志文本最大长度>限制日志文本最大长度</h4><p>有时候一个POJO非常大，当我们通过</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(</span><span class=s>&#34;result={}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>JSON</span><span class=p>.</span><span class=na>toJSONString</span><span class=p>(</span><span class=n>result</span><span class=p>))</span></span></span></code></pre></div></div><p>打印日志时，整条日志就会变得非常长，不但对性能有影响，主要是这么大的结果对实际问题排查也不见得有帮助。</p><p>可以通过<code>Format modifiers</code>限制消息最大长度，并将超出的部分丢弃</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=o>%</span><span class=p>.</span><span class=o>-</span><span class=n>2000message</span></span></span></code></pre></div></div><h4 id=限制堆栈的层级>限制堆栈的层级</h4><p>其实Logback天然支持，比如<code>%exception{50}</code>就可以只打印50层，同时Logback针对异常堆栈有更多的控制能力</p><h3 id=将堆栈合并为一行>将堆栈合并为一行</h3><p>有些同学希望将堆栈在一行输出，保证通过管道进行多层grep时捞到期望的记录。</p><p>其实通过Logback配置就可以支持这个能力，主要用到<code>%replace</code></p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-bash"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl>%replace<span class=o>(</span>%exception<span class=o>){</span><span class=s1>&#39;[\r\n\t]+&#39;</span>, <span class=s1>&#39;    &#39;</span><span class=o>}</span>%nopex</span></span></code></pre></div></div><ul><li><code>%replace(p){r, t}</code>，将给到的p，使用正则<code>r</code>进行匹配，命中的替换为<code>t</code>，所以上边就是，将<code>%exception</code>中的<code>[\r\n\t]</code>替换为四个空格</li><li><code>%nopex</code>：如果不加，Logabck会自动在日志最后追加<code>%exception</code>，导致异常堆栈被打两遍</li></ul><h3 id=不建议使用method和line>不建议使用%method和%line</h3><p>在Logback的配置中，可以通过<code>%method</code>和<code>%line</code>输出方法名和行号，但这两项都依赖于当前的堆栈轨迹（StackTrace），而获取堆栈轨迹的代价非常高，日志就会占用大量的CPU，所以一般情况下不建议在日志中输出这些字段。</p><p>如果对方法名有输出要求，可以直接硬编码到输出字符串中，比如</p><div class="code-block code-line-numbers open" style="counter-reset:code-block 0"><div class="code-header language-java"><span class=code-title><i class="arrow fas fa-angle-right fa-fw" aria-hidden=true></i></span>
-<span class=ellipses><i class="fas fa-ellipsis-h fa-fw" aria-hidden=true></i></span>
-<span class=copy title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden=true></i></span></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-java data-lang=java><span class=line><span class=cl><span class=n>log</span><span class=p>.</span><span class=na>info</span><span class=p>(</span><span class=s>&#34;queryUserInfo, request={}, result={}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>request</span><span class=p>,</span><span class=w> </span><span class=n>result</span><span class=p>);</span></span></span></code></pre></div></div><h3 id=不要将日志输出到console>不要将日志输出到Console</h3><p>我们平时调用<code>System.out.println</code>时，默认输出位置就是控制台，Logback也提供了<code>ch.qos.logback.core.ConsoleAppender</code>用于将日志输出到控制台，但控制台基本没人看，还浪费机器资源。</p><h3 id=无用的logutil>无用的LogUtil</h3><p>有时会遇到其他人额外写的日志工具类，比如<code>LogUtil</code>，将Slf4j或Logback已有能力重新实现一遍，但实际上通过正确配置，直接使用Slf4j提供的强大API是更好的做法。</p><h3 id=熟读日志规约>熟读《日志规约》</h3><p>《阿里巴巴Java开发手册》有专门一章是《日志规约》，建议熟读，其实整个《阿里巴巴Java开发手册》都应该熟读，花不了多少时间。</p></div><div class=post-footer id=post-footer><div class=post-info><div class=post-info-line><div class=post-info-mod><span>Updated on 2025-07-22</span></div></div><div class=post-info-line><div class=post-info-md><span><a class=link-to-markdown href=/posts/java-log-in-practice/index.md target=_blank>Read Markdown</a></span></div><div class=post-info-share><span><a href=javascript:void(0); title="Share on X" data-sharer=x data-url=http://example.org/posts/java-log-in-practice/ data-title=Java日志实战 data-hashtags=Java><i class="fab fa-x-twitter fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Threads" data-sharer=threads data-url=http://example.org/posts/java-log-in-practice/ data-title=Java日志实战><i class="fab fa-threads fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Facebook" data-sharer=facebook data-url=http://example.org/posts/java-log-in-practice/ data-hashtag=Java><i class="fab fa-facebook-square fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Hacker News" data-sharer=hackernews data-url=http://example.org/posts/java-log-in-practice/ data-title=Java日志实战><i class="fab fa-hacker-news fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Line" data-sharer=line data-url=http://example.org/posts/java-log-in-practice/ data-title=Java日志实战><i data-svg-src=https://cdn.jsdelivr.net/npm/simple-icons@14.9.0/icons/line.svg aria-hidden=true></i></a><a href=javascript:void(0); title="Share on 微博" data-sharer=weibo data-url=http://example.org/posts/java-log-in-practice/ data-title=Java日志实战><i class="fab fa-weibo fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Diaspora" data-sharer=diaspora data-url=http://example.org/posts/java-log-in-practice/ data-title=Java日志实战 data-description><i class="fab fa-diaspora fa-fw" aria-hidden=true></i></a><a href="https://t.me/share/url?url=http%3a%2f%2fexample.org%2fposts%2fjava-log-in-practice%2f&amp;text=Java%e6%97%a5%e5%bf%97%e5%ae%9e%e6%88%98" target=_blank title="Share on Telegram"><i class="fab fa-telegram fa-fw" aria-hidden=true></i></a></span></div></div></div><div class=post-info-more><section class=post-tags><i class="fas fa-tags fa-fw" aria-hidden=true></i>&nbsp;<a href=/tags/java/>Java</a></section><section><span><a href=javascript:void(0); onclick=window.history.back()>Back</a></span>&nbsp;|&nbsp;<span><a href=/>Home</a></span></section></div><div class=post-nav><a href=/posts/trino-filter-project/ class=prev rel=prev title=Presto数据过滤和投影><i class="fas fa-angle-left fa-fw" aria-hidden=true></i>Presto数据过滤和投影</a>
-<a href=/posts/foundationdb-in-practice/ class=next rel=next title="FoundationDB in Practice">FoundationDB in Practice<i class="fas fa-angle-right fa-fw" aria-hidden=true></i></a></div></div><div id=comments><div id=utterances class=comment></div><noscript>Please enable JavaScript to view the comments powered by <a href=https://utteranc.es/>utterances</a>.</noscript></div></article></div></main><footer class=footer><div class=footer-container><div class=footer-line>Powered by <a href=https://gohugo.io/ target=_blank rel="noopener noreffer" title="Hugo 0.140.2">Hugo</a> | Theme - <a href=https://github.com/dillonzq/LoveIt target=_blank rel="noopener noreffer" title="LoveIt 0.3.1-DEV"><i class="far fa-kiss-wink-heart fa-fw" aria-hidden=true></i> LoveIt</a></div><div class=footer-line itemscope itemtype=http://schema.org/CreativeWork><i class="far fa-copyright fa-fw" aria-hidden=true></i><span itemprop=copyrightYear>2022 - 2025</span><span class=author itemprop=copyrightHolder>&nbsp;<a href=/ target=_blank>xxxx</a></span></div></div></footer></div><div id=fixed-buttons><a href=# id=back-to-top class=fixed-button title="Back to Top"><i class="fas fa-arrow-up fa-fw" aria-hidden=true></i></a></div><div id=fixed-buttons-hidden><a href=# id=view-comments class=fixed-button title="View Comments"><i class="fas fa-comment fa-fw" aria-hidden=true></i></a></div><script src=https://cdn.jsdelivr.net/npm/autocomplete.js@0.38.1/dist/autocomplete.min.js></script><script src=https://cdn.jsdelivr.net/npm/lunr@2.3.9/lunr.min.js></script><script src=https://cdn.jsdelivr.net/npm/lazysizes@5.3.2/lazysizes.min.js></script><script src=https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js></script><script src=https://cdn.jsdelivr.net/npm/sharer.js@0.5.2/sharer.min.js></script><script>window.config={comment:{utterances:{darkTheme:"github-dark",issueTerm:"pathname",label:"",lightTheme:"github-light",repo:"ShadowUnderMoon/ShadowUnderMoon.github.io"}},search:{highlightTag:"em",lunrIndexURL:"/index.json",maxResultLength:10,noResultsFound:"No results found",snippetLength:50,type:"lunr"}}</script><script src=/js/theme.min.js></script></body></html>
+接口层：或者叫日志门面（facade），就是interface，只定义接口，等别人实现 实现层：真正干活的，能够把日志内存记录下来的工具，但请注意它不是上面接口实现，因为它不感知也不直接实现接口，仅仅是独立的实现 适配层：一般称为adapter，因为接口层和适配层并非都出自一家之手，它们之间无法直接匹配 适配层有可以分为绑定（binding）和桥接（bridging）两种能力：">
+<meta name="application-name" content="My cool site">
+<meta name="apple-mobile-web-app-title" content="My cool site">
+<meta name="referrer" content="no-referrer" /><meta name="theme-color" content="#ffffff"><meta name="msapplication-TileColor" content="#da532c"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/java-log-in-practice/" /><link rel="prev" href="http://example.org/posts/trino-filter-project/" /><link rel="next" href="http://example.org/posts/foundationdb-in-practice/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css"></noscript><link rel="preload" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css"></noscript><script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "headline": "Java日志实战",
+        "inLanguage": "zh-CN",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "http:\/\/example.org\/posts\/java-log-in-practice\/"
+        },"genre": "posts","keywords": "Java","wordcount":  11692 ,
+        "url": "http:\/\/example.org\/posts\/java-log-in-practice\/","datePublished": "2025-07-22T14:42:40+08:00","dateModified": "2025-07-22T14:42:40+08:00","publisher": {
+            "@type": "Organization",
+            "name": ""},"author": {
+                "@type": "Person",
+                "name": "爱吃芒果"
+            },"description": ""
+    }
+    </script></head>
+    <body data-header-desktop="fixed" data-header-mobile="auto"><script>(window.localStorage && localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : ('auto' === 'auto' ? window.matchMedia('(prefers-color-scheme: dark)').matches : 'auto' === 'dark')) && document.body.setAttribute('theme', 'dark');</script>
+
+        <div id="mask"></div><div class="wrapper"><header class="desktop" id="header-desktop">
+    <div class="header-wrapper">
+        <div class="header-title">
+            <a href="/" title="爱吃芒果">My cool site</a>
+        </div>
+        <div class="menu">
+            <div class="menu-inner"><a class="menu-item" href="/posts/"> 文章 </a><a class="menu-item" href="/page/archives/" title="Archives"> Archives </a><a class="menu-item" href="/tags/"> 标签 </a><a class="menu-item" href="/page/search/" title="Search"> Search </a><a class="menu-item" href="/categories/"> 分类 </a><span class="menu-item delimiter"></span><span class="menu-item search" id="search-desktop">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-desktop">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-desktop" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-desktop" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-desktop">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </span><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                    <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+                </a></div>
+        </div>
+    </div>
+</header><header class="mobile" id="header-mobile">
+    <div class="header-container">
+        <div class="header-wrapper">
+            <div class="header-title">
+                <a href="/" title="爱吃芒果">My cool site</a>
+            </div>
+            <div class="menu-toggle" id="menu-toggle-mobile">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div class="menu" id="menu-mobile"><div class="search-wrapper">
+                    <div class="search mobile" id="search-mobile">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-mobile">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-mobile" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-mobile" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-mobile">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </div>
+                    <a href="javascript:void(0);" class="search-cancel" id="search-cancel-mobile">
+                        Cancel
+                    </a>
+                </div><a class="menu-item" href="/posts/" title="">文章</a><a class="menu-item" href="/page/archives/" title="Archives">Archives</a><a class="menu-item" href="/tags/" title="">标签</a><a class="menu-item" href="/page/search/" title="Search">Search</a><a class="menu-item" href="/categories/" title="">分类</a><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+            </a></div>
+    </div>
+</header><div class="search-dropdown desktop">
+        <div id="search-dropdown-desktop"></div>
+    </div>
+    <div class="search-dropdown mobile">
+        <div id="search-dropdown-mobile"></div>
+    </div><main class="main">
+                <div class="container"><div class="toc" id="toc-auto">
+            <h2 class="toc-title">Contents</h2>
+            <div class="toc-content" id="toc-content-auto"></div>
+        </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Java日志实战</h1><div class="post-meta">
+            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/java/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Java</a></span></div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-07-22">2025-07-22</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;11692 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;24 minutes&nbsp;</div>
+        </div><div class="details toc" id="toc-static"  data-kept="">
+                <div class="details-summary toc-title">
+                    <span>Contents</span>
+                    <span><i class="details-icon fas fa-angle-right" aria-hidden="true"></i></span>
+                </div>
+                <div class="details-content toc-content" id="toc-content-static"><nav id="TableOfContents">
+  <ul>
+    <li><a href="#java日志的历史">Java日志的历史</a>
+      <ul>
+        <li><a href="#log4j-1999">Log4j (1999)</a></li>
+        <li><a href="#jul-20022">JUL (2002.2)</a></li>
+        <li><a href="#jcl-20028">JCL (2002.8)</a></li>
+        <li><a href="#slf4j-2005">Slf4j (2005)</a></li>
+        <li><a href="#logback-2006">Logback (2006)</a></li>
+        <li><a href="#log4j-22012">Log4j 2(2012)</a></li>
+        <li><a href="#spring-jcl">spring-jcl</a></li>
+        <li><a href="#总结">总结</a></li>
+      </ul>
+    </li>
+    <li><a href="#slf4j--logback整合和排包">Slf4j + Logback整合和排包</a>
+      <ul>
+        <li><a href="#基础依赖项">基础依赖项</a></li>
+        <li><a href="#适配spring-boot">适配Spring Boot</a></li>
+        <li><a href="#桥接其他实现层">桥接其他实现层</a></li>
+        <li><a href="#去除无用依赖">去除无用依赖</a></li>
+        <li><a href="#注意事项">注意事项</a></li>
+      </ul>
+    </li>
+    <li><a href="#slf4介绍">Slf4介绍</a>
+      <ul>
+        <li><a href="#创建logger实例">创建Logger实例</a></li>
+        <li><a href="#日志级别">日志级别</a></li>
+        <li><a href="#打印接口">打印接口</a></li>
+      </ul>
+    </li>
+    <li><a href="#logback介绍">Logback介绍</a>
+      <ul>
+        <li><a href="#配置入口">配置入口</a></li>
+        <li><a href="#配置文件介绍">配置文件介绍</a></li>
+        <li><a href="#java-api">Java API</a></li>
+        <li><a href="#mdb中的traceid">MDB中的traceId</a></li>
+      </ul>
+    </li>
+    <li><a href="#最佳实践">最佳实践</a>
+      <ul>
+        <li><a href="#总是使用接口层">总是使用接口层</a></li>
+        <li><a href="#不要打印分割线">不要打印分割线</a></li>
+        <li><a href="#避免因写日志而抛错">避免因写日志而抛错</a></li>
+        <li><a href="#两个fastjson参数">两个FastJson参数</a></li>
+        <li><a href="#不要遗漏异常堆栈">不要遗漏异常堆栈</a></li>
+        <li><a href="#限制日志输出长度">限制日志输出长度</a></li>
+        <li><a href="#将堆栈合并为一行">将堆栈合并为一行</a></li>
+        <li><a href="#不建议使用method和line">不建议使用%method和%line</a></li>
+        <li><a href="#不要将日志输出到console">不要将日志输出到Console</a></li>
+        <li><a href="#无用的logutil">无用的LogUtil</a></li>
+        <li><a href="#熟读日志规约">熟读《日志规约》</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav></div>
+            </div><div class="content" id="content"><p>主要其实是学习<a href="https://mp.weixin.qq.com/s/eIiu08fVk194E0BgGL5gow" target="_blank" rel="noopener noreffer ">Java日志通关</a>系列文章，大佬太强了</p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/java-log-in-practice/image-20250722145042812.png"
+        data-srcset="/posts/java-log-in-practice/image-20250722145042812.png, /posts/java-log-in-practice/image-20250722145042812.png 1.5x, /posts/java-log-in-practice/image-20250722145042812.png 2x"
+        data-sizes="auto"
+        alt="/posts/java-log-in-practice/image-20250722145042812.png"
+        title="image-20250722145042812" width="807" height="492" /></p>
+<p>日志发展到今天，被抽象成了三层，接口层、实现层、适配层。</p>
+<ul>
+<li>接口层：或者叫日志门面（facade），就是interface，只定义接口，等别人实现</li>
+<li>实现层：真正干活的，能够把日志内存记录下来的工具，但请注意它不是上面接口实现，因为它不感知也不直接实现接口，仅仅是独立的实现</li>
+<li>适配层：一般称为adapter，因为接口层和适配层并非都出自一家之手，它们之间无法直接匹配</li>
+</ul>
+<p>适配层有可以分为绑定（binding）和桥接（bridging）两种能力：</p>
+<ul>
+<li>绑定（binding）：将接口层绑定到某个实现层（实现一个接口层，并调用实现层的方法）</li>
+<li>桥接（bridging）：将接口层桥接到另一个接口层（实现一个接口层，并调用另一个接口层的接口），主要作用是方便用户低成本的在各接口层和适配层之间迁移</li>
+</ul>
+<h2 id="java日志的历史">Java日志的历史</h2>
+<h3 id="log4j-1999">Log4j (1999)</h3>
+<p>大神Ceki开发，提供了以下能力</p>
+<ul>
+<li>日志可以输出到控制台、文件、数据库，甚至远程服务器和电子邮件（被称作Appender）</li>
+<li>日志输出格式（被称作Layout）允许定制，比如错误日志和普通日志使用不同的展现方式</li>
+<li>日志被分为5个级别（被称为Level），从低到高依次是debug、info、warn、error、fatal，输出前会校验配置的允许级别，小于此级别的日志将被忽略。除外之外还有all、off两个特殊级别，表示完全开放和完全关闭日志</li>
+<li>可以在工程中随时指定不同的记录器（被称为Logger），可以为之配置独立的记录位置、日志级别</li>
+<li>支持通过properties或者xml文件进行配置</li>
+</ul>
+<p>不同Log4j有比较明显的性能短板，在Logback和Log4j 2推出后逐渐式微，最终Apache在2015年宣布终止开发Log4j并全面迁移至Log4j2</p>
+<h3 id="jul-20022">JUL (2002.2)</h3>
+<p>Sun公司在2002年发布，这套系统称为Java Logging API，包路径是java.util.logging，简称JUL。</p>
+<h3 id="jcl-20028">JCL (2002.8)</h3>
+<p>对于独立且轻量的项目来说，开发者可以根据喜好使用某个日志方案即可，但更多的情况是一套业务系统依赖了大量的三方工具，而众多三方工具会各自使用不同的日志实现，当它们被集成在一起时，必然导致日志记录的混乱。</p>
+<p>为此Apache在2002年推出了一套接口Jakarta Common Logging，简称JCL，它的主要作者仍然是Ceki，这套接口主动支持了Log4j、JUL等众多日志工具，开发者如果想打印日志，只需调用JCL的接口即可，至于最终使用的日志实现则由最上层的业务系统决定，我们可以看到，这其实就是典型的接口与实现分离的设计。</p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naKAIwp3hOt1o65w1O31YKYJqCFEH75mouFdF4iayGDQgZ65RzmHn4UTS5vIqaYo8icNgpMic4pRJmYIw/640?wx_fmt=png&amp;from=appmsg&amp;randomid=see8y0bf&amp;tp=webp&amp;wxfrom=5&amp;wx_lazy=1"
+        data-srcset="https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naKAIwp3hOt1o65w1O31YKYJqCFEH75mouFdF4iayGDQgZ65RzmHn4UTS5vIqaYo8icNgpMic4pRJmYIw/640?wx_fmt=png&amp;from=appmsg&amp;randomid=see8y0bf&amp;tp=webp&amp;wxfrom=5&amp;wx_lazy=1, https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naKAIwp3hOt1o65w1O31YKYJqCFEH75mouFdF4iayGDQgZ65RzmHn4UTS5vIqaYo8icNgpMic4pRJmYIw/640?wx_fmt=png&amp;from=appmsg&amp;randomid=see8y0bf&amp;tp=webp&amp;wxfrom=5&amp;wx_lazy=1 1.5x, https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naKAIwp3hOt1o65w1O31YKYJqCFEH75mouFdF4iayGDQgZ65RzmHn4UTS5vIqaYo8icNgpMic4pRJmYIw/640?wx_fmt=png&amp;from=appmsg&amp;randomid=see8y0bf&amp;tp=webp&amp;wxfrom=5&amp;wx_lazy=1 2x"
+        data-sizes="auto"
+        alt="https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naKAIwp3hOt1o65w1O31YKYJqCFEH75mouFdF4iayGDQgZ65RzmHn4UTS5vIqaYo8icNgpMic4pRJmYIw/640?wx_fmt=png&amp;from=appmsg&amp;randomid=see8y0bf&amp;tp=webp&amp;wxfrom=5&amp;wx_lazy=1"
+        title="图片" /></p>
+<p>简单介绍一下JCL自带的几个适配层、实现层：</p>
+<ul>
+<li>Jdk14Logger：用于绑定JUL（因为JUL从JDK 1.4开始提供）的适配层</li>
+<li>Log4JLogger：用于绑定Log4j的适配层</li>
+<li>NoOpLog：JCL自带的日志实现，但它是空实现，不做任何事情</li>
+<li>SimpleLog：JCL自带的日志实现，让用户哪怕不依赖其他工具也能打印日志，只是功能非常简单</li>
+</ul>
+<p>当时项目前缀取名Jakarta，是因为它属于Apache和Sun共同推出的Jakarta项目，现在JCL作为Apache Commons的子项目，叫Apache Commons Logging，与我们常用的Commons lang、CLommons Collections等是师兄弟，但JCL的简写命名被保留下来，并没有改成ACL。</p>
+<h3 id="slf4j-2005">Slf4j (2005)</h3>
+<p>Log4j的作者Ceki看到了很多Log4j和JCL的不足，但又无力推动项目快速迭代，加上对Apache管理不满，认为自己失去了对Log4j项目的控制权，于是在2005年选择自立门户，并很快推出了一款新作品Simple Logging Facade for Java，简称Slf4j。</p>
+<p>Slf4j也是一个接口层，接口设计与JCL非常接近（毕竟有师承关系），相比JCL有一个重要的区别是日志实现层的绑定方式：JCL是动态绑定，即在运行时执行日志记录时判定合适的日志实现，而Slf4j选择的是静态绑定，应用编译时已经确定日志实现，性能自然更好，这就是常被提到的classloader问题。</p>
+<p>在推出Slf4j的时候，市面上已经有另一套接口JCL，为了将选择权交给用户，Slf4j推出了两个桥接层：</p>
+<ul>
+<li>jcl-over-slf4j：客户调用JCL接口，底层转到Slf4j接口</li>
+<li>slf4j-jcl：客户调用slf4j接口，底层转到JCL接口</li>
+</ul>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/java-log-in-practice/image-20250722152841289.png"
+        data-srcset="/posts/java-log-in-practice/image-20250722152841289.png, /posts/java-log-in-practice/image-20250722152841289.png 1.5x, /posts/java-log-in-practice/image-20250722152841289.png 2x"
+        data-sizes="auto"
+        alt="/posts/java-log-in-practice/image-20250722152841289.png"
+        title="image-20250722152841289" width="678" height="509" /></p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/java-log-in-practice/image-20250722153006591.png"
+        data-srcset="/posts/java-log-in-practice/image-20250722153006591.png, /posts/java-log-in-practice/image-20250722153006591.png 1.5x, /posts/java-log-in-practice/image-20250722153006591.png 2x"
+        data-sizes="auto"
+        alt="/posts/java-log-in-practice/image-20250722153006591.png"
+        title="image-20250722153006591" width="673" height="401" /></p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/java-log-in-practice/image-20250722153015876.png"
+        data-srcset="/posts/java-log-in-practice/image-20250722153015876.png, /posts/java-log-in-practice/image-20250722153015876.png 1.5x, /posts/java-log-in-practice/image-20250722153015876.png 2x"
+        data-sizes="auto"
+        alt="/posts/java-log-in-practice/image-20250722153015876.png"
+        title="image-20250722153015876" width="677" height="448" /></p>
+<p>这里解释一下<code>slf4j-log4j12</code>这个名字，它表示slf4j + log4j 1.2（Log4j的最后一个版本）的适配层。类似的，<code>slf4j-jdk14</code>表示slf4j + jdk1.4（就是JUL）的适配层。</p>
+<h3 id="logback-2006">Logback (2006)</h3>
+<p>Ceki在2006年又推出一款日志记录实现方案：Logback，无论是易用度、功能、还是性能，Logback都优于Log4j，在加上天然支持Slf4j而不需要额外的适配层，自然拥趸者众，目前Logback已经成为Java社区最被广泛接受的日志实现层。</p>
+<p>相较于Log4j，Logback提供了很多我们现在看起来理所当然的新特性：</p>
+<ul>
+<li>支持日志文件切割滚动记录，支持异步写入</li>
+<li>针对历史日志，既支持按时间或按硬盘占用自动清理，也支持自动压缩以节省硬盘空间</li>
+<li>支持分支语法，通过<code>&lt;if&gt;</code>、<code>&lt;then&gt;</code>、<code>&lt;else&gt;</code>可以按条件配置不同的日志输出逻辑，比如判断仅在开发环境输出更详细的日志信息</li>
+<li>大量的日志过滤器，甚至可以做到通过登陆用户Session识别每一位用户并输出独立的日志文件</li>
+<li>异常堆栈支持打印jar信息，让我们不但知道调用出自哪个文件哪一行，也可以知道这个文件来自哪个jar包</li>
+</ul>
+<p>Logback主要由三个部分组成：</p>
+<ul>
+<li>logback-core：记录、输出日志的核心实现</li>
+<li>logback-classic：适配层，完整实现了Slf4j接口</li>
+<li>logback_access：用于将Logback集成到Servlet容器（Tomcat、Jetty）中，让这些容器的HTTP访问日志也可以经由强大的Logback输出</li>
+</ul>
+<h3 id="log4j-22012">Log4j 2(2012)</h3>
+<p>Apache在2012年推出Apache Log4j 2，有以下亮点：</p>
+<ul>
+<li>插件化结构，用户可以自己开发插件，实现Appender、Logger、Filter完成扩展</li>
+<li>基于LMAX Disruptor的异步话输出，在多线程场景下相比Logback有10倍左右的性能提升</li>
+</ul>
+<p>Log4j 2主要由两部分组成：</p>
+<ul>
+<li>log4j-core：核心实现，功能类似于logback-core</li>
+<li>log4j-api：接口层，功能类似于Slf4j，里面只包含Log4j 2的接口定义</li>
+</ul>
+<p>Log4j 2提供JCL和Slf4j之外的第三个接口层（log4j-api，虽然只是自己的接口），不过目前大家一般把Log4j 2看做实现层看待，并引入JCL或Slf4j作为接口层，特别是JCL，在时隔近10年后，与2023年推出了1.3.0版，增加了对Log4j 2的适配。</p>
+<p>虽然Log4j 2发布已经很久了，但它依然无法撼动Logbakc的江湖地方</p>
+<ul>
+<li>Log4j 2虽然顶着Log4j的名号，但却是一套完全重写的日志系统，无法只通过修改Log4j版本号完成升级，历史用户升级意愿低</li>
+<li>Log4j 2比Logback晚面世6年，却没有提供足够两眼及差异化的能力，而Slf4j+Logback这套组合已经非常优秀，先发优势明显</li>
+</ul>
+<h3 id="spring-jcl">spring-jcl</h3>
+<p>Spring Boot目前使用sprint-jcl + Logback这套方案，Spring曾在它的官方blog中提到，如果可以重来，Spring会选择Slf4j而不是JCL作为默认日志接口。Spring想要支持SLF4j，又要保证向前兼容JCL，于是从5.0 （Spring Boot 2.0）开始提供了spring-jcl这个包，它顶着Spring的名号，代码中报名却与JCL一致（<code>org.apache.commons.logging</code>），作用自然也与JCL一致，但它额外适配了Slf4j。并将Slf4j放在查找的第一顺位。</p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/java-log-in-practice/image-20250722160501509.png"
+        data-srcset="/posts/java-log-in-practice/image-20250722160501509.png, /posts/java-log-in-practice/image-20250722160501509.png 1.5x, /posts/java-log-in-practice/image-20250722160501509.png 2x"
+        data-sizes="auto"
+        alt="/posts/java-log-in-practice/image-20250722160501509.png"
+        title="image-20250722160501509" width="679" height="632" /></p>
+<p>如果你是基于Spring Initialize新创建的应用，可以不必管这个包，它已经在背后默默工作了，如果你在项目开发过程中遇到包冲突，或者需要自己选择日志接口和实现，则可以把spring-jcl当做jcl对待，大胆排除即可。</p>
+<h3 id="总结">总结</h3>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/java-log-in-practice/image-20250722160744558.png"
+        data-srcset="/posts/java-log-in-practice/image-20250722160744558.png, /posts/java-log-in-practice/image-20250722160744558.png 1.5x, /posts/java-log-in-practice/image-20250722160744558.png 2x"
+        data-sizes="auto"
+        alt="/posts/java-log-in-practice/image-20250722160744558.png"
+        title="image-20250722160744558" width="1083" height="475" /></p>
+<p>两个接口（JCL、Slf4j）和四个实现(Log4j、JUL、Logback、Log4j2)，再加上无数的适配层，组成了一张图。</p>
+<ul>
+<li>相同颜色的模块具有相同的<code>groupId</code></li>
+<li>JCL的适配层是直接在它自己的包中提供的</li>
+<li>要想使用Logback，就一定绕不开Slf4j（引用它的适配层也算）。同样的，要想使用Log4j 2，那它的<code>log4j-api</code>也绕不开。</li>
+</ul>
+<h2 id="slf4j--logback整合和排包">Slf4j + Logback整合和排包</h2>
+<p>对<a href="https://mp.weixin.qq.com/s/jABbG4MKvEiWXwdYwUk8SA" target="_blank" rel="noopener noreffer ">Java日志通关（二） - Slf4j+Logback 整合及排包</a>的学习</p>
+<p>选择Slf4j + Logback的原因：</p>
+<ul>
+<li>Slf4j的API相较JCL更丰富，且得到Intellij IDEA编辑器的完整支持，这是核心优势</li>
+<li>Slf4j支持日志内容惰性求值，相比JCL性能更好</li>
+<li>在前边选定Slf4j的前提下，同一厂牌且表现优异的Logback自然中标</li>
+<li>Slf4j + Logback是目前大部分开发者的选择（2021年Slf4j 76%,Logback 48%）</li>
+</ul>
+<h3 id="基础依赖项">基础依赖项</h3>
+<p>根据前面的知识，我们很容易知道以下三个包是必须的：</p>
+<ul>
+<li>Slf4j是基本的日志门面，它的核心APi在<code>org.slf4j:slf4j-api</code>中</li>
+<li>Logback的核心实现层在<code>ch.qos.logback:logback-core</code>中</li>
+<li>Logback针对Slf4j的适配层在<code>ch.qos.logback:logback-classic</code>中</li>
+</ul>
+<p>其中logback-classic会直接依赖其他两项，而且它依赖的一定是它能够支持的最合适版本，所以为了避免歧义，我们可以在项目中仅显式依赖logback-classic即可。</p>
+<p>另外要注意，Slf4j和Logback的版本并不完全向前兼容，他们之间也有对应关系</p>
+<h4 id="slf4j版本兼容性">slf4j版本兼容性</h4>
+<p>slfj4j 2.0.x版本有不小的改动，不再主动查找<code>org.slf4j.impl.StaticLoggerBinder</code>，而是改用JDK ServiceLoader（也就是SPI，Service Provider Interface）的方式来加载实现，这是JDK 8中的特性，所以Slf4j对JDK的依赖显而易见。</p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/java-log-in-practice/image-20250722162953271.png"
+        data-srcset="/posts/java-log-in-practice/image-20250722162953271.png, /posts/java-log-in-practice/image-20250722162953271.png 1.5x, /posts/java-log-in-practice/image-20250722162953271.png 2x"
+        data-sizes="auto"
+        alt="/posts/java-log-in-practice/image-20250722162953271.png"
+        title="image-20250722162953271" width="676" height="168" /></p>
+<h4 id="logback版本兼容性">Logback版本兼容性</h4>
+<p>因为Slf4j技术方案变化，导致logback-classic也需要分别作适配，如果使用了不匹配的版本将会报异常</p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/java-log-in-practice/image-20250722163344515.png"
+        data-srcset="/posts/java-log-in-practice/image-20250722163344515.png, /posts/java-log-in-practice/image-20250722163344515.png 1.5x, /posts/java-log-in-practice/image-20250722163344515.png 2x"
+        data-sizes="auto"
+        alt="/posts/java-log-in-practice/image-20250722163344515.png"
+        title="image-20250722163344515" width="675" height="202" /></p>
+<p>其中logback 1.3.x和1.4.x是并行维护版本，每次更新都会同时发布1.3.n和1.4.n，用户需要根据项目的JDK版本进行选择，不过目前Logback已经全面升级1.5.x，且1.3.x和1.4.x不再维护。</p>
+<h4 id="总结-1">总结</h4>
+<p>从前面的版本兼容性我们可以知道：</p>
+<ul>
+<li>如果使用JDK8，建议选择Slf4j 2.0 + Logback 1.3</li>
+<li>如果使用JDK 11及以上，建议选择Slf4j 2.0 + Logback 1.5</li>
+</ul>
+<h3 id="适配spring-boot">适配Spring Boot</h3>
+<p>Spring Boot通过<code>spring-boot-starter-logging</code>包直接依赖了Logback（然后再间接依赖了Slf4j），它通过<code>org.springframework.boot.logging.LoggingSystem</code>查找日志接口并自动适配，所以我们使用Spring Boot时一般并不需要关系日志依赖，只管使用即可。但因为slf4j 2.0.x和1.7.x实现不一致，导致Spring Boot也会挑版本。</p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/java-log-in-practice/image-20250722164225550.png"
+        data-srcset="/posts/java-log-in-practice/image-20250722164225550.png, /posts/java-log-in-practice/image-20250722164225550.png 1.5x, /posts/java-log-in-practice/image-20250722164225550.png 2x"
+        data-sizes="auto"
+        alt="/posts/java-log-in-practice/image-20250722164225550.png"
+        title="image-20250722164225550" width="676" height="167" /></p>
+<p>根据这个表格，以及前一节总结的版本兼容关系，最终可以得出结论：</p>
+<ul>
+<li>如果使用Spring Boot 2及以下，建议 Slf4j 1.7.x  + Logback 1.2.x</li>
+<li>如果使用Spring Boot 3，建议选择Slf4j 2.0.x + Logback 1.4.x（如果Spring做好了Logback 1.4.x的适配，估计就推荐1.5.x了）</li>
+</ul>
+<h3 id="桥接其他实现层">桥接其他实现层</h3>
+<p>我们还要保证项目依赖的二方、三方包能够正常打印日志，而它们可能依赖的是JCL/Log4j/Log4j2/JUL，我们可以统一引入适配层做好桥接：</p>
+<ul>
+<li>通过<code>org.slf4j:jcl-over-slf4j</code>将JCL桥接到Slf4j上</li>
+<li>通过<code>org.slf4j:log4j-over-slf4j</code>将Log4j桥接到Slf4j上</li>
+<li>通过<code>org.slf4j:jul-to-slf4j</code>将JUL桥接到Slf4j上</li>
+<li>通过<code>org.apache.logging.log4j:log4j-to-slf4j</code>将Log4j2桥接到Slf4j上</li>
+</ul>
+<p>注意，所有<code>org.slf4j</code>的包版本要完全一致，所以如果引入这些桥接包，要保证它们的版本与前面选择的slf4j-api版本对应，为此Slf4j从2.0.8开始提供bom包，省去维护每个包版本的烦恼（至于低版本就只能人肉保持版本一致性了）。<code>log4j-to-slf4j</code>这个包，对Sfl4j1和slf2j2都能支持。</p>
+<h3 id="去除无用依赖">去除无用依赖</h3>
+<p>桥接层使用与被桥接包一样的包结构，再将调用转到另一个接口上，所以如果同时引入桥接层以及被桥接的包，大概率会引起包冲突。</p>
+<p>由于很多工具会在不经意间引入日志接口层、实现层，所以我们有必要从整个应用级别着眼，把那些无用的接口层、实现层排除掉，包括JCL、Log4j和Log4j 2</p>
+<ul>
+<li>排掉JCL：<code>commons-logging:commons-logging</code></li>
+<li>排掉Log4j：<code>log4j:log4j</code></li>
+<li>排掉Log4j2：<code>org.apache.logging.log4j:log4j-core</code></li>
+</ul>
+<p>以及，如果项目间接引入了其他的桥接包，也可能会引起和冲突，需要排掉。可以使用<code>maven-enforcer-plugin</code>插件标识那些包是要被排掉的，它只是一个校验，实际上你仍然需要在每个引入了错误包的依赖中进行排除。</p>
+<h3 id="注意事项">注意事项</h3>
+<p>根据前面的介绍，我们在实际项目中将主要做两类事情：</p>
+<ul>
+<li>引入期望的包，并指定版本</li>
+<li>排除一些包（指定空版本）</li>
+</ul>
+<p>以上两个动作，一般我们都是在父POM的<code>&lt;dependencyManagement&gt;</code>中完成的，但这只是管理包版本，在项目没有实际引用之前，并不会真的加载。</p>
+<p>在实际项目中，我们一般会按照这个思路来处理：</p>
+<ul>
+<li>有一个模块A，依赖Log4j打印日志，所以它依赖了<code>log4j:log4j</code>包</li>
+<li>我们在父POM中把<code>log4j:log4j</code>排掉了，此时模块A调用<code>Log4j</code>会报错</li>
+<li>我们在父POM中引入<code>log4j-over-slf4j</code>，目标是把`Log4j切换到Slf4j，让模块A不报错</li>
+</ul>
+<p>看起来很完美，项目也能正常启动，但当模块A需要打印日志是，我们却还是得到了一个错误<code>log4j:WARN No appenders could be found for logger</code>。这是因为<code>log4j-over-slf4j</code>并没有真的被引入我们的项目中（很少有哪一个二方包会引这个东西，会被骂的）。</p>
+<p>解决方案也很简单，将<code>log4j-over-slf4j</code>通过<code>dependencies&gt;</code>引入即可，在父POM做这个也行，在实际有依赖的子POM也行。</p>
+<h2 id="slf4介绍">Slf4介绍</h2>
+<p>学习大佬<a href="https://mp.weixin.qq.com/s/Ys9LxsvmRhhwgtL4Kji_FQ" target="_blank" rel="noopener noreffer ">Java日志通关（三） - Slf4j 介绍</a></p>
+<h3 id="创建logger实例">创建Logger实例</h3>
+<h4 id="工厂函数">工厂函数</h4>
+<p>要使用Slf4j，需要先创建一个<code>org.slf4j.Logger</code>实例，可以使用它的工厂函数<code>org.slf4j.LoggerFactory.getLogger()</code>，参数可以是字符串或Class：</p>
+<ul>
+<li>如果是字符串，这个字符串会作为返回Logger实例的名字</li>
+<li>如果是Class，会调用它的<code>getName</code>获取Class的全路径，作为Logger实例的名字</li>
+</ul>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">ExampleService</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="c1">// 传Class，一般都是传当前的Class</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">Logger</span><span class="w"> </span><span class="n">log</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LoggerFactory</span><span class="p">.</span><span class="na">getLogger</span><span class="p">(</span><span class="n">ExampleService</span><span class="p">.</span><span class="na">class</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="c1">// 相当于</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">logger</span><span class="w"> </span><span class="n">log</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LoggerFactory</span><span class="p">.</span><span class="na">getLogger</span><span class="p">(</span><span class="s">&#34;com.example.service.ExampleService&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="c1">// 你也可以指定任意字符串</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">Logger</span><span class="w"> </span><span class="n">log</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LoggerFactory</span><span class="p">.</span><span class="na">getLogger</span><span class="p">(</span><span class="s">&#34;service&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
+<p>这个字符串格式的实例名字可以称之为LoggerName，用于在日志实现层区分如何打印日志。</p>
+<h4 id="lombook">Lombook</h4>
+<p>Lombok提供了针对各种日志系统的支持，比如你只需要<code>@lombok.extern.slf4j.Slf4j</code>注解就可以得到一个静态的<code>log</code>字段，不用在手动调用工厂函数，默认的LoggerName即是被注解的Class，同时也支持字符串格式的<code>topic</code>字段指定LoggerName。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="nd">@Slf4j</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">ExampleService</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="c1">// 注解 @Slf4j 会帮你生成下边这行代码</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="c1">// private staitc final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExampleService.class)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"> 
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
+<h3 id="日志级别">日志级别</h3>
+<p>通过<code>org.slf4j.event.Level</code>我们可以看到一共有五个等级，按优先级从低到高依次为：</p>
+<ul>
+<li><code>TRACE</code>：一般用于记录调用链路，比如方法进入时打印<code>xxx start</code></li>
+<li><code>DEBUG</code>：类似于trace，可以用来打印方法的出入参</li>
+<li><code>INFO</code>：默认级别，一般用于记录代码执行时的关键信息</li>
+<li><code>WARN</code>：当代码执行遇到预期外场景，但它不影响后续执行时使用</li>
+<li><code>ERROR</code>：出现异常，以及代码无法兜底时使用</li>
+</ul>
+<p>日志的实现层会决定那个等级的日志可以输出，这也是我们打印日志是需要区分等级的原因，在保证重要的日志不丢失的同时，仅在有需要时才打印用于Debug的日志。</p>
+<h3 id="打印接口">打印接口</h3>
+<p>通过<code>org.slf4j.Logger</code>可以看到有非常多的日志打印接口，打过定义的格式都类型，以<code>info</code>为例，一共有两大类</p>
+<ul>
+<li><code>public boolean info(...)</code></li>
+<li><code>public boolean isInfoEnabled(...)</code></li>
+</ul>
+<h4 id="info方法">info方法</h4>
+<p>这个方法有大量的重载，不过使用逻辑是一致的</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="nd">@Slf4j</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">ExampleService</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">querySomething</span><span class="p">(</span><span class="n">Long</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 只传入一个String参数，String内容需要自己拼</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&#34;request&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&#34;request a=&#34;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s">&#34;, b = &#34;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">b</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 使用格式模板，通过{}插入占位符</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// Intellij IDEA会校验后续参数数量是否与占位符一致，不一致时会给出警告</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&#34;request a={}&#34;</span><span class="p">);</span><span class="w"> </span><span class="c1">// 警告：参数比占位符少</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&#34;request a={}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">a</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&#34;request a={}, b={}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 所有参数的最后可以跟一个异常，它不占用占位符</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">Exception</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">RuntimeException</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&#34;request a={}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
+<h4 id="isinfoenabled方法">isInfoEnabled方法</h4>
+<p>通过<code>isInfoEnabled</code>方法可以获取当前Logger实例是否开启了对应的日志级别，比如我们可能见过类似这样的代码：</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">log</span><span class="p">.</span><span class="na">isInfoEnabled</span><span class="p">())</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(...)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
+<p>但其实日志实现层本身就会判断当前Logger实例的输出等级，低于此等级的日志并不会输出，所以一般不太需要这样的判断，但如果你的输出需要额外消耗资源，那么还是先判断一下为好</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">log</span><span class="p">.</span><span class="na">isIInfoEnabled</span><span class="p">())</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="c1">// 有远程调用</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="n">String</span><span class="w"> </span><span class="n">resource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rpcService</span><span class="p">.</span><span class="na">call</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&#34;resource={}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">resource</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="c1">// 要解析大对象</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="n">Object</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span><span class="w"> </span><span class="c1">// 一个大对象</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&#34;result={}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">JSON</span><span class="p">.</span><span class="na">toJSONString</span><span class="p">(</span><span class="n">result</span><span class="p">));</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
+<h4 id="marker">Marker</h4>
+<p>有些接口支持<code>org.slf4j.Marker</code>类型的入参，比如<code>log.info(Marker, ...)</code></p>
+<p>我们可以通过工厂函数创建Marker并使用，比如</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="n">Marker</span><span class="w"> </span><span class="n">marker</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MarkerFactory</span><span class="p">.</span><span class="na">getMarker</span><span class="p">(</span><span class="s">&#34;foobar&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="n">marker</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;test a={}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">1</span><span class="p">);</span></span></span></code></pre></div></div>
+<p>这个Marker是一个标记，它会传递给日志实现层，由实现层决定Marker的处理方式，比如</p>
+<ul>
+<li>将Marker通过%marker打印出来</li>
+<li>使用MarkerFilter过滤出（或过滤掉）带有某个Marker的日志，比如把需要Sunfire监控的日志都过滤出来写到一个单独的日志文件中。</li>
+</ul>
+<h4 id="mdc">MDC</h4>
+<p>MDC的全称是Mapped Diagnostic Context，直译为映射调试上下文，说人话就是用来存储扩展字段的地方，而且它是线程安全的，比如OpenTelemetry的traceId就会被存到MDC中</p>
+<p>而且MDC的使用也很简单，就像是一个<code>Map&lt;String, String&gt;</code>实例，常用方法<code>put/get/remove/clear</code>都有</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="c1">// 和Map&lt;String, String&gt; 相似的接口定义</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">MDC</span><span class="p">.</span><span class="na">put</span><span class="p">(</span><span class="s">&#34;key&#34;</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;value&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">String</span><span class="w"> </span><span class="n">valeu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MDC</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="s">&#34;key&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">MDC</span><span class="p">.</span><span class="na">remove</span><span class="p">(</span><span class="s">&#34;key&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">MDC</span><span class="p">.</span><span class="na">clear</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="c1">// 获取MDC中的所有内容</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">Map</span><span class="o">&lt;</span><span class="n">String</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="n">context</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MDC</span><span class="p">.</span><span class="na">getCopyOfContextMap</span><span class="p">();</span></span></span></code></pre></div></div>
+<h2 id="logback介绍">Logback介绍</h2>
+<p>学习<a href="https://mp.weixin.qq.com/s/UR30lfp_Guu9d6f0jzWfJw" target="_blank" rel="noopener noreffer ">Java日志通关（四） - Logback 介绍</a></p>
+<h3 id="配置入口">配置入口</h3>
+<p>Logback支持XML、Groovy的配置方式，以XML来说，它会默认查找resources目录下的<code>logback-test.xml</code>用于测试/<code>logback.xml</code>文件。</p>
+<p>而如果你是使用Spring Boot，那么你还可以使用logback-spring.xml文件进行配置，这两者的区别是</p>
+<ul>
+<li><code>logback-spring.xml</code>是由Sprint Boot找到，插入自己的上下文信息并做进一步处理后再传递给Logback的，你可以在其中使用<code>&lt;springProfile&gt;</code>区分环境配置，也可以使用<code>&lt;springProperty&gt;</code>拿到Spring上下文信息（比如<code>spring.application.name</code>）。</li>
+<li><code>logback.xml</code>是由logback自己找到，自然不会有Spring Boot相关的能力。</li>
+</ul>
+<h3 id="配置文件介绍">配置文件介绍</h3>
+<p>接下来我们以<code>logback-spring.xml</code>为例进行介绍，一个Logback配置文件主要有以下几个标签：</p>
+<ul>
+<li><code>configuration</code>：最外层的父标签，其中有几个属性配置，但项目中较少使用</li>
+<li><code>property</code>：定义变量</li>
+<li><code>appender</code>：负责日志输出（一般是写到文件），我们可以通过它设置输出方案</li>
+<li><code>logger</code>：用来设置某个LoggerNmae的打印级别</li>
+<li><code>root</code>：logger的兜底配置，从而我们不必配置每个LoggerName</li>
+<li>conversionRule：定义转换规则</li>
+</ul>
+<h4 id="springproperty和property">springProperty和property</h4>
+<p>前文提到<code>&lt;springProperty&gt;</code>用来插入Spring上下文，那<code>&lt;property&gt;</code>就是Logback自己定义变量的标签</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-xml">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-xml" data-lang="xml"><span class="line"><span class="cl"><span class="nt">&lt;springProperty</span> <span class="na">scope=</span><span class="s">&#34;context&#34;</span> <span class="na">name=</span><span class="s">&#34;APP_NAME&#34;</span> <span class="na">source=</span><span class="s">&#34;spring.application.name&#34;</span><span class="nt">/&gt;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;property</span> <span class="na">name=</span><span class="s">&#34;LOG_PATH&#34;</span> <span class="na">value=</span><span class="s">&#34;${user.home}/${APP_NAME}/logs&#34;</span><span class="nt">/&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;property</span> <span class="na">name=</span><span class="s">&#34;APP_LOG_FILE&#34;</span> <span class="na">value=</span><span class="s">&#34;${LOG_PATH}/application.log&#34;</span><span class="nt">/&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;property</span> <span class="na">name=</span><span class="s">&#34;APP_LOG_PATTERN&#34;</span> <span class="na">value=</span><span class="s">&#34;%date{yyyy-MM-dd HH:mm:ss.SSS}|%-5level|%X{trace_id}|%thread|%logger{20}|%message%n%exception&#34;</span><span class="nt">/&gt;</span></span></span></code></pre></div></div>
+<p>我们首先使用<code>&lt;springProperty&gt;</code>插入<code>APP_NAME</code>这个变量来表示应用名，虽然用它拼出<code>LOG_PATH</code>变量，示例中还用到了<code>${user.home}</code>这个Logback内建支持的上下文变量，<code>APP_LOG_FILE</code>是log文件路径，<code>APP_LOG_PATTERN</code>是日志格式。</p>
+<h4 id="appender">appender</h4>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-xml">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-xml" data-lang="xml"><span class="line"><span class="cl"><span class="nt">&lt;appender</span> <span class="na">name=</span><span class="s">&#34;APPLICATION&#34;</span> <span class="na">class=</span><span class="s">&#34;ch.qos.logback.core.rolliing.RollingFileAppender&#34;</span><span class="nt">&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;file&gt;</span>${APP_LOG_FILE}<span class="nt">&lt;/file&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;encoder&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&lt;pattern&gt;</span>${APP_LOG_PATTERN}<span class="nt">&lt;/pattern&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;/encoder&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;rollingPolicy</span> <span class="na">class=</span><span class="s">&#34;ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy&#34;</span><span class="nt">&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&lt;fileNamePolicy&gt;</span>${APP_LOG_FILE}.%d{yyyy-MM-dd}.%i<span class="nt">&lt;/fileNamePolicy&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&lt;maxHistory&gt;</span>30<span class="nt">&lt;/maxHistory&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&lt;maxFileSize&gt;</span>200MB<span class="nt">&lt;/maxFileSize&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&lt;totalSizeCap&gt;</span>10GB<span class="nt">&lt;/totalSizeCap&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;/rollingPolicy&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;/appender&gt;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;appender</span> <span class="na">name=</span><span class="s">&#34;APPLICATION-async&#34;</span> <span class="na">class=</span><span class="s">&#34;ch.qos.logback.classic.AsyncAppender&#34;</span><span class="nt">&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;queueSize&gt;</span>256<span class="nt">&lt;/queueSize&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;discardingThresold&gt;</span>0<span class="nt">&lt;/discardingThresold&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;nerverBlock&gt;</span>true<span class="nt">&lt;/nerverBlock&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;append-ref</span> <span class="na">ref=</span><span class="s">&#34;APPLICATION&#34;</span><span class="nt">/&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;/appender&gt;</span></span></span></code></pre></div></div>
+<p><code>ch.qos.logback.core.rolling.RollingFileAppender</code>负责将日志滚动打印，避免单文件体积过大，具体的滚动策略在<code>&lt;rollingPolicy&gt;</code>中指定。</p>
+<p><code>ch.qos.logback.classic.AsyncAppender</code>负责将日志异步打印，避免大量打印日志时阻塞线程</p>
+<h4 id="logger和root">logger和root</h4>
+<p><code>&lt;logger&gt;</code>用来设置某个LoggerName的打印级别，比如</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-xml">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-xml" data-lang="xml"><span class="line"><span class="cl"><span class="nt">&lt;logger</span> <span class="na">level=</span><span class="s">&#34;INFO&#34;</span> <span class="na">additivity=</span><span class="s">&#34;false&#34;</span> <span class="na">name=</span><span class="s">&#34;com.foo.bar&#34;</span><span class="nt">&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;appender-ref</span> <span class="na">ref=</span><span class="s">&#34;APPLICATION-async&#34;</span><span class="nt">/&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;/logger&gt;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;root</span> <span class="na">level=</span><span class="s">&#34;INFO&#34;</span><span class="nt">&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;appender-ref</span> <span class="na">ref=</span><span class="s">&#34;APPLICATION-async&#34;</span><span class="nt">/&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;/root&gt;</span></span></span></code></pre></div></div>
+<p>上面的配置指定所有LoggerName为<code>com.foo.bar</code>的日志以<code>INFO</code>级别进行打印，此配置绑定的输出器（appender）为<code>APPLICATION-async</code>。</p>
+<p>其中LoggerName会以<code>.</code>为分隔符逐级向上匹配，比如实际LoggerName为<code>com.foo.bar.service.ExampleService</code>，那么它的查找过程依次为：</p>
+<ol>
+<li><code>com.foo.bar.service.ExampleSerivce</code></li>
+<li><code>com.foo.bar.service</code></li>
+<li><code>com.foo.bar</code>（此时命中了我们提供的logger，另外因为配置了additivity=&ldquo;false&rdquo;，所以停止继续向下查找</li>
+<li><code>com.foo</code></li>
+<li><code>com</code></li>
+<li><code>&lt;root&gt;</code></li>
+</ol>
+<p>而<code>&lt;root&gt;</code>就是兜底配置了，当LoggerName没匹配到任何一项<code>&lt;logger&gt;</code>时，就会使用<code>&lt;root&gt;</code>，所以它没有<code>additivity</code>和<code>name</code>属性的。一般实际业务场景中，所有<code>&lt;logger&gt;</code>都建议加上<code>additivity=false</code>，否则日志就会因查找到多个<code>&lt;logger&gt;</code>（或<code>&lt;root&gt;</code>）而打印多份。</p>
+<h4 id="springprofile">springProfile</h4>
+<p>Spring还提供了<code>&lt;springProfile&gt;</code>标签，用来根据Spring Profiles（即<code>spring.profiles.active</code>的值）动态调整日志信息，比如我们希望线上环境使用INFO级别，而预发、日志使用TRACE级别。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-xml">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-xml" data-lang="xml"><span class="line"><span class="cl"><span class="nt">&lt;springProfile</span> <span class="na">name=</span><span class="s">&#34;production&#34;</span><span class="nt">&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;root</span> <span class="na">level=</span><span class="s">&#34;INFO&#34;</span><span class="nt">&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&lt;appender-ref</span> <span class="na">ref=</span><span class="s">&#34;APPLICATION-async&#34;</span><span class="nt">/&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;/root&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;/springProfile&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;springProfile</span> <span class="na">name=</span><span class="s">&#34;staging.testing&#34;</span><span class="nt">&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;root</span> <span class="na">level=</span><span class="s">&#34;TRACE&#34;</span><span class="nt">&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&lt;appender-ref</span> <span class="na">ref=</span><span class="s">&#34;APPLICATION-async&#34;</span><span class="nt">/&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;/root&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;/springProfile&gt;</span></span></span></code></pre></div></div>
+<h3 id="java-api">Java API</h3>
+<p>除了使用XML配置文件外，Logback还提供了大量的Java API以支持更复杂的业务诉求，我们通过三个非常实用的场景来简单介绍一下：</p>
+<ol>
+<li>场景一：使用<code>log.info(&quot;obj={}&quot;, obj)</code>时，如何将obj统一转JSON String后输出</li>
+<li>场景二：日志中涉及到的手机号、身份证号，如何脱敏后再记录日志</li>
+<li>场景三：Logback配置基于XML，如何不改代码不发布，也可以动态修改日志级别</li>
+</ol>
+<p>其中前两个问题都可以通过MessageConverter实现，第三个问题可以借助LoggerContext及Logger实现。</p>
+<h3 id="mdb中的traceid">MDB中的traceId</h3>
+<p>手动记录traceId，比如</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&#34;traceId={}, blah blah blah&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">Span</span><span class="p">.</span><span class="na">current</span><span class="p">().</span><span class="na">getSpanContext</span><span class="p">().</span><span class="na">getTraceId</span><span class="p">());</span></span></span></code></pre></div></div>
+<p>其实OpenTelemetry已经自动将traceId加到了MDC，对应的Key是<code>trace_id</code>，使用<code>%mdc{trace_id}</code>即可打印出traceI。</p>
+<h2 id="最佳实践">最佳实践</h2>
+<p>学习<a href="https://mp.weixin.qq.com/s/KrJ1s1bCjOQLlnWeUaHJvg" target="_blank" rel="noopener noreffer ">Java日志通关（五） - 最佳实践</a></p>
+<h3 id="总是使用接口层">总是使用接口层</h3>
+<p>无论是写代码还是实现一个三方工具，请只使用接口层记录日志</p>
+<p>如果需要向外提供三方工具，记得在依赖中将日志的实现层及适配层标记为optional，比如：</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-xml">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-xml" data-lang="xml"><span class="line"><span class="cl"><span class="nt">&lt;dependency&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;groupId&gt;</span>ch.qos.logback<span class="nt">&lt;/groupId&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;artifactId&gt;</span>logback-core<span class="nt">&lt;/artifactId&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;version&gt;</span>${logback.version}<span class="nt">&lt;/version&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;scope&gt;</span>runtime<span class="nt">&lt;/scope&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;optional&gt;</span>true<span class="nt">&lt;/optional&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;/dependency&gt;</span></span></span></code></pre></div></div>
+<ul>
+<li><code>&lt;scope&gt;runtime&lt;/scope&gt;</code>：runtime的包编译时会被忽略（认为运行环境已经有对应包了）</li>
+<li><code>&lt;optional&gt;true&lt;/optional&gt;</code>：依赖不会传递，maven不会自动安装此包</li>
+</ul>
+<h3 id="不要打印分割线">不要打印分割线</h3>
+<p>不要打印类似这种只包含分割线的内容，<code>log.info(&quot;=========start========&quot;)</code>，因为在茫茫的日志中，这句日志的下一条很可能来自其他异步任务，如果使用SLS收集甚至来自另一台机器，这条分割线根本起不到任何作用。</p>
+<p>正确的方式是通过关键字进行标记，比如：<code>log.info(&quot;FooBarProcessor start, request={}&quot;, request)</code>，之后就可以通过关键字<code>FooBarProcessor</code>快速过滤，这对于grep和SLS都适用。</p>
+<p>另外，可以用Marker让日志语义更清晰，只是麻烦了点，看个人喜好。</p>
+<h3 id="避免因写日志而抛错">避免因写日志而抛错</h3>
+<p>比如没有判空就直接调用了它的方法：</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="n">Object</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rpcResource</span><span class="p">.</span><span class="na">call</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&#34;result.userId={}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="na">getUserId</span><span class="p">());</span></span></span></code></pre></div></div>
+<h3 id="两个fastjson参数">两个FastJson参数</h3>
+<h4 id="ignoreerrorgetter">IgnoreErrorGetter</h4>
+<p>Fastjson的序列化其实是依赖于类中各个getter，如果某个getter抛异常则会阻断整个序列化，但其实有些getter异常并非严重问题，此时就可以使用SerializerFeature.IgnoreErrorGetter参数忽略getter中抛出的异常：</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">Foo</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="kd">private</span><span class="w"> </span><span class="n">Long</span><span class="w"> </span><span class="n">userId</span><span class="p">;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nd">@Deprecated</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="kd">private</span><span class="w"> </span><span class="n">Long</span><span class="w"> </span><span class="n">accountId</span><span class="p">;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="nf">getAccountId</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">throw</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">RuntimeException</span><span class="p">(</span><span class="s">&#34;accountId deprecated&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&#34;foo={}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">JSON</span><span class="p">.</span><span class="na">toJSONString</span><span class="p">(</span><span class="n">foo</span><span class="p">,</span><span class="w"> </span><span class="n">SerializerFeature</span><span class="p">.</span><span class="na">IgnoreErrorGetter</span><span class="p">));</span></span></span></code></pre></div></div>
+<h4 id="ignorenonfieldgetter">IgnoreNonFieldGetter</h4>
+<p>比如有个<code>Result</code>包装类如下，注意<code>isError</code>方法，当被Fastjson序列化时，会输出<code>&quot;error&quot;:false</code>，如果希望忽略掉类似这种没有实体字段对应的getter方法，就可以追加<code>SerializerFeature.IgnoreNonFieldGetter</code>参数</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="nd">@Data</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">Result</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="kd">private</span><span class="w"> </span><span class="kt">boolean</span><span class="w"> </span><span class="n">success</span><span class="p">;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="kd">private</span><span class="w"> </span><span class="n">T</span><span class="w"> </span><span class="n">data</span><span class="p">;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="kt">boolean</span><span class="w"> </span><span class="nf">isError</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="o">!</span><span class="n">success</span><span class="p">;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&#34;result={}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">JSON</span><span class="p">.</span><span class="na">toJSONString</span><span class="p">(</span><span class="n">result</span><span class="p">,</span><span class="w"> </span><span class="n">SerializerFeature</span><span class="p">.</span><span class="na">IgnoreNonFieldGetter</span><span class="p">))</span></span></span></code></pre></div></div>
+<p>这个参数对于打印Result包装类非常有帮助，如果打印出<code>&quot;error&quot;: false</code>，那当你希望使用<code>error</code>作为关键字查询错误时，就会匹配到很多包含<code>error</code>却并非错误的无效数据。</p>
+<h3 id="不要遗漏异常堆栈">不要遗漏异常堆栈</h3>
+<p>异常值参数是不占用字符模版的，如果你的参数数量不匹配，很可能打印结果与预期不符</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="n">Exception</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">RuntimeException</span><span class="p">(</span><span class="s">&#34;blahblashblash&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">log</span><span class="p">.</span><span class="na">error</span><span class="p">(</span><span class="s">&#34;exception={}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">);</span></span></span></code></pre></div></div>
+<p>因为此时e和对应的<code>{}</code>位置匹配，Slf4j会尝试将异常转为字符串拼到日志模版中，最终这句相当于</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="n">log</span><span class="p">.</span><span class="na">error</span><span class="p">(</span><span class="s">&#34;exception={}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="na">toString</span><span class="p">());</span></span></span></code></pre></div></div>
+<p>最终你只能得到<code>exception=blahblashblash</code>，而堆栈就丢掉了</p>
+<p>正确的做法是要保证异常参数不占用字符模版</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="c1">// 用 e.getMessage()拼到日志信息后，通过有独立的e用于打印堆栈</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">log</span><span class="p">.</span><span class="na">error</span><span class="p">(</span><span class="s">&#34;exception={}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="na">getMessage</span><span class="p">(),</span><span class="w"> </span><span class="n">e</span><span class="p">);</span></span></span></code></pre></div></div>
+<p>最终会输出</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-bash">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nv">exception</span><span class="o">=</span>blashblashlbahs
+</span></span><span class="line"><span class="cl">换行后会有堆栈信息</span></span></code></pre></div></div>
+<h3 id="限制日志输出长度">限制日志输出长度</h3>
+<h4 id="限制日志文本最大长度">限制日志文本最大长度</h4>
+<p>有时候一个POJO非常大，当我们通过</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&#34;result={}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">JSON</span><span class="p">.</span><span class="na">toJSONString</span><span class="p">(</span><span class="n">result</span><span class="p">))</span></span></span></code></pre></div></div>
+<p>打印日志时，整条日志就会变得非常长，不但对性能有影响，主要是这么大的结果对实际问题排查也不见得有帮助。</p>
+<p>可以通过<code>Format modifiers</code>限制消息最大长度，并将超出的部分丢弃</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="o">%</span><span class="p">.</span><span class="o">-</span><span class="n">2000message</span></span></span></code></pre></div></div>
+<h4 id="限制堆栈的层级">限制堆栈的层级</h4>
+<p>其实Logback天然支持，比如<code>%exception{50}</code>就可以只打印50层，同时Logback针对异常堆栈有更多的控制能力</p>
+<h3 id="将堆栈合并为一行">将堆栈合并为一行</h3>
+<p>有些同学希望将堆栈在一行输出，保证通过管道进行多层grep时捞到期望的记录。</p>
+<p>其实通过Logback配置就可以支持这个能力，主要用到<code>%replace</code></p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-bash">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">%replace<span class="o">(</span>%exception<span class="o">){</span><span class="s1">&#39;[\r\n\t]+&#39;</span>, <span class="s1">&#39;    &#39;</span><span class="o">}</span>%nopex</span></span></code></pre></div></div>
+<ul>
+<li><code>%replace(p){r, t}</code>，将给到的p，使用正则<code>r</code>进行匹配，命中的替换为<code>t</code>，所以上边就是，将<code>%exception</code>中的<code>[\r\n\t]</code>替换为四个空格</li>
+<li><code>%nopex</code>：如果不加，Logabck会自动在日志最后追加<code>%exception</code>，导致异常堆栈被打两遍</li>
+</ul>
+<h3 id="不建议使用method和line">不建议使用%method和%line</h3>
+<p>在Logback的配置中，可以通过<code>%method</code>和<code>%line</code>输出方法名和行号，但这两项都依赖于当前的堆栈轨迹（StackTrace），而获取堆栈轨迹的代价非常高，日志就会占用大量的CPU，所以一般情况下不建议在日志中输出这些字段。</p>
+<p>如果对方法名有输出要求，可以直接硬编码到输出字符串中，比如</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="n">log</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&#34;queryUserInfo, request={}, result={}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">request</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">);</span></span></span></code></pre></div></div>
+<h3 id="不要将日志输出到console">不要将日志输出到Console</h3>
+<p>我们平时调用<code>System.out.println</code>时，默认输出位置就是控制台，Logback也提供了<code>ch.qos.logback.core.ConsoleAppender</code>用于将日志输出到控制台，但控制台基本没人看，还浪费机器资源。</p>
+<h3 id="无用的logutil">无用的LogUtil</h3>
+<p>有时会遇到其他人额外写的日志工具类，比如<code>LogUtil</code>，将Slf4j或Logback已有能力重新实现一遍，但实际上通过正确配置，直接使用Slf4j提供的强大API是更好的做法。</p>
+<h3 id="熟读日志规约">熟读《日志规约》</h3>
+<p>《阿里巴巴Java开发手册》有专门一章是《日志规约》，建议熟读，其实整个《阿里巴巴Java开发手册》都应该熟读，花不了多少时间。</p>
+</div><div class="post-footer" id="post-footer">
+    <div class="post-info">
+        <div class="post-info-line">
+            <div class="post-info-mod">
+                <span>Updated on 2025-07-22</span>
+            </div></div>
+        <div class="post-info-line">
+            <div class="post-info-md"><span>
+                            <a class="link-to-markdown" href="/posts/java-log-in-practice/index.md" target="_blank">Read Markdown</a>
+                        </span></div>
+            <div class="post-info-share">
+                <span><a href="javascript:void(0);" title="Share on X" data-sharer="x" data-url="http://example.org/posts/java-log-in-practice/" data-title="Java日志实战" data-hashtags="Java"><i class="fab fa-x-twitter fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Threads" data-sharer="threads" data-url="http://example.org/posts/java-log-in-practice/" data-title="Java日志实战"><i class="fab fa-threads fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Facebook" data-sharer="facebook" data-url="http://example.org/posts/java-log-in-practice/" data-hashtag="Java"><i class="fab fa-facebook-square fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Hacker News" data-sharer="hackernews" data-url="http://example.org/posts/java-log-in-practice/" data-title="Java日志实战"><i class="fab fa-hacker-news fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Line" data-sharer="line" data-url="http://example.org/posts/java-log-in-practice/" data-title="Java日志实战"><i data-svg-src="https://cdn.jsdelivr.net/npm/simple-icons@14.9.0/icons/line.svg" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on 微博" data-sharer="weibo" data-url="http://example.org/posts/java-log-in-practice/" data-title="Java日志实战"><i class="fab fa-weibo fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Diaspora" data-sharer="diaspora" data-url="http://example.org/posts/java-log-in-practice/" data-title="Java日志实战" data-description=""><i class="fab fa-diaspora fa-fw" aria-hidden="true"></i></a><a href="https://t.me/share/url?url=http%3a%2f%2fexample.org%2fposts%2fjava-log-in-practice%2f&amp;text=Java%e6%97%a5%e5%bf%97%e5%ae%9e%e6%88%98" target="_blank" title="Share on Telegram"><i class="fab fa-telegram fa-fw" aria-hidden="true"></i></a></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="post-info-more">
+        <section class="post-tags"><i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/java/">Java</a></section>
+        <section>
+            <span><a href="javascript:void(0);" onclick="window.history.back();">Back</a></span>&nbsp;|&nbsp;<span><a href="/">Home</a></span>
+        </section>
+    </div>
+
+    <div class="post-nav"><a href="/posts/trino-filter-project/" class="prev" rel="prev" title="Presto数据过滤和投影"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>Presto数据过滤和投影</a>
+            <a href="/posts/foundationdb-in-practice/" class="next" rel="next" title="FoundationDB in Practice">FoundationDB in Practice<i class="fas fa-angle-right fa-fw" aria-hidden="true"></i></a></div>
+</div>
+<div id="comments"><div id="utterances" class="comment"></div><noscript>
+                Please enable JavaScript to view the comments powered by <a href="https://utteranc.es/">utterances</a>.
+            </noscript></div></article></div>
+            </main><footer class="footer">
+        <div class="footer-container"><div class="footer-line">Powered by <a href="https://gohugo.io/" target="_blank" rel="noopener noreffer" title="Hugo 0.140.2">Hugo</a> | Theme - <a href="https://github.com/dillonzq/LoveIt" target="_blank" rel="noopener noreffer" title="LoveIt 0.3.1-DEV"><i class="far fa-kiss-wink-heart fa-fw" aria-hidden="true"></i> LoveIt</a>
+                </div><div class="footer-line" itemscope itemtype="http://schema.org/CreativeWork"><i class="far fa-copyright fa-fw" aria-hidden="true"></i><span itemprop="copyrightYear">2022 - 2026</span><span class="author" itemprop="copyrightHolder">&nbsp;<a href="/" target="_blank">xxxx</a></span></div>
+        </div>
+    </footer></div>
+
+        <div id="fixed-buttons"><a href="#" id="back-to-top" class="fixed-button" title="Back to Top">
+                <i class="fas fa-arrow-up fa-fw" aria-hidden="true"></i>
+            </a>
+        </div>
+
+        <div id="fixed-buttons-hidden"><a href="#" id="view-comments" class="fixed-button" title="View Comments">
+                <i class="fas fa-comment fa-fw" aria-hidden="true"></i>
+            </a>
+        </div><script src="https://cdn.jsdelivr.net/npm/autocomplete.js@0.38.1/dist/autocomplete.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lunr@2.3.9/lunr.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lazysizes@5.3.2/lazysizes.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js"></script><script src="https://cdn.jsdelivr.net/npm/sharer.js@0.5.2/sharer.min.js"></script><script>window.config={"comment":{"utterances":{"darkTheme":"github-dark","issueTerm":"pathname","label":"","lightTheme":"github-light","repo":"ShadowUnderMoon/ShadowUnderMoon.github.io"}},"search":{"highlightTag":"em","lunrIndexURL":"/index.json","maxResultLength":10,"noResultsFound":"No results found","snippetLength":50,"type":"lunr"}};</script><script src="/js/theme.min.js"></script></body>
+</html>

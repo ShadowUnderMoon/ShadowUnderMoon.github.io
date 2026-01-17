@@ -15,9 +15,7 @@ categories:
     - "FoundationDB"
 ---
 
-
-
-### mac上运行FoundationDB
+## mac上运行FoundationDB
 
 fdb_java的java包没有打包fdb_c的动态链接库，所以需要通过`-DFDB_LIBRARY_PATH_FDB_C=/usr/local/lib/libfdb_c.dylib`指定对应的动态链接库位置。
 
@@ -118,25 +116,27 @@ FoundationDB支持根据不断变化的需求动态添加或移除硬件资源�
 
 ## FoundationDB的架构
 
+### FoundationDB集群的组成
+
 FoundationDB让你的架构更具有灵活性，且易于运维，你的应用程序可以将数据直接发送到FoundationDB，或发送到一个层Layer中，这是用户编写的模块，可提供新的数据模型、与现有系统的兼容性，甚至作为完整的框架使用，无论那种方式，所有数据都会通过一个有序地、事务性的键值API存储到同一个地方。FoundationDB的架构采用了解耦式设计，其中每个进程被分配不同的异构角色（例如Coordinator、Storage Server、Master等），集群在运行时会尝试将不同的角色分别招募为独立的进程，然而为了满足集群的招募目标，也有可能将多个无状态角色合并部署在同一个进程上，通过为不同角色水平扩展进程数量，可以实现数据库的扩展。
 
-### Coordinator
+**Coordinator**
 
 所有客户端和服务器通过一个cluster file连接到FoundationDB集群，该文件中包含Coordinator的IP:PORT信息，客户端和服务器都会使用Coordinator与ClusterController建立连接，如果当前没有集群控制器，服务器会尝试竞选称为控制器，并在选举完成后向其注册，客户端则通过集群控制器获取最新的GRV代理（GRV proxies）和提交代理（commit proxies）列表。
 
-### Cluster Controller
+**Cluster Controller**
 
 集群控制器是一个由多数协调者选举产生的单例角色，它是整个集群中所有进程的入口，负责以下任务：判断某个进程是否故障、告知各个进程应承担的角色，在所有进程之间传递系统信息
 
-### Master
+**Master**
 
 Master负责协调写子系统（write sub-system）从一个代（generation）过渡到下一个代的过程，写子系统包括Master、GRV代理、提交代理、解析器以及事务日志，这三个角色（指Master、GRV proxy、commit Proxy）被视为一个整体，如果其中任何一个失败，将会同时重新招募这三个角色的替代进程。Master还负责为一批mutation（变更操作）提供提交版本号，将其分发给commit proxies，在早期的版本中，Ratekeeper和Data Distributor是与Master运行在同一个进程中，但从6.2版本开始，它们都成为了集群中的单例角色，其生命周期不再依赖于Master
 
-### GRV Proxies
+**GRV Proxies**
 
 GRV代理负责提供读取版本（read version），并与Ratekeeper通信以控制读取版本的发放速率，为了提供一个读取版本，GRV代理会向所有Master查询当前为止最大的已提交版本（commited version），同时检查事务日志（transaction log）是否仍在正常运行（未停止），Ratekeeper会人为地减慢GRV代理提供读取版本的速率，以控制系统负载。
 
-### Commit Proxies
+**Commit Proxies**
 
 提交代理负责提交事务、向Master汇报已提交的版本，并追踪每个键范围所对应的存储服务器，提交事务的过程包含以下步骤：
 
@@ -146,11 +146,446 @@ GRV代理负责提供读取版本（read version），并与Ratekeeper通信以�
 
 以`\xff`字节开头的键空间是保留的系统元数据区域，所有写入该区域的mutation（变更操作）都会通过解析器分发到所有提交代理，这个系统元数据包含一个键范围到存储服务器的映射关系，即每个键区间是由哪些存储服务器负责存储的。提交代理会按需将这些映射信息提供给客户端，客户端会缓存这份映射表，如果客户端向某个存储服务器请求一个该服务器没有的数据键，会清楚缓存并从提交代理获取一份最新的服务器列表。
 
-### Transaction Logs
+**Transaction Logs**
+
+事务日志将变更持久化到磁盘，以实现快速的提交延迟，这些日志会按版本顺序从提交代理（commit proxy）接收提交请求，只有在数据被写入并通过fsync同步到磁盘上的追加式变更日志后，才会向提交代理返回响应。在数据写入磁盘之前，系统就会将变更转发给负责该变更的存储服务器，一旦存储服务器将变更持久化，它们就会从日志从弹出该变更，这通过发生在变更最初提交到日志后的大约6s左右，我们只会在进程重启时从日志的磁盘中读取数据，如果某个存储服务器发生故障，那么原本要发送到该服务器的变更将会在日志中堆积，一旦数据分布机制将该故障服务器负责的数据重新分配给其他存储服务器，我们就会丢弃原本为该失败服务器保留的日志数据。
+
+**Resolvers**
+
+解析器负责判断事务之间是否存在冲突，如果某个事务读取了某个键，而这个键在该事务的读取版本与提交版本之间被写入过，则该事务就会发生冲突。解析器通过将最近5s内已提交的写操作保存在内存中，并将新事务的读取请求与这批提交进行比较，从而判断是否存在冲突。
+
+**Storage Servers**
+
+集群中绝大多数进程都是存储服务器，存储服务器被分配了一定范围的键区间，并负责存储该区间内的所有数据，它们会在内存中保留最近5s的变更，同时在磁盘上保留一份截至5s前的数据副本，客户端必须在最近5s内的版本上进行读取操作，否则会收到`transaction_too_old`错误。当前的SSD存储引擎使用基于SQLite的B树来存储数据，而内存存储引擎将数据保存在内存中，并维护一个追加式日志，只有在进程重启时，才会从磁盘中读取日志。在FoundationDB 7.0版本，B树存储引擎将被全新的Redwood引擎所取代。
+
+**Data Distributor**
+
+数据分发器负责管理存储服务器的生命周期，决定每个存储服务器负责哪些数据区间，并确保数据在所有存储服务器之间均匀分布，数据分发器在集群中是一个单例角色，由集群控制器负责选举和监控。
+
+**Ratekeeper**
+
+速率控制器负责监控系统负载，当集群接近饱和时，它会通过降低代理（proxy）分发读取版本的速率来减慢客户端事务的速率，Ratekeeper是集群中的一个单例角色，由集群控制器负责选举和监控。
+
+**Client**
+
+客户端通过链接特定语言的绑定（即客户端库）来与FoundationDB集群通信，这些语言绑定支持加载多个版本的C库，允许客户端能够与较旧版本的FoundationDB集群进行通信，目前，FoundationDB官方支持的语言绑定包括：C、Go、Python、Java和Ruby。
+
+### 事务处理
+
+在FoundationDB中，数据库事务由客户端访问某个GRV (Get Read Version)代理开始，以获取一个读版本，这个读版本保证大于客户端已知的任何提交版本，即使这些版本是通过FoundationDB之外的其他途径获得的（比如从日志、其他客户端、外部系统等得知），这样可以确保客户端在事务中能够看到此前已经提交的变更结果。随后，客户端可以向存储服务器发起多次读取请求，以获取该读取版本下的数据。写操作则会暂存于客户端的局地内存中，并不会立即发送到集群。在默认请求下，如果在同一个事务中读取了某个已写入的键，客户端会返回刚刚写入的值。在提交阶段，客户端会将事务数据（包括所有读取和写入操作）发送给某个提交代理（commit proxy），并等待其返回事务是否成功提交的结果，如果事务与其他事务发生冲突而无法提交，客户端可以选择从头开始重试。如果事务提交成功，提交代理会将该事务的提交版本返回给客户端以及master，以便GRV代理获取到最新的提交版本。需要注意的是，这个提交版本由master分配，且一定大于最初的读取版本。FoundationDB的架构将客户端的读取操作和写入（即事务提交）操作分离，从而分别实现扩展性，读取操作由客户端直接发送给存储服务器，随着存储服务器数增加可以线性扩展，写入操作则通过增加Commit Proxy、Resolver和Log Server等组件的实例来实现扩展。
+
+### 确定读取版本
+
+当客户端向GRV代理请求读取版本时，GRV代理会向master查询最新的已提交版本，并检查一组符合复制策略的事务日志是否处于存活状态，随后GRV代理会将当前最大已提交版本作为读取版本返回给客户端。GRV代理之所以需要向master请求最新的提交版本，是因为master是集中维护所有提交代理中最大提交版本的角色。而GRV代理检查一组符合复制策略的事务日志是否存活，是为了确保自己不是一个已经被新一代GRV代理取代的旧代理，因为GRV代理是无状态的角色，每次恢复后都会重新选举，如果发生过一次恢复，而旧的GRV代理进程仍然存活，它仍可能对外发放读取版本，这样会导致只读事务读取到过时数据（而读写事务会因为版本冲突而被中止）。通过验证满足复制策略的一组事务日志仍然在线，GRV代理可以确认系统并未经历恢复，因此只读事务能够读取到最新的数据。需要注意的是，客户端不能直接想master请求读取版本，这是因为master无法横向拓展，承担太多工作会成为性能瓶颈，尽管分发读取版本的开销本身并不高，但这项工作仍然需要master从Ratekeeper获取事务配额、批处理请求，并可能维护数千个客户端的网络连接。因此，这项工作被委托给可扩展的GRV代理来处理。
+
+### 事务提交
+
+一个客户端事务的提交过程包括以下步骤，客户端将事务发送给一个提交代理，提交代理想master请求一个提交版本，master返回一个比以往任何提交版本都更大的版本号，提交代理将事务的读取冲突区间和写入冲突区间连同提交版本一起发送给解析器，解析器根据提交版本对事务排序，并判断在此顺序下执行是否有冲突，从而确定该事务是否与之前的事务存在冲突，如果存在冲突，提交代理会向客户单返回not_commited错误，如果不存在冲突，提交代理会将该事务的变更和提交版本发送到事务日志，一旦这些变更在日志中被持久化，提交代理就向客户端返回成功响应。需要注意的是，提交代理会将每个解析器所负责的键区间（key ranges）分别发送给对应的解析器，如果任意一个解析器检测到冲突，整个事务就不会被提交。这个机制有一个缺陷，如果只有某一个解析器发现了冲突，其他解析器没有，后者会错误的任务事务已提交，并在之后对有重叠写入冲突区间的事务执行错误的冲突判断，可能导致本应可提交的事务被错误中止，不过在实际应用中，一个设计良好的工作负载通常只有极少数事务发生冲突，因此这种冲突放大现象对性能影响很小，另外，每个事务在解析器中仅保留5s的冲突信息，5s后解析器会清楚旧事务的冲突区间，这也进一步降低了出现此类误判冲突的可能性。
+
+### 后台工作
+
+在事务处理流程背后存在一些后台工作：
+
+- Ratekeeper：从GRV代理、提交代理、事务日志、存储服务器收集统计信息，并计算集群预期的事务速率
+- Data distribution：监控所有的存储服务器并执行负载均衡操作在所有存储服务器中均匀分布数据
+- Storage Server：从事务日志拉取变更，将它们写入存储服务器的磁盘
+- commit Proxies：当没有客户端产生事务时，周期性的发送空的提交到事务日志以保持提交版本的增长
+
+### 事务系统恢复
+
+事务系统实现了FoundtionDB集群的写流水线，它的性能严重影响事务提交延迟，典型的恢复时间大概在几百毫秒，但更长时间（通常几秒钟）也有可能发生。每当事务系统中发生故障时，将执行恢复流程从而恢复事务系统到一个新的配置，比如说一个干净的状态。特别的，master进程监控GRV代理、提交代理、Resolver、事务日志的健康，如果被监控的进程中任何一个发生故障，master进程将会中止，集群控制器检测到这一事件，将会选举新的Master，新的Master将协调组织恢复过程并且选举出一个新的事务系统实例，通过这种方式，事务处理被划分为多个epoch（时期），每个epoch代表事务系统的一代实例，并由一个唯一的Master进程负责协调。对每个epoch，Master通过几步发起恢复流程，首先，Master从Coordinator读取之前的事务系统状态，并且锁定协调状态，以防止其他Master进程同时进行恢复操作。然后Master恢复原先的事务系统状态，包括所有事务日志服务器的信息，停止这些事务日志服务器接受事务，并且选举新的一组GRV代理、提交代理、解析器和事务日志服务器。在之前的事务日志服务器停止并且选举出新的事务系统之后，Master会将包含当前事务系统信息的协调状态写入协调者，最后，Master开始接受新的事务提交请求。
+
+因为GRV代理、提交代理和解析器是无状态的，它们的恢复不需要额外的工作，相反的，事务日志服务器保存提交事务的日志，我们需要确保之前所以提交的事务都是持久化的，并且可被存储服务器获取。也就是说，对于任何提交代理已向客户端返回提交成功的事务，它们的变更日志必须已经被持久化到多个日志服务器中（例如，在副本要求为3的情况下，日志需保留于3个服务器上）。
+
+最后，恢复过程会将事务系统时间快速推进90s，这会导致所有正在进行的客户端事务引读取版本过旧而被中止，并返回`transaction_too_old`错误。在重试过程中，这些客户端事务将连接到新一代的事务系统，并重新发起提交。
+
+`commit_result_unknown`错误表示：在事务提交过程中如果发生了恢复，也就是说提交代理已经将变更发送给事务日志，那么客户端可能会收到`commit_result_unknown`错误，并随后重试该事务，在这种情况下，FoundationDB允许第一次提交和重试提交都成功，因为`commit_result_unknown`的含义是这个事务可能提交了，可能没有提交，因此强烈建议事务具有幂等性，这样才能正确处理`commit_result_unknown`场景下可能出现的重复提交。
+
+### 事务权威
+
+由于FoundationDB允许多个客户端同时进行操作，它内部使用一组分布式节点来协作完成节点的冲突检测，这些节点共同构成了所谓了事务权威（transactional authority）。在事务执行时，FoundationDB使用的是乐观并发控制（Optimistic Concurrency Control，OCC），也就是说，它不会像传统数据库那样在更新某个key前加锁，更新后解锁，取而代之的是，客户端提交事务后，系统会去检查是否有其他事务在此期间对相同的key做过冲突性的修改，如果存在冲突，事务会被事务权威拒绝，客户端需要重试这笔事务。
+
+为了保持高性能，事务权威是由多个独立的事务服务器（transaction servers）实现的，每台服务器负责处理部分传入的事务流，FoundationDB将事务处理拆分为若干独立的功能模块，并能够分别对这些模块进行拓展，这些功能模块包括：
+
+- 对传入的事务进行批处理
+- 检测事务冲突
+- 记录事务日志
+- 持久化存储数据
+
+在人们的直觉中，通常会认为事务冲突检测阶段可能是性能瓶颈，幸运的是，这个阶段实际上是可以扩展的，FoundationDB使用了先进的数据并行（data-parallel）和多线程算法对冲突检测进行优化，因此该阶段只占用系统总资源的很小一部分，正是由于这种优化，使得少量的事务服务器就能支撑一个大型的存储服务器集群。
+
+## Layer概念
+
+当我们开始构建FoundationDB时，我们没有去设想它可以具备哪些功能，而是反过来问自己，有哪些功能可以被去掉，我们的结论是几乎所有功能都可以去掉，我们选择简化核心设计，把重点放在将核心系统做得尽可能强大和可靠上，其他功能作为分层（layer）构建在核心之上。
+
+当你在今天选择一个数据库时，实际上你并不是选择了一项技术，而是同时选择了三层技术：存储引擎、数据模型、API/查询语言。举个例子，选择PostgreSQL，你实际上选择了PostgreSQL的存储引擎、关系型数据模型以及SQL查询语言，选择MongoDB，你选择的是MongoDB的分布式存储引擎、文档型数据模型以及MongoDB的API。在这些系统中，各层的功能是交织在一起的，例如，它们都提供了索引功能，而索引这个概念在存储引擎、数据模型和API三层中都存在其表现形式，不论是文档数据库、列式存储、行存储、JSON数据库还是键值存储，各种模型在不同场景下都有其合理性，而现实中，一个应用的不同部分可能适合不同的数据模型，这就带来了一个艰难的选择，是为了支持新的数据模型引入一整套全新的数据库还是硬塞进已有的数据库，勉强适配？
+
+FoundationDB将数据存储技术和数据模型解耦开来，它的核心是一个有序的键值存储引擎，可以高效地适配并映射到各种丰富的数据模型上，以索引为例，FoundationDB的核心层完全不提供索引功能，也永远不会提供。相反，索引功能也由上层组件（Layer）来实现，通过存储两类键值对：一类用于存储原始数据，另一类用于维护索引。例如，键值对`people/alice/eye_color=blue`存储了Alice的眼睛颜色，同时维护一个索引键值对`eye_color/blue/alice=true`表示按眼睛颜色索引到Alice。现在要查找所有眼睛是蓝色的人，只需查找所有以`eye_color/blue`开头的键即可，由于FoundationDB核心会保持所有键的有序性，并且这些键有共同的前缀，所以这个操作可以通过一次高效的范围读取（range-read）实现，当然，任何一个支持有效键值的数据库理论上都能采用类似的方式，但真正的魔力在于FoundationDB提供了真正的ACID事务支持，索引层可以在同一个事务中同时更新数据和索引，从而确保两者的一致性，这种事务保障的重要性不容低估，正因为有了事务机制，才使得构建上层功能（如索引、视图、关系模型等）变得简单、可靠和高效。
+
+## 性能
+
+### 可拓展性
+
+![image-20250803170239273](image-20250803170239273.png)
+
+FoundationDB能够很好地横向扩展，集群中CPU核心数增加时，它的性能也会成比例的提高，无论集群是小规模还是大规模。
+
+### 延迟
+
+![image-20250803170453172](image-20250803170453172.png)
+
+FoundationDB在各种不同类型的工作负载下都能保持较低的延迟，即使在接近集群饱和（资源接近用尽）时，延迟也只是温和地增加。对于FoundationDB客户端来说，最显著的延迟出现在事务的准备和提交过程中，写操作本身不会引入延迟，直到事务提交。一个事务中真正涉及延迟的操作有三种：
+
+- 事务开始：第一次读取时需要获取一致性版本号，这通常需要几毫秒，在高写负载时延迟可能会集中在这里
+- 读取操作：单次读取的延迟通常低于1毫秒，但如果读取时串行进行，延迟会累积，使用非阻塞并发读取可以减少总延迟和冲突
+- 提交操作：对于写事务，提交会在确保数据持久化且完成复制后成功，平均延迟为3ms，只有一小部分会影响事务冲突检测。
+
+### 吞吐
+
+![image-20250803172243355](image-20250803172243355.png)
+
+FoundationDB提供了良好的吞吐量，适用于各种读写工作负载，并支持两种完全持久化的存储引擎选项。Memory引擎适用于数据集完全可以放入内存的场景，只在写入时使用二级存储（如磁盘）来保证持久性，读取操作全部来自内存。SSD引擎适用于数据集无法完全放入内存的场景，一部分的读取会来自二次存储（SSD）。因为SATA接口的SSD只比内存慢大约50倍，所以只要缓存命中率合理，将SSD和内存结合使用仍然可以实现接近内存级别的吞吐量，与之相比，传统机械硬盘比内存慢大约5000倍，一旦缓存命中率低于100%，吞吐量会急剧下降。
+
+FoundationDB只有在高并发的工作负载下才能达到最大吞吐量，事实上，在给定的平均延迟下，并发性是吞吐量的主要决定因素。
+
+### 并发
+
+![image-20250803173335680](image-20250803173335680.png)
+
+FoundationDB被设计为在来自大量客户端的高并发下实现高性能，在一个给定系统中，平均吞吐量和延迟之间的关系由排队论中的Little定律（利特尔法则）描述，这一定律在FoundationDB中的实际应用是
+$$
+throughput = outstanding \  requests / latency
+$$
+这个公式意味着：在固定的平均延迟下，只有足够多的并发请求才能最大化吞吐量
+
+比如一个FoundationDB集群的提交延迟可能是2ms，但它的处理能力远超每秒500次提交，事实上每秒几万个提交都是轻松可以实现的，要实现这种吞吐量，必须同时并发处理上百个请求，没有足够的挂起请求（即并发不足）是性能低下的最主要原因。
 
 
 
+## 在FoundationDB中处理大value
+
+[https://github.com/sunesimonsen/fdb-blobs](fdb-blobs)通过将数据切分成chunk实现了对任意大小blob的处理，下面分析一下实现：
+
+```go
+type Store struct {
+	db                   fdb.Database
+	blobsDir             directory.DirectorySubspace
+	removedDir           directory.DirectorySubspace
+	uploadsDir           directory.DirectorySubspace
+	chunkSize            int
+	chunksPerTransaction int
+	systemTime           SystemTime
+	idGenerator          IdGenerator
+}
+```
 
 
 
+```go
+// Creates and returns a new blob with the content of the given reader r.
+func (store *Store) Create(r io.Reader) (*Blob, error) {
+  // 在upload路径下生成类似uuid的路径,并将上传时间和实际数据分别写到 /uploadStartedAt 和 /bytes子路径下
+  // 数据会自动分片到/byte/chunk_number，返回对应的路径 /id
+	token, err := store.Upload(r)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := transact(store.db, func(tr fdb.Transaction) (Id, error) {
+		return store.CommitUpload(tr, token)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return store.Blob(id)
+}
+```
+
+
+
+```go
+// Uploads the content of the given reader r into a temporary location and
+// returns a token for commiting the upload on a transaction later.
+func (store *Store) Upload(r io.Reader) (UploadToken, error) {
+  // 产生一个随机的id，类似于uuid
+	id := store.idGenerator.NextId()
+  // 创建一个uploadDir: uploadDir/id，实际上在foundationdb底层没有路径的概念，但很多时候我们都会使用路径来区分不同键
+	uploadDir, err := store.uploadsDir.Create(store.db, []string{string(id)}, nil)
+
+	token := UploadToken{dir: uploadDir}
+
+	if err != nil {
+		return token, err
+	}
+
+	err = updateTransact(store.db, func(tr fdb.Transaction) error {
+		unixTimestamp := store.systemTime.Now().Unix()
+    // 写入 (uploadDir/id/uploadStartedAt, unixTimeStamp)，记录上传时间点
+		tr.Set(uploadDir.Sub("uploadStartedAt"), encodeUInt64(uint64(unixTimestamp)))
+		return nil
+	})
+
+	if err != nil {
+		return token, err
+	}
+
+	err = store.write(uploadDir, r)
+	// 返回的token是写入数据的path，即uploadDir/id
+	return token, err
+}
+```
+
+```java
+func (store *Store) write(blobDir subspace.Subspace, r io.Reader) error {
+  // chunkSize，每个chunk的大小，最后一个chunk的大小可以小于这个，默认为10kb
+	chunk := make([]byte, store.chunkSize)
+	var written uint64
+	var chunkIndex int
+
+	bytesSpace := blobDir.Sub("bytes")
+
+   // 循环，如果数据量大，可能需要多个事务才能写入
+	for {
+		finished, err := transact(store.db, func(tr fdb.Transaction) (bool, error) {
+      // chunksPerTransaction 每个事务中的写入的chunk数量
+			for i := 0; i < store.chunksPerTransaction; i++ {
+        
+				n, err := io.ReadFull(r, chunk)
+        // 写入数据 (uploadDir/id/bytes/chunkIndex, chunk_data)  
+				tr.Set(bytesSpace.Sub(chunkIndex), chunk[0:n])
+
+				chunkIndex++
+				written += uint64(n)
+
+				if err == io.ErrUnexpectedEOF || err == io.EOF {
+					return true, nil
+				}
+
+				if err != nil {
+					return false, err
+				}
+			}
+
+			return false, nil
+		})
+
+		if finished {
+			break
+		}
+
+		if err != nil {
+			return err
+		}
+	}
+	return updateTransact(store.db, func(tr fdb.Transaction) error {
+    // 写入len
+		tr.Set(blobDir.Sub("len"), encodeUInt64(written))
+    // 写入chunkSize
+		tr.Set(blobDir.Sub("chunkSize"), encodeUInt64(uint64(store.chunkSize)))
+		return nil
+	})
+}
+```
+
+
+
+```go
+// Commits an upload with the given token on a transaction. This creates a blob
+// from the upload and returns its id.
+// 这个整个就是一个事务
+func (store *Store) CommitUpload(tr fdb.Transaction, token UploadToken) (Id, error) {
+	if token.dir == nil {
+		return "", errors.New("invalid upload token, tokens needs to be produced by the upload method")
+	}
+
+	uploadDir := token.dir
+	uploadPath := uploadDir.GetPath()
+	id := uploadPath[len(uploadPath)-1]
+
+	dstPath := append(store.blobsDir.GetPath(), id)
+  // 将对于从 uploadDir目录移动到blobs目录，这里应该没有底层数据的移动，只是目录元数据的移动，目录元数据可能记录在fdb的System metadata中，Directory的抽象或许很好用
+	blobDir, err := uploadDir.MoveTo(tr, dstPath)
+
+	if err != nil {
+		return Id(id), err
+	}
+
+	unixTimestamp := store.systemTime.Now().Unix()
+  // 设置blob的创建时间
+	tr.Set(blobDir.Sub("createdAt"), encodeUInt64(uint64(unixTimestamp)))
+
+	return Id(id), nil
+}
+```
+
+```go
+// Returns a blob instance for the given id.
+func (store *Store) Blob(id Id) (*Blob, error) {
+	blobDir, err := store.openBlobDir(id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := readTransact(store.db, func(tr fdb.ReadTransaction) ([]byte, error) {
+		return tr.Get(blobDir.Sub("chunkSize")).Get()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	chunkSize := int(decodeUInt64(data))
+
+	blob := &Blob{
+		db:                   store.db,
+		dir:                  blobDir,
+		chunkSize:            chunkSize,
+		chunksPerTransaction: store.chunksPerTransaction,
+	}
+
+	return blob, err
+}
+```
+
+```go
+// Returns a new reader for the content of the blob.
+//
+// New chunks are fetched on demand based on the chunk size and number of chunks
+// per transaction configured for the store.
+func (blob *Blob) Reader() io.Reader {
+	reader := &reader{
+		db:                   blob.db,
+		dir:                  blob.dir,
+		chunkSize:            blob.chunkSize,
+		chunksPerTransaction: blob.chunksPerTransaction,
+	}
+
+	return reader
+}
+```
+
+```go
+type reader struct {
+	db                   fdb.Database
+	dir                  directory.DirectorySubspace
+	off                  int
+	buf                  []byte
+	chunkSize            int
+	chunksPerTransaction int
+}
+
+func (br *reader) Read(buf []byte) (int, error) {
+	read := copy(buf, br.buf)
+	br.buf = br.buf[read:]
+
+	// This also take care of io.EOF
+	if len(buf) == read {
+		return read, nil
+	}
+
+	br.dir.Sub("chunkSize")
+	bytesSpace := br.dir.Sub("bytes")
+
+	_, err := readTransact(br.db, func(tr fdb.ReadTransaction) (any, error) {
+		startChunk := br.off
+		endChunk := br.off + int(math.Ceil(float64(len(buf)-read)/float64(br.chunkSize)))
+		endChunkCap := int(math.Min(float64(startChunk+br.chunksPerTransaction), float64(endChunk))) + 1
+
+		chunkRange := fdb.KeyRange(fdb.KeyRange{
+			Begin: bytesSpace.Sub(startChunk),
+			End:   bytesSpace.Sub(endChunkCap),
+		})
+
+		entries, err := tr.GetRange(chunkRange, fdb.RangeOptions{}).GetSliceWithError()
+
+		if err != nil {
+			return read, err
+		}
+
+		if len(entries) == 0 {
+			// Didn't find any entries, we are done
+			return read, io.EOF
+		}
+
+		for _, v := range entries {
+			n := copy(buf[read:], v.Value)
+			br.off += 1
+			read += n
+
+			if n < len(v.Value) {
+				// No more output buffer, safe the rest for next read
+				br.buf = v.Value[n:]
+				return read, nil
+			} else if len(v.Value) < br.chunkSize {
+				// chunk is too short and we read all of it;
+				// we are now at the end
+				return read, io.EOF
+			}
+		}
+
+		if len(entries[len(entries)-1].Value) < br.chunkSize {
+			// last chunk was too short
+			// we hit the end
+			return read, io.EOF
+		}
+
+		return read, nil
+	})
+
+	return read, err
+}
+```
+
+
+
+```java
+// Deletes uploads that was started before a given time.
+//
+// This is useful to make a periodical cleaning job.
+// 清理操作还是很简单的
+func (store *Store) DeleteUploadsStartedBefore(date time.Time) ([]Id, error) {
+	var deletedIds []Id
+	err := updateTransact(store.db, func(tr fdb.Transaction) error {
+		ids, err := store.uploadsDir.List(tr, []string{})
+
+		if err != nil {
+			return err
+		}
+
+		for _, id := range ids {
+			uploadDir, err := store.uploadsDir.Open(tr, []string{id}, nil)
+
+			if err != nil {
+				return err
+			}
+
+			data, err := tr.Get(uploadDir.Sub("uploadStartedAt")).Get()
+
+			if err != nil {
+				return err
+			}
+
+			uploadStartedAt := time.Unix(int64(decodeUInt64(data)), 0)
+
+			if uploadStartedAt.Before(date) {
+				deleted, err := store.uploadsDir.Remove(tr, []string{id})
+				if err != nil {
+					return err
+				}
+
+				if deleted {
+					deletedIds = append(deletedIds, Id(id))
+				}
+			}
+		}
+
+		return nil
+	})
+
+	return deletedIds, err
+}
+```
 

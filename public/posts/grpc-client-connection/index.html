@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noodp" />
+        <title>Grpc Client Connection - 爱吃芒果</title><meta name="Description" content="This is my cool site"><meta property="og:url" content="http://example.org/posts/grpc-client-connection/">
+  <meta property="og:site_name" content="爱吃芒果">
+  <meta property="og:title" content="Grpc Client Connection">
+  <meta property="og:description" content="是的，有不少优秀的博客／技术文章探讨了在 gRPC / TCP 长连接中，应对“隐蔽断开”（silent drop）、“僵尸连接”（zombie connection）问题的方案。下面列几个经典与实用的，并且我还会摘关键要点供你快速对比。">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-10-12T16:55:50+08:00">
+    <meta property="article:modified_time" content="2025-10-12T16:55:50+08:00">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Grpc Client Connection">
+  <meta name="twitter:description" content="是的，有不少优秀的博客／技术文章探讨了在 gRPC / TCP 长连接中，应对“隐蔽断开”（silent drop）、“僵尸连接”（zombie connection）问题的方案。下面列几个经典与实用的，并且我还会摘关键要点供你快速对比。">
+<meta name="application-name" content="My cool site">
+<meta name="apple-mobile-web-app-title" content="My cool site">
+<meta name="referrer" content="no-referrer" /><meta name="theme-color" content="#ffffff"><meta name="msapplication-TileColor" content="#da532c"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/grpc-client-connection/" /><link rel="prev" href="http://example.org/posts/direct-memory-in-practice/" /><link rel="next" href="http://example.org/posts/grpc-keepalive/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css"></noscript><link rel="preload" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css"></noscript><script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "headline": "Grpc Client Connection",
+        "inLanguage": "zh-CN",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "http:\/\/example.org\/posts\/grpc-client-connection\/"
+        },"genre": "posts","wordcount":  2131 ,
+        "url": "http:\/\/example.org\/posts\/grpc-client-connection\/","datePublished": "2025-10-12T16:55:50+08:00","dateModified": "2025-10-12T16:55:50+08:00","publisher": {
+            "@type": "Organization",
+            "name": ""},"author": {
+                "@type": "Person",
+                "name": "爱吃芒果"
+            },"description": ""
+    }
+    </script></head>
+    <body data-header-desktop="fixed" data-header-mobile="auto"><script>(window.localStorage && localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : ('auto' === 'auto' ? window.matchMedia('(prefers-color-scheme: dark)').matches : 'auto' === 'dark')) && document.body.setAttribute('theme', 'dark');</script>
+
+        <div id="mask"></div><div class="wrapper"><header class="desktop" id="header-desktop">
+    <div class="header-wrapper">
+        <div class="header-title">
+            <a href="/" title="爱吃芒果">My cool site</a>
+        </div>
+        <div class="menu">
+            <div class="menu-inner"><a class="menu-item" href="/posts/"> 文章 </a><a class="menu-item" href="/page/archives/" title="Archives"> Archives </a><a class="menu-item" href="/tags/"> 标签 </a><a class="menu-item" href="/page/search/" title="Search"> Search </a><a class="menu-item" href="/categories/"> 分类 </a><span class="menu-item delimiter"></span><span class="menu-item search" id="search-desktop">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-desktop">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-desktop" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-desktop" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-desktop">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </span><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                    <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+                </a></div>
+        </div>
+    </div>
+</header><header class="mobile" id="header-mobile">
+    <div class="header-container">
+        <div class="header-wrapper">
+            <div class="header-title">
+                <a href="/" title="爱吃芒果">My cool site</a>
+            </div>
+            <div class="menu-toggle" id="menu-toggle-mobile">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div class="menu" id="menu-mobile"><div class="search-wrapper">
+                    <div class="search mobile" id="search-mobile">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-mobile">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-mobile" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-mobile" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-mobile">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </div>
+                    <a href="javascript:void(0);" class="search-cancel" id="search-cancel-mobile">
+                        Cancel
+                    </a>
+                </div><a class="menu-item" href="/posts/" title="">文章</a><a class="menu-item" href="/page/archives/" title="Archives">Archives</a><a class="menu-item" href="/tags/" title="">标签</a><a class="menu-item" href="/page/search/" title="Search">Search</a><a class="menu-item" href="/categories/" title="">分类</a><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+            </a></div>
+    </div>
+</header><div class="search-dropdown desktop">
+        <div id="search-dropdown-desktop"></div>
+    </div>
+    <div class="search-dropdown mobile">
+        <div id="search-dropdown-mobile"></div>
+    </div><main class="main">
+                <div class="container"><div class="toc" id="toc-auto">
+            <h2 class="toc-title">Contents</h2>
+            <div class="toc-content" id="toc-content-auto"></div>
+        </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Grpc Client Connection</h1><div class="post-meta">
+            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span></div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-10-12">2025-10-12</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;2131 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;5 minutes&nbsp;</div>
+        </div><div class="details toc" id="toc-static"  data-kept="">
+                <div class="details-summary toc-title">
+                    <span>Contents</span>
+                    <span><i class="details-icon fas fa-angle-right" aria-hidden="true"></i></span>
+                </div>
+                <div class="details-content toc-content" id="toc-content-static"><nav id="TableOfContents">
+  <ul>
+    <li><a href="#-推荐文章与博客">📚 推荐文章与博客</a></li>
+    <li><a href="#-关键要点--总结">🔍 关键要点 &amp; 总结</a></li>
+    <li><a href="#-推荐的博客--文章--技术资源">📚 推荐的博客 / 文章 / 技术资源</a></li>
+  </ul>
+</nav></div>
+            </div><div class="content" id="content"><p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/grpc-client-connection/image-20251012165622531.png"
+        data-srcset="/posts/grpc-client-connection/image-20251012165622531.png, /posts/grpc-client-connection/image-20251012165622531.png 1.5x, /posts/grpc-client-connection/image-20251012165622531.png 2x"
+        data-sizes="auto"
+        alt="/posts/grpc-client-connection/image-20251012165622531.png"
+        title="image-20251012165622531" width="3728" height="1552" /></p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/grpc-client-connection/image-20251012165854471.png"
+        data-srcset="/posts/grpc-client-connection/image-20251012165854471.png, /posts/grpc-client-connection/image-20251012165854471.png 1.5x, /posts/grpc-client-connection/image-20251012165854471.png 2x"
+        data-sizes="auto"
+        alt="/posts/grpc-client-connection/image-20251012165854471.png"
+        title="image-20251012165854471" width="3758" height="1904" /></p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/grpc-client-connection/image-20251012171239336.png"
+        data-srcset="/posts/grpc-client-connection/image-20251012171239336.png, /posts/grpc-client-connection/image-20251012171239336.png 1.5x, /posts/grpc-client-connection/image-20251012171239336.png 2x"
+        data-sizes="auto"
+        alt="/posts/grpc-client-connection/image-20251012171239336.png"
+        title="image-20251012171239336" width="3690" height="1648" /></p>
+<p>是的，有不少优秀的博客／技术文章探讨了在 gRPC / TCP 长连接中，应对“隐蔽断开”（silent drop）、“僵尸连接”（zombie connection）问题的方案。下面列几个经典与实用的，并且我还会摘关键要点供你快速对比。</p>
+<p>你也可以根据你用的语言 / 框架（Go / Java / C++ / .NET 等）去找相应的实践版本。</p>
+<hr>
+<h2 id="-推荐文章与博客">📚 推荐文章与博客</h2>
+<table>
+  <thead>
+      <tr>
+          <th>标题 / 链接</th>
+          <th>核心内容 / 亮点</th>
+          <th>适合读者 /用途</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td><em>How gRPC Keepalive Solved Our Zombie Connections</em></td>
+          <td>讲述一个真实案例：他们因为网络黑洞（节点断网）导致 gRPC 客户端一直认为连接可用，最终采用 gRPC Keepalive 机制将故障检测时间从分钟级降到秒级。 (<a href="https://medium.com/freshworks-engineering-blog/how-grpc-keepalive-solved-our-zombie-connections-mystery-f4f626c8a9f2?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">Medium</a>)</td>
+          <td>适合理解为何需要 “应用层 keepalive”</td>
+      </tr>
+      <tr>
+          <td><em>Lessons learned from running a large gRPC mesh at Datadog</em></td>
+          <td>在大规模 gRPC Mesh 中的经验总结，其中讲到要开启 keepalive 通道选项、设置 MAX_CONNECTION_AGE、监控 silent connection drop 等细节。 (<a href="https://www.datadoghq.com/blog/grpc-at-datadog/?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">Datadog</a>)</td>
+          <td>适合架构级设计参考</td>
+      </tr>
+      <tr>
+          <td><em>Why TCP keepalive may be important</em></td>
+          <td>从更底层的 TCP 层面讲为什么要用 keepalive，默认关闭的问题，以及使用时的配置考虑。 (<a href="https://www.redpill-linpro.com/techblog/2024/12/17/failovers-and-keepalive.html?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">redpill-linpro.com</a>)</td>
+          <td>用于理解 TCP 本身的补充机制</td>
+      </tr>
+      <tr>
+          <td><em>TCP Keepalive is a lie</em></td>
+          <td>警示式文章，指出启用 TCP keepalive 后也不一定能快速感知连接断开的局限性。 (<a href="https://codearcana.com/posts/2015/08/28/tcp-keepalive-is-a-lie.html?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">Code Arcana</a>)</td>
+          <td>用于理解 “keepalive 也有不能解决的问题”</td>
+      </tr>
+      <tr>
+          <td><em>When TCP sockets refuse to die</em></td>
+          <td>Cloudflare 的文章，除了讲 keepalive 之外，还推荐使用 <code>TCP_USER_TIMEOUT</code> 等套接字选项检测不活跃 / 卡住的连接。 (<a href="https://blog.cloudflare.com/when-tcp-sockets-refuse-to-die/?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">The Cloudflare Blog</a>)</td>
+          <td>对底层网络 / 操作系统感兴趣的开发者</td>
+      </tr>
+      <tr>
+          <td><em>Need to be careful when you using gRPC keepalive</em></td>
+          <td>一篇 medium 博文，提醒使用 keepalive 需谨慎配置，比如不能把 keepalive 时间设得太激进，容易触发服务器端限制。 (<a href="https://lukexng.medium.com/grpc-keepalive-maxconnectionage-maxconnectionagegrace-6352909c57b8?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">Medium</a>)</td>
+          <td>适合实际调优阶段参考</td>
+      </tr>
+      <tr>
+          <td><em>gRPC is easy to misconfigure</em></td>
+          <td>探讨一些常见 gRPC keepalive 的误用，以及 gRPC 默认设置背后的“陷阱” (比如 <code>TCP_USER_TIMEOUT</code> 被启用) (<a href="https://www.evanjones.ca/grpc-is-tricky.html?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">Evan Jones</a>)</td>
+          <td>适合中级 / 进阶开发者理解坑点</td>
+      </tr>
+  </tbody>
+</table>
+<hr>
+<h2 id="-关键要点--总结">🔍 关键要点 &amp; 总结</h2>
+<p>从这些文章中，我们可以提炼出一些行之有效的策略，以及需要注意的坑。下面是我给你的总结、对比与建议：</p>
+<table>
+  <thead>
+      <tr>
+          <th>方案 / 技术</th>
+          <th>优点</th>
+          <th>局限 / 风险</th>
+          <th>实践建议</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td><strong>gRPC HTTP/2 Keepalive（PING）</strong></td>
+          <td>在没有流量时主动探测对端是否存活；一旦 PING 超时则断开重连。Datadog 在其 gRPC Mesh 中就用这个来缓解 silent drop 问题。 (<a href="https://www.datadoghq.com/blog/grpc-at-datadog/?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">Datadog</a>)</td>
+          <td>如果配置不当，PING 太频繁可能被服务器视为 Abuse（过多 PING）而断开连接；也要与服务端的最小 PING 间隔策略匹配。 (<a href="https://www.datadoghq.com/blog/grpc-at-datadog/?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">Datadog</a>)</td>
+          <td>给客户端通道设置 keepalive 时间 &amp; 超时（timeout），不要设得太小。</td>
+      </tr>
+      <tr>
+          <td><strong>设置 <code>TCP_USER_TIMEOUT</code></strong></td>
+          <td>可使操作系统在写入数据长时间未被 ACK 时主动断开，从而及时让上层感知异常。Cloudflare 提倡此办法。 (<a href="https://blog.cloudflare.com/when-tcp-sockets-refuse-to-die/?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">The Cloudflare Blog</a>)</td>
+          <td>某些操作系统 / 栈可能不支持 / 对该选项兼容性有限。需要确保你的平台支持。</td>
+          <td>配合 keepalive 使用，使 “探测失败” 更快地被 TCP 栈捕捉。</td>
+      </tr>
+      <tr>
+          <td><strong>定期重建连接（剔除老连接 / 强制重连）</strong></td>
+          <td>即使连接看似正常，也可以定期（例如每 N 分钟）主动关闭旧连接，重新做 DNS 解析或 LB 选路。Datadog 就用 <code>MAX_CONNECTION_AGE</code>。 (<a href="https://www.datadoghq.com/blog/grpc-at-datadog/?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">Datadog</a>)</td>
+          <td>会引入短暂的连接重建开销和可能的抖动；需要平衡重连频率与稳定性。</td>
+          <td>在服务端 / 客户端都支持的情况下加上该策略。</td>
+      </tr>
+      <tr>
+          <td><strong>网络层 / 链路层检测机制（BFD 等）</strong></td>
+          <td>在网络设备层面（交换机 / 路由器）可以更快检测链路故障。BFD 是一个典型协议。 (<a href="https://en.wikipedia.org/wiki/Bidirectional_Forwarding_Detection?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">维基百科</a>)</td>
+          <td>这个方案通常需要网络设备支持、配置能力强；对于端到端用户层程序控制能力有限。</td>
+          <td>如果你在可控网络环境（数据中心 /专有网络）中，可以考虑配合 BFD 等链路级检测。</td>
+      </tr>
+      <tr>
+          <td><strong>监控 &amp; 告警 / 可视化检查</strong></td>
+          <td>即使你有 keepalive / 探测，也要监控 socket 状态（未 ACK 的字节、重试次数等），以便及时预警。Datadog 用 <code>ss</code> 命令查看 TCP 未 ACK 字节。 (<a href="https://www.datadoghq.com/blog/grpc-at-datadog/?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">Datadog</a>)</td>
+          <td>监控本身有开销；如果监控逻辑有误或漏检测，可能不够及时。</td>
+          <td>定期把这些指标纳入你的监控看板（如 “socket 重传次数 / 队列长度 / 重试超时次数”）</td>
+      </tr>
+  </tbody>
+</table>
+<hr>
+<p>如果你愿意的话，我可以根据你用的 <strong>语言 + 框架（例如 Go gRPC / Java gRPC / gRPC-C++）</strong>，给你一个 “在你的技术栈里最优的连接健壮性方案 + 示例配置 + 推荐博客” 的整理。要吗？</p>
+<p>是的，有不少博客 / 技术文章或者官方文档讨论了 gRPC channel 状态、<code>UNAVAILABLE</code> 问题、连接语义 (connectivity semantics) 和如何监控通道状态。下面列几个比较有代表性的，以及你可以进一步阅读的方向：</p>
+<hr>
+<h2 id="-推荐的博客--文章--技术资源">📚 推荐的博客 / 文章 / 技术资源</h2>
+<table>
+  <thead>
+      <tr>
+          <th>名称</th>
+          <th>内容概要</th>
+          <th>价值 / 侧重点</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td><em>A short introduction to Channelz</em></td>
+          <td>介绍 gRPC 的 <code>channelz</code> 调试工具，如何用它观察连接、子通道（subchannels）、流等运行时指标。 (<a href="https://grpc.io/blog/a-short-introduction-to-channelz/?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">gRPC</a>)</td>
+          <td>如果你想在生产环境里动态监控通道状态，这篇是很好的入门</td>
+      </tr>
+      <tr>
+          <td><em>gRPC Connectivity Semantics and API</em></td>
+          <td>官方文档，详细描述 gRPC channel 的状态机（CONNECTING, READY, TRANSIENT_FAILURE, IDLE, SHUTDOWN 等）以及状态变迁的语义。 (<a href="https://grpc.github.io/grpc/core/md_doc_connectivity-semantics-and-api.html?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">grpc.github.io</a>)</td>
+          <td>最基础、权威的语义说明</td>
+      </tr>
+      <tr>
+          <td><em>Lessons learned from running a large gRPC mesh at Datadog</em></td>
+          <td>Datadog 在大规模 gRPC 网络中的经验分享，包括连接管理、失联恢复、keepalive、负载均衡策略等。 (<a href="https://www.datadoghq.com/blog/grpc-at-datadog/?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">Datadog</a>)</td>
+          <td>实战层面的思考，可以借鉴在工程系统中的做法</td>
+      </tr>
+      <tr>
+          <td><em>Keep Python gRPC Client Connection Truly Alive</em>（Jeff Li 的博客）</td>
+          <td>讲述在 Python 客户端里 channel 被垃圾回收或长时间空闲导致 “UNAVAILABLE” 错误的案例，以及如何保持 channel 存活。 (<a href="https://bluesalt.github.io/blog/2017/08/02/keep-python-grpc-client-connection-truly-alive?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">bluesalt.github.io</a>)</td>
+          <td>对于 Python 客户端特别实用</td>
+      </tr>
+      <tr>
+          <td><em>Trying to connect an http1.x server — gRPC error</em></td>
+          <td>分析 “UNAVAILABLE: Trying to connect an http1.x server” 错误，指出可能是因为通过 HTTP 代理或服务器不支持 HTTP/2 导致的兼容问题。 (<a href="https://putridparrot.com/blog/the-unavailable-trying-to-connect-an-http1-x-server-grpc-error/?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">putridparrot.com</a>)</td>
+          <td>在复杂网络 / 代理 / 协议环境下可能遇到这种错误，这篇能提供诊断方向</td>
+      </tr>
+      <tr>
+          <td><em>Channel State Does Not Change（grpc-node issue）</em></td>
+          <td>虽然是 issue 而不是传统博客，但讨论当网络断开时 channel 状态不更新的问题，也就是状态检测的局限性。 (<a href="https://github.com/grpc/grpc-node/issues/745?utm_source=chatgpt.com" target="_blank" rel="noopener noreffer ">GitHub</a>)</td>
+          <td>提醒你“状态”并不总是能即时反映真实网络断开</td>
+      </tr>
+  </tbody>
+</table>
+<hr>
+<p>如果你愿意的话，我可以挑几篇比较贴近你使用的语言 / 框架（Java, Go, Python, etc.）的博客给你。要吗？</p>
+</div><div class="post-footer" id="post-footer">
+    <div class="post-info">
+        <div class="post-info-line">
+            <div class="post-info-mod">
+                <span>Updated on 2025-10-12</span>
+            </div></div>
+        <div class="post-info-line">
+            <div class="post-info-md"><span>
+                            <a class="link-to-markdown" href="/posts/grpc-client-connection/index.md" target="_blank">Read Markdown</a>
+                        </span></div>
+            <div class="post-info-share">
+                <span><a href="javascript:void(0);" title="Share on X" data-sharer="x" data-url="http://example.org/posts/grpc-client-connection/" data-title="Grpc Client Connection"><i class="fab fa-x-twitter fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Threads" data-sharer="threads" data-url="http://example.org/posts/grpc-client-connection/" data-title="Grpc Client Connection"><i class="fab fa-threads fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Facebook" data-sharer="facebook" data-url="http://example.org/posts/grpc-client-connection/"><i class="fab fa-facebook-square fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Hacker News" data-sharer="hackernews" data-url="http://example.org/posts/grpc-client-connection/" data-title="Grpc Client Connection"><i class="fab fa-hacker-news fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Line" data-sharer="line" data-url="http://example.org/posts/grpc-client-connection/" data-title="Grpc Client Connection"><i data-svg-src="https://cdn.jsdelivr.net/npm/simple-icons@14.9.0/icons/line.svg" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on 微博" data-sharer="weibo" data-url="http://example.org/posts/grpc-client-connection/" data-title="Grpc Client Connection"><i class="fab fa-weibo fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Diaspora" data-sharer="diaspora" data-url="http://example.org/posts/grpc-client-connection/" data-title="Grpc Client Connection" data-description=""><i class="fab fa-diaspora fa-fw" aria-hidden="true"></i></a><a href="https://t.me/share/url?url=http%3a%2f%2fexample.org%2fposts%2fgrpc-client-connection%2f&amp;text=Grpc%20Client%20Connection" target="_blank" title="Share on Telegram"><i class="fab fa-telegram fa-fw" aria-hidden="true"></i></a></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="post-info-more">
+        <section class="post-tags"></section>
+        <section>
+            <span><a href="javascript:void(0);" onclick="window.history.back();">Back</a></span>&nbsp;|&nbsp;<span><a href="/">Home</a></span>
+        </section>
+    </div>
+
+    <div class="post-nav"><a href="/posts/direct-memory-in-practice/" class="prev" rel="prev" title="直接内存实战"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>直接内存实战</a>
+            <a href="/posts/grpc-keepalive/" class="next" rel="next" title="Grpc Keepalive">Grpc Keepalive<i class="fas fa-angle-right fa-fw" aria-hidden="true"></i></a></div>
+</div>
+<div id="comments"><div id="utterances" class="comment"></div><noscript>
+                Please enable JavaScript to view the comments powered by <a href="https://utteranc.es/">utterances</a>.
+            </noscript></div></article></div>
+            </main><footer class="footer">
+        <div class="footer-container"><div class="footer-line">Powered by <a href="https://gohugo.io/" target="_blank" rel="noopener noreffer" title="Hugo 0.140.2">Hugo</a> | Theme - <a href="https://github.com/dillonzq/LoveIt" target="_blank" rel="noopener noreffer" title="LoveIt 0.3.1-DEV"><i class="far fa-kiss-wink-heart fa-fw" aria-hidden="true"></i> LoveIt</a>
+                </div><div class="footer-line" itemscope itemtype="http://schema.org/CreativeWork"><i class="far fa-copyright fa-fw" aria-hidden="true"></i><span itemprop="copyrightYear">2022 - 2026</span><span class="author" itemprop="copyrightHolder">&nbsp;<a href="/" target="_blank">xxxx</a></span></div>
+        </div>
+    </footer></div>
+
+        <div id="fixed-buttons"><a href="#" id="back-to-top" class="fixed-button" title="Back to Top">
+                <i class="fas fa-arrow-up fa-fw" aria-hidden="true"></i>
+            </a>
+        </div>
+
+        <div id="fixed-buttons-hidden"><a href="#" id="view-comments" class="fixed-button" title="View Comments">
+                <i class="fas fa-comment fa-fw" aria-hidden="true"></i>
+            </a>
+        </div><script src="https://cdn.jsdelivr.net/npm/autocomplete.js@0.38.1/dist/autocomplete.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lunr@2.3.9/lunr.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lazysizes@5.3.2/lazysizes.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js"></script><script src="https://cdn.jsdelivr.net/npm/sharer.js@0.5.2/sharer.min.js"></script><script>window.config={"comment":{"utterances":{"darkTheme":"github-dark","issueTerm":"pathname","label":"","lightTheme":"github-light","repo":"ShadowUnderMoon/ShadowUnderMoon.github.io"}},"search":{"highlightTag":"em","lunrIndexURL":"/index.json","maxResultLength":10,"noResultsFound":"No results found","snippetLength":50,"type":"lunr"}};</script><script src="/js/theme.min.js"></script></body>
+</html>

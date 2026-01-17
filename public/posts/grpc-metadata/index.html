@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noodp" />
+        <title>gRPC元数据 - 爱吃芒果</title><meta name="Description" content="This is my cool site"><meta property="og:url" content="http://example.org/posts/grpc-metadata/">
+  <meta property="og:site_name" content="爱吃芒果">
+  <meta property="og:title" content="gRPC元数据">
+  <meta property="og:description" content="Metadata是关于某个特定RPC调用的信息，grpc元数据通过HTTP/2 header实现，它以键值对的形式存在，其中键是字符串，值通常是字符串，但也可以是二进制数据。键不区分大小写，由ASCII字母、数字和特殊字符-、_、.组成，但不能以grpc-开头（该前缀保留给gRPC使用），二进制数据对应的key以-bin结尾，而ASCII类型的键不带-bin后缀。">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-08-02T17:15:19+08:00">
+    <meta property="article:modified_time" content="2025-08-02T17:15:19+08:00">
+    <meta property="article:tag" content="Grpc">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="gRPC元数据">
+  <meta name="twitter:description" content="Metadata是关于某个特定RPC调用的信息，grpc元数据通过HTTP/2 header实现，它以键值对的形式存在，其中键是字符串，值通常是字符串，但也可以是二进制数据。键不区分大小写，由ASCII字母、数字和特殊字符-、_、.组成，但不能以grpc-开头（该前缀保留给gRPC使用），二进制数据对应的key以-bin结尾，而ASCII类型的键不带-bin后缀。">
+<meta name="application-name" content="My cool site">
+<meta name="apple-mobile-web-app-title" content="My cool site">
+<meta name="referrer" content="no-referrer" /><meta name="theme-color" content="#ffffff"><meta name="msapplication-TileColor" content="#da532c"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/grpc-metadata/" /><link rel="prev" href="http://example.org/posts/grpc-interceptors/" /><link rel="next" href="http://example.org/posts/direct-memory-in-practice/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css"></noscript><link rel="preload" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css"></noscript><script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "headline": "gRPC元数据",
+        "inLanguage": "zh-CN",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "http:\/\/example.org\/posts\/grpc-metadata\/"
+        },"genre": "posts","keywords": "gRPC","wordcount":  1287 ,
+        "url": "http:\/\/example.org\/posts\/grpc-metadata\/","datePublished": "2025-08-02T17:15:19+08:00","dateModified": "2025-08-02T17:15:19+08:00","publisher": {
+            "@type": "Organization",
+            "name": ""},"author": {
+                "@type": "Person",
+                "name": "爱吃芒果"
+            },"description": ""
+    }
+    </script></head>
+    <body data-header-desktop="fixed" data-header-mobile="auto"><script>(window.localStorage && localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : ('auto' === 'auto' ? window.matchMedia('(prefers-color-scheme: dark)').matches : 'auto' === 'dark')) && document.body.setAttribute('theme', 'dark');</script>
+
+        <div id="mask"></div><div class="wrapper"><header class="desktop" id="header-desktop">
+    <div class="header-wrapper">
+        <div class="header-title">
+            <a href="/" title="爱吃芒果">My cool site</a>
+        </div>
+        <div class="menu">
+            <div class="menu-inner"><a class="menu-item" href="/posts/"> 文章 </a><a class="menu-item" href="/page/archives/" title="Archives"> Archives </a><a class="menu-item" href="/tags/"> 标签 </a><a class="menu-item" href="/page/search/" title="Search"> Search </a><a class="menu-item" href="/categories/"> 分类 </a><span class="menu-item delimiter"></span><span class="menu-item search" id="search-desktop">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-desktop">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-desktop" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-desktop" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-desktop">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </span><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                    <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+                </a></div>
+        </div>
+    </div>
+</header><header class="mobile" id="header-mobile">
+    <div class="header-container">
+        <div class="header-wrapper">
+            <div class="header-title">
+                <a href="/" title="爱吃芒果">My cool site</a>
+            </div>
+            <div class="menu-toggle" id="menu-toggle-mobile">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div class="menu" id="menu-mobile"><div class="search-wrapper">
+                    <div class="search mobile" id="search-mobile">
+                        <input type="text" placeholder="Search titles or contents..." id="search-input-mobile">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-mobile" title="Search">
+                            <i class="fas fa-search fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-mobile" title="Clear">
+                            <i class="fas fa-times-circle fa-fw" aria-hidden="true"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-mobile">
+                            <i class="fas fa-spinner fa-fw fa-spin" aria-hidden="true"></i>
+                        </span>
+                    </div>
+                    <a href="javascript:void(0);" class="search-cancel" id="search-cancel-mobile">
+                        Cancel
+                    </a>
+                </div><a class="menu-item" href="/posts/" title="">文章</a><a class="menu-item" href="/page/archives/" title="Archives">Archives</a><a class="menu-item" href="/tags/" title="">标签</a><a class="menu-item" href="/page/search/" title="Search">Search</a><a class="menu-item" href="/categories/" title="">分类</a><a href="javascript:void(0);" class="menu-item theme-switch" title="Switch Theme">
+                <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+            </a></div>
+    </div>
+</header><div class="search-dropdown desktop">
+        <div id="search-dropdown-desktop"></div>
+    </div>
+    <div class="search-dropdown mobile">
+        <div id="search-dropdown-mobile"></div>
+    </div><main class="main">
+                <div class="container"><div class="toc" id="toc-auto">
+            <h2 class="toc-title">Contents</h2>
+            <div class="toc-content" id="toc-content-auto"></div>
+        </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">gRPC元数据</h1><div class="post-meta">
+            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/grpc/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Grpc</a></span></div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2025-08-02">2025-08-02</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;1287 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;3 minutes&nbsp;</div>
+        </div><div class="details toc" id="toc-static"  data-kept="">
+                <div class="details-summary toc-title">
+                    <span>Contents</span>
+                    <span><i class="details-icon fas fa-angle-right" aria-hidden="true"></i></span>
+                </div>
+                <div class="details-content toc-content" id="toc-content-static"><nav id="TableOfContents"></nav></div>
+            </div><div class="content" id="content"><p>Metadata是关于某个特定RPC调用的信息，grpc元数据通过HTTP/2 header实现，它以键值对的形式存在，其中键是字符串，值通常是字符串，但也可以是二进制数据。键不区分大小写，由ASCII字母、数字和特殊字符<code>-</code>、<code>_</code>、<code>.</code>组成，但不能以<code>grpc-</code>开头（该前缀保留给gRPC使用），二进制数据对应的key以<code>-bin</code>结尾，而ASCII类型的键不带<code>-bin</code>后缀。</p>
+<p>grpc的metadata可以由客户端和服务端双方发送和接收，Headers（首部信息）：在RPC调用中，客户端在发送初始请求之前会将headers发送给服务端，而服务端在发送初始响应之前，也会将headers发送给客户端。Trailers（尾部信息）：当服务端关闭某个RPC时，会发送trailers给客户端。Headers是RPC开始时的metadata，类似于HTTP请求、响应的头部，Trailers是RPC结束时的metadata，常用于传递状态码或错误信息。grpc使用HTTP/2作为底层协议，这种机制借用了HTTP/2的header/trailer概念。</p>
+<p>用户自定义的metadata不会被gRPC使用，这允许客户端向服务端提供与调用有关的信息，反之亦然。对metadata的访问方式取决于具体的编程语言。</p>
+<p>元数据的使用场景：</p>
+<ul>
+<li>验证证书</li>
+<li>跟踪信息（tracing）</li>
+<li>自定义header（负载均衡、速率控制、错误信息）</li>
+<li>其他应用相关的信息，依赖于在rpc负载之前或者之后发送的数据</li>
+</ul>
+<p>元数据的限制：</p>
+<ul>
+<li>非流量控制，要求用户自定义的限制，GRPC_ARG_MAX_METADATA_SIZE控制单个请求被允许的元数据大小，如果请求的元数据大小超过限制，请求会被拒绝</li>
+</ul>
+<p>**不一致的metadata限制:**请求的元数据大小小于服务器的限制，但却被拒绝，提供了<code>metadata limit exceeded</code>的错误信息。代理配置了一个更小的元数据限制，所以导致请求压根没有到服务器，直接被拒绝。通过为所有的代理配置全局的元数据限制，客户端和服务端都不应该超过这个限制，如果它们期望请求能够通过这些代理。</p>
+<p>另外，如果代理新增一些元数据，也可能导致最终到达服务器的请求元数据超限，导致请求被拒绝。</p>
+<p>**全部请求被拒绝：**如果新的metadata元素被添加到请求，恰好超过了对端允许的metadata大小限制，请求会被拒绝，如果某个客户端的所有请求都发生了这种情况，则所有请求都会被拒绝，在最坏情况下导致系统完全不可用。</p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="/posts/grpc-metadata/image-20250802175452930.png"
+        data-srcset="/posts/grpc-metadata/image-20250802175452930.png, /posts/grpc-metadata/image-20250802175452930.png 1.5x, /posts/grpc-metadata/image-20250802175452930.png 2x"
+        data-sizes="auto"
+        alt="/posts/grpc-metadata/image-20250802175452930.png"
+        title="image-20250802175452930" width="2556" height="720" /></p>
+<p>引入两层限制，软限制和硬限制，在两个限制之间随机拒绝一些请求，随着元数据大小的增加请求被拒绝的概率提升，从而让客户有机会注意到增长的元数据超限报错，避免完全不可用。</p>
+<p>要点：</p>
+<ul>
+<li>
+<p>保证元数据软限制和硬限制的一致性，并且意识到客户端和服务端之间元数据的限制，包括代理</p>
+</li>
+<li>
+<p>监控增长的<code>RESOURCE_EXHAUSTED</code>错误，可能表示元数据超限</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="nl">RESOURCE_EXHAUSTED</span><span class="p">:</span><span class="w"> </span><span class="n">received</span><span class="w"> </span><span class="n">metadata</span><span class="w"> </span><span class="n">size</span><span class="w"> </span><span class="n">exceeds</span><span class="w"> </span><span class="n">soft</span><span class="w"> </span><span class="nf">limit</span><span class="w"> </span><span class="p">(</span><span class="n">15000</span><span class="w"> </span><span class="n">vs</span><span class="w"> </span><span class="n">8192</span><span class="p">);</span><span class="w"> </span><span class="p">:</span><span class="n">path</span><span class="p">:</span><span class="n">50B</span><span class="w"> </span><span class="p">:</span><span class="n">authority</span><span class="p">:</span><span class="n">100B</span></span></span></code></pre></div></div>
+</li>
+<li>
+<p>使用GRPC_ARG_MAX_METADATA_SIZE设置软限制（默认8KB），GRPC_ARG_ABSOLUTE_MAX_METADATA_SIZE设置硬限制（默认16KB）</p>
+</li>
+</ul>
+</div><div class="post-footer" id="post-footer">
+    <div class="post-info">
+        <div class="post-info-line">
+            <div class="post-info-mod">
+                <span>Updated on 2025-08-02</span>
+            </div></div>
+        <div class="post-info-line">
+            <div class="post-info-md"><span>
+                            <a class="link-to-markdown" href="/posts/grpc-metadata/index.md" target="_blank">Read Markdown</a>
+                        </span></div>
+            <div class="post-info-share">
+                <span><a href="javascript:void(0);" title="Share on X" data-sharer="x" data-url="http://example.org/posts/grpc-metadata/" data-title="gRPC元数据" data-hashtags="gRPC"><i class="fab fa-x-twitter fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Threads" data-sharer="threads" data-url="http://example.org/posts/grpc-metadata/" data-title="gRPC元数据"><i class="fab fa-threads fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Facebook" data-sharer="facebook" data-url="http://example.org/posts/grpc-metadata/" data-hashtag="gRPC"><i class="fab fa-facebook-square fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Hacker News" data-sharer="hackernews" data-url="http://example.org/posts/grpc-metadata/" data-title="gRPC元数据"><i class="fab fa-hacker-news fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Line" data-sharer="line" data-url="http://example.org/posts/grpc-metadata/" data-title="gRPC元数据"><i data-svg-src="https://cdn.jsdelivr.net/npm/simple-icons@14.9.0/icons/line.svg" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on 微博" data-sharer="weibo" data-url="http://example.org/posts/grpc-metadata/" data-title="gRPC元数据"><i class="fab fa-weibo fa-fw" aria-hidden="true"></i></a><a href="javascript:void(0);" title="Share on Diaspora" data-sharer="diaspora" data-url="http://example.org/posts/grpc-metadata/" data-title="gRPC元数据" data-description=""><i class="fab fa-diaspora fa-fw" aria-hidden="true"></i></a><a href="https://t.me/share/url?url=http%3a%2f%2fexample.org%2fposts%2fgrpc-metadata%2f&amp;text=gRPC%e5%85%83%e6%95%b0%e6%8d%ae" target="_blank" title="Share on Telegram"><i class="fab fa-telegram fa-fw" aria-hidden="true"></i></a></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="post-info-more">
+        <section class="post-tags"><i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/grpc/">Grpc</a></section>
+        <section>
+            <span><a href="javascript:void(0);" onclick="window.history.back();">Back</a></span>&nbsp;|&nbsp;<span><a href="/">Home</a></span>
+        </section>
+    </div>
+
+    <div class="post-nav"><a href="/posts/grpc-interceptors/" class="prev" rel="prev" title="grpc拦截器"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>grpc拦截器</a>
+            <a href="/posts/direct-memory-in-practice/" class="next" rel="next" title="直接内存实战">直接内存实战<i class="fas fa-angle-right fa-fw" aria-hidden="true"></i></a></div>
+</div>
+<div id="comments"><div id="utterances" class="comment"></div><noscript>
+                Please enable JavaScript to view the comments powered by <a href="https://utteranc.es/">utterances</a>.
+            </noscript></div></article></div>
+            </main><footer class="footer">
+        <div class="footer-container"><div class="footer-line">Powered by <a href="https://gohugo.io/" target="_blank" rel="noopener noreffer" title="Hugo 0.140.2">Hugo</a> | Theme - <a href="https://github.com/dillonzq/LoveIt" target="_blank" rel="noopener noreffer" title="LoveIt 0.3.1-DEV"><i class="far fa-kiss-wink-heart fa-fw" aria-hidden="true"></i> LoveIt</a>
+                </div><div class="footer-line" itemscope itemtype="http://schema.org/CreativeWork"><i class="far fa-copyright fa-fw" aria-hidden="true"></i><span itemprop="copyrightYear">2022 - 2026</span><span class="author" itemprop="copyrightHolder">&nbsp;<a href="/" target="_blank">xxxx</a></span></div>
+        </div>
+    </footer></div>
+
+        <div id="fixed-buttons"><a href="#" id="back-to-top" class="fixed-button" title="Back to Top">
+                <i class="fas fa-arrow-up fa-fw" aria-hidden="true"></i>
+            </a>
+        </div>
+
+        <div id="fixed-buttons-hidden"><a href="#" id="view-comments" class="fixed-button" title="View Comments">
+                <i class="fas fa-comment fa-fw" aria-hidden="true"></i>
+            </a>
+        </div><script src="https://cdn.jsdelivr.net/npm/autocomplete.js@0.38.1/dist/autocomplete.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lunr@2.3.9/lunr.min.js"></script><script src="https://cdn.jsdelivr.net/npm/lazysizes@5.3.2/lazysizes.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js"></script><script src="https://cdn.jsdelivr.net/npm/sharer.js@0.5.2/sharer.min.js"></script><script>window.config={"comment":{"utterances":{"darkTheme":"github-dark","issueTerm":"pathname","label":"","lightTheme":"github-light","repo":"ShadowUnderMoon/ShadowUnderMoon.github.io"}},"search":{"highlightTag":"em","lunrIndexURL":"/index.json","maxResultLength":10,"noResultsFound":"No results found","snippetLength":50,"type":"lunr"}};</script><script src="/js/theme.min.js"></script></body>
+</html>
