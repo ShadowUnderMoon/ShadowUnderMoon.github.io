@@ -1,5 +1,5 @@
 ---
-title: "Presto的计算流程"
+title: "Presto查询提交流程"
 author: "爱吃芒果"
 description:
 date: "2025-07-09T22:27:56+08:00"
@@ -10,20 +10,17 @@ hidden: false
 comments: true
 draft: false
 tags:
-    - "Presto"
+- Presto
+- Trino
 categories:
     - "Presto"
 ---
 
 
 
-直接从maven仓库下载对应版本的`presto-cli`作为客户端，记得下载`presto-cli-350-executable.jar`版本，否则可能不能直接运行
-
-## 查询的接收、解析和提交
-
 ### 接收SQL查询请求
 
-客户端sql请求作为HTTP POST请求`v1/statement` 被`io.prestosql.dispatcher.QueuedStatementResource#postStatement`处理，生成QueryId，然后将查询加入map中，返回响应报文给客户端。
+客户端首先发送HTTP请求`v1/statement`将待查询的sql发送给集群协调节点， 交由`io.prestosql.dispatcher.QueuedStatementResource#postStatement`处理，生成QueryId，然后将查询加入待执行队列中，返回响应报文给客户端，响应报文中包含了下一次客户端应该访问的URI，即`/v1/statement/queued`。
 
 ```java
 public Response postStatement(
@@ -52,12 +49,44 @@ public Response postStatement(
 }
 ```
 
-之后客户端会发起第二次HTTP请求`queued/{queryId}/{slug}/{token}`，Presto此时才会真正将查询提交到DispatchManager::createQueryInternal来执行。
-
-
+产生的QueryId的格式为`YYYYMMdd_HHmmss_index_coordId`，分别表示当前时间戳、查询计数和协调节点id。
 
 ```java
-// TODO: 这段异步处理的逻辑后面再看
+// io.prestosql.execution.QueryIdGenerator#createNextQueryId
+public synchronized QueryId createNextQueryId()
+{
+    // only generate 100,000 ids per day
+    if (counter > 99_999) {
+        // wait for the second to rollover
+        while (MILLISECONDS.toSeconds(nowInMillis()) == lastTimeInSeconds) {
+            Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
+        }
+        counter = 0;
+    }
+
+    // if it has been a second since the last id was generated, generate a new timestamp
+    long now = nowInMillis();
+    if (MILLISECONDS.toSeconds(now) != lastTimeInSeconds) {
+        // generate new timestamp
+        lastTimeInSeconds = MILLISECONDS.toSeconds(now);
+        lastTimestamp = TIMESTAMP_FORMAT.print(now);
+
+        // if the day has rolled over, restart the counter
+        if (MILLISECONDS.toDays(now) != lastTimeInDays) {
+            lastTimeInDays = MILLISECONDS.toDays(now);
+            counter = 0;
+        }
+    }
+
+    return new QueryId(format("%s_%05d_%s", lastTimestamp, counter++, coordinatorId));
+}
+```
+
+
+
+之后客户端会发起第二次HTTP请求`queued/{queryId}/{slug}/{token}`，slug和token只是Presto用来验证接收到的请求是否是合法的，slug在生成后就不会变，token在生成nextURI的逻辑中每次会+1，Presto此时才会真正将查询提交到DispatchManager::createQueryInternal来执行。
+
+```java
 @ResourceSecurity(PUBLIC)
 @GET
 @Path("queued/{queryId}/{slug}/{token}")
@@ -97,10 +126,6 @@ public void getStatus(
 
 
 ```java
-/**
- * Creates and registers a dispatch query with the query tracker.  This method will never fail to register a query with the query
- * tracker.  If an error occurs while creating a dispatch query, a failed dispatch will be created and registered.
- */
 private <C> void createQueryInternal(QueryId queryId, Slug slug, SessionContext sessionContext, String query, ResourceGroupManager<C> resourceGroupManager)
 {
     Session session = null;
@@ -122,7 +147,7 @@ private <C> void createQueryInternal(QueryId queryId, Slug slug, SessionContext 
         // sql解析，生成抽象语法树
         preparedQuery = queryPreparer.prepareQuery(session, query);
 
-        // select resource group
+        // 选择Query并执行对应的ResourceGroup
         Optional<String> queryType = getQueryType(preparedQuery.getStatement().getClass()).map(Enum::name);
         SelectionContext<C> selectionContext = resourceGroupManager.selectGroup(new SelectionCriteria(
                 sessionContext.getIdentity().getPrincipal().isPresent(),
@@ -139,6 +164,7 @@ private <C> void createQueryInternal(QueryId queryId, Slug slug, SessionContext 
         // mark existing transaction as active
         transactionManager.activateTransaction(session, isTransactionControlStatement(preparedQuery.getStatement()), accessControl);
 
+      	// 生成DispatchQuery
         DispatchQuery dispatchQuery = dispatchQueryFactory.createDispatchQuery(
                 session,
                 query,
@@ -146,6 +172,7 @@ private <C> void createQueryInternal(QueryId queryId, Slug slug, SessionContext 
                 slug,
                 selectionContext.getResourceGroupId());
 
+      	// 向ResourceGroupManager提交查询请求并执行
         boolean queryAdded = queryCreated(dispatchQuery);
         if (queryAdded && !dispatchQuery.isDone()) {
             try {
@@ -173,93 +200,11 @@ private <C> void createQueryInternal(QueryId queryId, Slug slug, SessionContext 
 }
 ```
 
-`sessionSpplier.createSession`创建了查询会话，设置了各种状态和信息。
-
-```java
-public Session createSession(QueryId queryId, SessionContext context)
-{
-    Identity identity = context.getIdentity();
-    accessControl.checkCanSetUser(identity.getPrincipal(), identity.getUser());
-
-    // authenticated identity is not present for HTTP or if authentication is not setup
-    context.getAuthenticatedIdentity().ifPresent(authenticatedIdentity -> {
-        // only check impersonation if authenticated user is not the same as the explicitly set user
-        if (!authenticatedIdentity.getUser().equals(identity.getUser())) {
-            accessControl.checkCanImpersonateUser(authenticatedIdentity, identity.getUser());
-        }
-    });
-
-    SessionBuilder sessionBuilder = Session.builder(sessionPropertyManager)
-            .setQueryId(queryId)
-            .setIdentity(identity)
-            .setSource(context.getSource())
-            .setPath(new SqlPath(path))
-            .setRemoteUserAddress(context.getRemoteUserAddress())
-            .setUserAgent(context.getUserAgent())
-            .setClientInfo(context.getClientInfo())
-            .setClientTags(context.getClientTags())
-            .setClientCapabilities(context.getClientCapabilities())
-            .setTraceToken(context.getTraceToken())
-            .setResourceEstimates(context.getResourceEstimates());
-
-    defaultCatalog.ifPresent(sessionBuilder::setCatalog);
-    defaultSchema.ifPresent(sessionBuilder::setSchema);
-
-    if (context.getCatalog() != null) {
-        sessionBuilder.setCatalog(context.getCatalog());
-    }
-
-    if (context.getSchema() != null) {
-        sessionBuilder.setSchema(context.getSchema());
-    }
-
-    if (context.getPath() != null) {
-        sessionBuilder.setPath(new SqlPath(Optional.of(context.getPath())));
-    }
-
-    if (forcedSessionTimeZone.isPresent()) {
-        sessionBuilder.setTimeZoneKey(forcedSessionTimeZone.get());
-    }
-    else if (context.getTimeZoneId() != null) {
-        sessionBuilder.setTimeZoneKey(getTimeZoneKey(context.getTimeZoneId()));
-    }
-
-    if (context.getLanguage() != null) {
-        sessionBuilder.setLocale(Locale.forLanguageTag(context.getLanguage()));
-    }
-
-    for (Entry<String, String> entry : context.getSystemProperties().entrySet()) {
-        sessionBuilder.setSystemProperty(entry.getKey(), entry.getValue());
-    }
-    for (Entry<String, Map<String, String>> catalogProperties : context.getCatalogSessionProperties().entrySet()) {
-        String catalog = catalogProperties.getKey();
-        for (Entry<String, String> entry : catalogProperties.getValue().entrySet()) {
-            sessionBuilder.setCatalogSessionProperty(catalog, entry.getKey(), entry.getValue());
-        }
-    }
-
-    for (Entry<String, String> preparedStatement : context.getPreparedStatements().entrySet()) {
-        sessionBuilder.addPreparedStatement(preparedStatement.getKey(), preparedStatement.getValue());
-    }
-
-    if (context.supportClientTransaction()) {
-        sessionBuilder.setClientTransactionSupport();
-    }
-
-    Session session = sessionBuilder.build();
-    if (context.getTransactionId().isPresent()) {
-        session = session.beginTransactionId(context.getTransactionId().get(), transactionManager, accessControl);
-    }
-
-    return session;
-}
-```
-
 ### 词法与语法分析并生成抽象语法树
 
 SqlParser使用Antlr4作为解析工具，通过词法和语法解析通过SQL字符串生成抽象语法树。抽象语法树是用一种树形结构表示SQL想要表述的语义，将一段SQL字符串结构化，以支持SQL执行引擎根据抽象语法树生成SQL执行计划。在Presto中，Node表示树的节点的抽象，根据语义不同，SQL抽象语法树中有多种不同类型的节点，都继承了Node节点。
 
-抽象语法树在我看来只是将字符串转成结构更加严谨的树状结构，和sql的文本表述类似，除了将文本转成树状结构外，没有做额外的操作，比如FunctionCall并没有真的生成调用的函数，而只是描述。
+抽象语法树在我看来只是将字符串转成结构更加严谨的树状结构，和sql的文本表述类似，除了将文本转成树状结构外，没有做额外的操作，比如FunctionCall并没有真的生成调用的函数，而只是描述，这一步最终会生成一个用Statement表示的根的抽象语法树。
 
 ```java
 public class FunctionCall
@@ -280,130 +225,9 @@ public class FunctionCall
 
 `dispatchQueryFactory.createDispatchQuery`方法在执行中，会根据Statement的类型生成QueryExecution，对于DML操作(Data Manipulatioin language)生成SqlQueryExecution，对于DDL (Data Definition language)生成DataDefinitionExecution，然后进一步包装成LocalDispatchQuery，提交到resourceGroupManager等待运行。
 
-```java
-public void start()
-{
-    try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
-        try {
-            if (!stateMachine.transitionToPlanning()) {
-                // query already started or finished
-                return;
-            }
-						// 生成逻辑执行计划，此方法进一步调用了doPlanQuery
-            PlanRoot plan = planQuery();
-            // DynamicFilterService needs plan for query to be registered.
-            // Query should be registered before dynamic filter suppliers are requested in distribution planning.
-            registerDynamicFilteringQuery(plan);
-          	// 生成数据源连接器的ConnectorSplitSource，创建SqlStageExecution(Stage)，指定StageScheduler
-            planDistribution(plan);
+resourceGroup应该是Presto用来支持资源隔离的方法，如果某个组内cpu或者内存资源不足，则会等待资源可用或者超时失败。`io.prestosql.execution.resourcegroups.InternalResourceGroup#canRunMore`会根据资源组对cpu和内存的限制决定当前查询是否可以执行，`io.prestosql.dispatcher.LocalDispatchQuery#waitForMinimumWorkers`等待获取需要的worker数量。
 
-            if (!stateMachine.transitionToStarting()) {
-                // query already started or finished
-                return;
-            }
-
-            // if query is not finished, start the scheduler, otherwise cancel it
-            SqlQueryScheduler scheduler = queryScheduler.get();
-						// 查询执行阶段的调度，根据执行计划将任务调度到Presto查询执行节点上
-            if (!stateMachine.isDone()) {
-                scheduler.start();
-            }
-        }
-        catch (Throwable e) {
-            fail(e);
-            throwIfInstanceOf(e, Error.class);
-        }
-    }
-}
-```
-
-## 执行计划的生成和优化
-
-### 语义分析、生成执行计划
-
-```java
-private PlanRoot doPlanQuery()
-{
-    // planNodeId是一个从0递增的int值
-    PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
-    LogicalPlanner logicalPlanner = new LogicalPlanner(stateMachine.getSession(),
-            planOptimizers,
-            idAllocator,
-            metadata,
-            typeOperators,
-            new TypeAnalyzer(sqlParser, metadata),
-            statsCalculator,
-            costCalculator,
-            stateMachine.getWarningCollector());
-  	// 语义分析(Analysis)，生成执行计划
-  	// 优化执行计划，生成优化后的执行计划
-    Plan plan = logicalPlanner.plan(analysis);
-    queryPlan.set(plan);
-
-    // 将逻辑执行计划分成多棵子树
-    SubPlan fragmentedPlan = planFragmenter.createSubPlans(stateMachine.getSession(), plan, false, stateMachine.getWarningCollector());
-
-    // extract inputs
-    List<Input> inputs = new InputExtractor(metadata, stateMachine.getSession()).extractInputs(fragmentedPlan);
-    stateMachine.setInputs(inputs);
-
-    stateMachine.setOutput(analysis.getTarget());
-
-    boolean explainAnalyze = analysis.getStatement() instanceof Explain && ((Explain) analysis.getStatement()).isAnalyze();
-    return new PlanRoot(fragmentedPlan, !explainAnalyze);
-}
-```
-
-LogicalPlanner.plan的职责如下：
-
-- 语义分析：遍历SQL抽象语法树，将抽象语法树中表达的含义拆解为多个map结构，以便后续生成执行计划时，不再频繁遍历SQL抽象语法树。同时获取了表和字段的元数据，生成了对应的ConnectorTableHandle、ColumnHandle等与数据源连接器相关的对象实例，为了之后拿来即用打下基础。在此过程中生成的所有对象，都维护在一个实例化的Analysis对象，Analysis对象可以理解为一个Context对象
-- 生成执行计划：生成以PlanNode为节点的逻辑执行计划，它也是类似于抽象语法树的树型结构，树节点和根的类型都是PlanNode。
-- 优化执行计划，生成优化后的执行计划：用预定义的几百个优化器迭代优化之前生成的PlanNode树，并返回优化后的PlanNode树
-
-```java
-public Plan plan(Analysis analysis, Stage stage, boolean collectPlanStatistics)
-{
-  	// 语义分析，生成执行计划
-    PlanNode root = planStatement(analysis, analysis.getStatement());
-
-    planSanityChecker.validateIntermediatePlan(root, session, metadata, typeOperators, typeAnalyzer, symbolAllocator.getTypes(), warningCollector);
-
-  	// 优化执行计划，生成优化后的执行计划
-    if (stage.ordinal() >= OPTIMIZED.ordinal()) {
-        for (PlanOptimizer optimizer : planOptimizers) {
-            root = optimizer.optimize(root, session, symbolAllocator.getTypes(), symbolAllocator, idAllocator, warningCollector);
-            requireNonNull(root, format("%s returned a null plan", optimizer.getClass().getName()));
-        }
-    }
-
-    if (stage.ordinal() >= OPTIMIZED_AND_VALIDATED.ordinal()) {
-        // make sure we produce a valid plan after optimizations run. This is mainly to catch programming errors
-        planSanityChecker.validateFinalPlan(root, session, metadata, typeOperators, typeAnalyzer, symbolAllocator.getTypes(), warningCollector);
-    }
-
-    TypeProvider types = symbolAllocator.getTypes();
-
-    StatsAndCosts statsAndCosts = StatsAndCosts.empty();
-    if (collectPlanStatistics) {
-        StatsProvider statsProvider = new CachingStatsProvider(statsCalculator, session, types);
-        CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, Optional.empty(), session, types);
-        statsAndCosts = StatsAndCosts.create(root, statsProvider, costProvider);
-    }
-    return new Plan(root, types, statsAndCosts);
-}
-```
-
-### 将逻辑执行计划树拆分为多棵子树
-
-将逻辑执行计划拆分为多棵子树并生成subPlan的逻辑，这个过程用SimplePlanRewriter的实现类Fragmenter层层遍历上一步生成的PlanNode树，将其中的ExchangeNode[scope=REMOTE]替换为RemoteSourceNode，并且断开它与叶子节点的连接，这样一个PlanNode树就被划分成了两个PlanNode树，一个父树（对应创建一个PlanFragment）和一个子树（又称为SubPlan，对应创建一个PlanFragment）。在查询执行的数据流转中，子树是父树的数据产出上游。
-
-```java
-public class SubPlan
-{
-    private final PlanFragment fragment;
-    private final List<SubPlan> children;
-}
-```
+经过一系列的异步操作（各种Future），代码执行到`SqlQueryExecution.start`方法，该方法串起来执行计划的生成和调度。
 
 ## 执行计划的调度
 

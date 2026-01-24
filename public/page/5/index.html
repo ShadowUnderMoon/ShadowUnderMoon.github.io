@@ -94,6 +94,17 @@
     </div><main class="main">
                 <div class="container"><div class="page home" data-home="posts"><div class="home-profile"><h1 class="home-title">爱吃芒果</h1><div class="home-subtitle"><div id="id-1" class="typeit"></div></div><div class="links"><a href="https://github.com/ShadowUnderMoon" title="GitHub" target="_blank" rel="noopener noreffer me"><i class="fab fa-github fa-fw" aria-hidden="true"></i></a></div></div>
 <article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
+        <a href="/posts/spark_logical_plan/">Spark逻辑处理流程</a>
+    </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-05-11">2025-05-11</time></span>&nbsp;<span class="post-category">included in <a href="/categories/spark/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Spark</a></span></div><div class="content"><p>Spark应用程序需要先转化为逻辑处理流程，逻辑处理流程主要包括：</p>
+<ul>
+<li>RDD数据模型</li>
+<li>数据操作</li>
+<li>数据依赖关系</li>
+</ul>
+<p>数据操作分为两种，<code>transformation</code>操作并不会触发job的实际执行，<code>action</code>操作创建job并立即执行。类似于java中的stream，采用懒加载的方式。</p></div><div class="post-footer">
+        <a href="/posts/spark_logical_plan/">Read More</a><div class="post-tags">
+                <i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/spark/">Spark</a></div></div>
+</article><article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
         <a href="/posts/spark-base/">Spark基础知识</a>
     </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-05-10">2025-05-10</time></span>&nbsp;<span class="post-category">included in <a href="/categories/spark/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Spark</a></span></div><div class="content"><h2 id="rdd数据模型">RDD数据模型</h2>
 <p>RDD （Resilient Distributed DataSet)是spark对计算过程中输入输出数据以及中间数据的抽象，表示不可变、分区的集合数据，可以被并行处理。</p></div><div class="post-footer">
@@ -143,23 +154,6 @@
 <p>我实际使用的编译器为java17，idea会提示配置scala编译器。</p></div><div class="post-footer">
         <a href="/posts/spark_developement_envrionment/">Read More</a><div class="post-tags">
                 <i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/spark/">Spark</a></div></div>
-</article><article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
-        <a href="/posts/spark_memory_manager/">Spark内存管理</a>
-    </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-03-09">2025-03-09</time></span>&nbsp;<span class="post-category">included in <a href="/categories/spark/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Spark</a>&nbsp;<a href="/categories/%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>内存管理</a></span></div><div class="content"><h2 id="关键问题">关键问题</h2>
-<ol>
-<li>
-<p>内存被分成哪些区域，各分区之间的关系是什么，通过什么参数控制</p>
-</li>
-<li>
-<p>内存上报和释放的单位是什么，上报和释放是如何实现的</p>
-</li>
-<li>
-<p>如何避免内存没有释放导致资源泄露</p>
-</li>
-<li>
-<p>如何避免重复上报和漏上报问题</p></div><div class="post-footer">
-        <a href="/posts/spark_memory_manager/">Read More</a><div class="post-tags">
-                <i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/spark/">Spark</a>,&nbsp;<a href="/tags/%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/">内存管理</a></div></div>
 </article><ul class="pagination"><li class="page-item ">
                     <span class="page-link">
                         <a href="/">1</a>

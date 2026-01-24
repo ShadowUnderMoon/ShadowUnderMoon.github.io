@@ -178,7 +178,7 @@
 <p>感觉这里没有必要用<code>memoryMXBean</code>重新获取当前内存占用并判断是否高负载，完全可以使用<code>afterGcDataSize.toBytes()</code>代替。</p>
 <h2 id="高负载后如何恢复">高负载后如何恢复</h2>
 <p>Presto选择杀掉当前worker上占用内存最高的查询，这里的内存占用是说它上报的内存占用，而非实际的内存占用，实际的内存占用除非打dump否则很难获得。</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>

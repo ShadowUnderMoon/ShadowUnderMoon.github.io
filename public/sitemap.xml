@@ -2,15 +2,16 @@
     xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
     xmlns:xhtml="http://www.w3.org/1999/xhtml"
     ><url>
-            <loc>http://example.org/categories/</loc><lastmod>2026-01-17T15:11:35&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/posts/</loc><lastmod>2026-01-17T15:11:35&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/tags/presto/</loc><lastmod>2026-01-17T15:11:35&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/categories/presto/</loc><lastmod>2026-01-17T15:11:35&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/categories/</loc><lastmod>2026-01-24T19:35:06&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/posts/</loc><lastmod>2026-01-24T19:35:06&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/tags/presto/</loc><lastmod>2026-01-24T19:35:06&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/categories/presto/</loc><lastmod>2026-01-24T19:35:06&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/posts/presto-query-plan/</loc><lastmod>2026-01-24T19:35:06&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/tags/</loc><lastmod>2026-01-24T19:35:06&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/tags/trino/</loc><lastmod>2026-01-24T19:35:06&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/categories/trino/</loc><lastmod>2026-01-24T19:35:06&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/</loc><lastmod>2026-01-24T19:35:06&#43;08:00</lastmod></url><url>
             <loc>http://example.org/posts/presto-environment-setup/</loc><lastmod>2026-01-17T15:11:35&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/tags/</loc><lastmod>2026-01-17T15:11:35&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/tags/trino/</loc><lastmod>2026-01-17T15:11:35&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/categories/trino/</loc><lastmod>2026-01-17T15:11:35&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/</loc><lastmod>2026-01-17T15:11:35&#43;08:00</lastmod></url><url>
             <loc>http://example.org/posts/presto-high-memory-task-killer/</loc><lastmod>2026-01-14T16:26:01&#43;08:00</lastmod></url><url>
             <loc>http://example.org/posts/grpc-keepalive/</loc><lastmod>2025-10-19T09:08:02&#43;08:00</lastmod></url><url>
             <loc>http://example.org/posts/grpc-client-connection/</loc><lastmod>2025-10-12T16:55:50&#43;08:00</lastmod></url><url>
@@ -26,7 +27,7 @@
             <loc>http://example.org/posts/foundationdb-in-practice/</loc><lastmod>2025-07-26T17:05:57&#43;08:00</lastmod></url><url>
             <loc>http://example.org/posts/java-log-in-practice/</loc><lastmod>2025-07-22T14:42:40&#43;08:00</lastmod></url><url>
             <loc>http://example.org/posts/trino-filter-project/</loc><lastmod>2025-07-20T09:12:14&#43;08:00</lastmod></url><url>
-            <loc>http://example.org/posts/trino-practice/</loc><lastmod>2025-07-09T22:27:56&#43;08:00</lastmod></url><url>
+            <loc>http://example.org/posts/presto_query_submission/</loc><lastmod>2025-07-09T22:27:56&#43;08:00</lastmod></url><url>
             <loc>http://example.org/posts/file_lock/</loc><lastmod>2025-06-24T21:39:19&#43;08:00</lastmod></url><url>
             <loc>http://example.org/posts/size_of_engine/</loc><lastmod>2025-06-22T20:20:36&#43;08:00</lastmod></url><url>
             <loc>http://example.org/posts/cache-in-practice/</loc><lastmod>2025-06-21T14:01:54&#43;08:00</lastmod></url><url>

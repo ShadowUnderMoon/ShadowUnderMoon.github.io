@@ -3,9 +3,53 @@
         <title>爱吃芒果</title>
         <link>http://example.org/</link>
         <description>This is my cool site</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 17 Jan 2026 15:11:35 &#43;0800</lastBuildDate>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 24 Jan 2026 19:35:06 &#43;0800</lastBuildDate>
             <atom:link href="http://example.org/index.xml" rel="self" type="application/rss+xml" />
         <item>
+    <title>Presto查询计划生成和优化</title>
+    <link>http://example.org/posts/presto-query-plan/</link>
+    <pubDate>Sat, 24 Jan 2026 19:35:06 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://example.org/posts/presto-query-plan/</guid>
+    <description><![CDATA[<h3 id="语义分析生成执行计划">语义分析、生成执行计划</h3>
+<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="kd">private</span><span class="w"> </span><span class="n">PlanRoot</span><span class="w"> </span><span class="nf">doPlanQuery</span><span class="p">()</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// planNodeId是一个从0递增的int值</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">PlanNodeIdAllocator</span><span class="w"> </span><span class="n">idAllocator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">PlanNodeIdAllocator</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">LogicalPlanner</span><span class="w"> </span><span class="n">logicalPlanner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">LogicalPlanner</span><span class="p">(</span><span class="n">stateMachine</span><span class="p">.</span><span class="na">getSession</span><span class="p">(),</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">planOptimizers</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">idAllocator</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">metadata</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">typeOperators</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="k">new</span><span class="w"> </span><span class="n">TypeAnalyzer</span><span class="p">(</span><span class="n">sqlParser</span><span class="p">,</span><span class="w"> </span><span class="n">metadata</span><span class="p">),</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">statsCalculator</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">costCalculator</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">stateMachine</span><span class="p">.</span><span class="na">getWarningCollector</span><span class="p">());</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  	</span><span class="c1">// 语义分析(Analysis)，生成执行计划</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  	</span><span class="c1">// 优化执行计划，生成优化后的执行计划</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">Plan</span><span class="w"> </span><span class="n">plan</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">logicalPlanner</span><span class="p">.</span><span class="na">plan</span><span class="p">(</span><span class="n">analysis</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">queryPlan</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="n">plan</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 将逻辑执行计划分成多棵子树</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">SubPlan</span><span class="w"> </span><span class="n">fragmentedPlan</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">planFragmenter</span><span class="p">.</span><span class="na">createSubPlans</span><span class="p">(</span><span class="n">stateMachine</span><span class="p">.</span><span class="na">getSession</span><span class="p">(),</span><span class="w"> </span><span class="n">plan</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="n">stateMachine</span><span class="p">.</span><span class="na">getWarningCollector</span><span class="p">());</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// extract inputs</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">List</span><span class="o">&lt;</span><span class="n">Input</span><span class="o">&gt;</span><span class="w"> </span><span class="n">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">InputExtractor</span><span class="p">(</span><span class="n">metadata</span><span class="p">,</span><span class="w"> </span><span class="n">stateMachine</span><span class="p">.</span><span class="na">getSession</span><span class="p">()).</span><span class="na">extractInputs</span><span class="p">(</span><span class="n">fragmentedPlan</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">stateMachine</span><span class="p">.</span><span class="na">setInputs</span><span class="p">(</span><span class="n">inputs</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">stateMachine</span><span class="p">.</span><span class="na">setOutput</span><span class="p">(</span><span class="n">analysis</span><span class="p">.</span><span class="na">getTarget</span><span class="p">());</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kt">boolean</span><span class="w"> </span><span class="n">explainAnalyze</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">analysis</span><span class="p">.</span><span class="na">getStatement</span><span class="p">()</span><span class="w"> </span><span class="k">instanceof</span><span class="w"> </span><span class="n">Explain</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="p">((</span><span class="n">Explain</span><span class="p">)</span><span class="w"> </span><span class="n">analysis</span><span class="p">.</span><span class="na">getStatement</span><span class="p">()).</span><span class="na">isAnalyze</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">PlanRoot</span><span class="p">(</span><span class="n">fragmentedPlan</span><span class="p">,</span><span class="w"> </span><span class="o">!</span><span class="n">explainAnalyze</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
+<p>LogicalPlanner.plan的职责如下：</p>]]></description>
+</item>
+<item>
     <title>Presto环境搭建</title>
     <link>http://example.org/posts/presto-environment-setup/</link>
     <pubDate>Sat, 17 Jan 2026 15:11:35 &#43;0800</pubDate>
@@ -97,43 +141,6 @@
 <li>适配层：一般称为adapter，因为接口层和适配层并非都出自一家之手，它们之间无法直接匹配</li>
 </ul>
 <p>适配层有可以分为绑定（binding）和桥接（bridging）两种能力：</p>]]></description>
-</item>
-<item>
-    <title>Presto数据过滤和投影</title>
-    <link>http://example.org/posts/trino-filter-project/</link>
-    <pubDate>Sun, 20 Jul 2025 09:12:14 &#43;0800</pubDate>
-    <author>爱吃芒果</author>
-    <guid>http://example.org/posts/trino-filter-project/</guid>
-    <description><![CDATA[<h2 id="简单拉取数据查询的实现原理">简单拉取数据查询的实现原理</h2>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-sql">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="line"><span class="cl"><span class="k">SELECT</span><span class="w"> </span><span class="n">ss_item_sk</span><span class="p">,</span><span class="w"> </span><span class="n">ss_sales_price</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">FROM</span><span class="w"> </span><span class="n">store_sales</span><span class="p">;</span></span></span></code></pre></div></div>
-<h3 id="执行计划的生成和优化">执行计划的生成和优化</h3>
-<h4 id="初始逻辑执行计划">初始逻辑执行计划</h4>
-<div class="mermaid" id="id-1"></div><p>TableScan节点：负责从数据源连接器拉取数据</p>
-<p>Output节点：逻辑执行计划的根节点，表示输出计算结果，其自身没有计算逻辑</p>
-<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
-    <div class="code-header language-java">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">TableScanNode</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="kd">extends</span><span class="w"> </span><span class="n">PlanNode</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">{</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  	</span><span class="c1">// TableHandle表示的是与当前TableScanNode对应的是数据源存储中的那个类</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">TableHandle</span><span class="w"> </span><span class="n">table</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  	</span><span class="c1">// outputSymbols: TableScanNode输出的symbols列表，在Presto中使用Symbol表示要输出哪些列</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">Symbol</span><span class="o">&gt;</span><span class="w"> </span><span class="n">outputSymbols</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  	</span><span class="c1">// assignments：对于outputSymbols中的每个Symbol，明确其来源于数据源Connector的那个Column（用ColumnHandle表示）</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">Map</span><span class="o">&lt;</span><span class="n">Symbol</span><span class="p">,</span><span class="w"> </span><span class="n">ColumnHandle</span><span class="o">&gt;</span><span class="w"> </span><span class="n">assignments</span><span class="p">;</span><span class="w"> </span><span class="c1">// symbol -&gt; column</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">TupleDomain</span><span class="o">&lt;</span><span class="n">ColumnHandle</span><span class="o">&gt;</span><span class="w"> </span><span class="n">enforcedConstraint</span><span class="p">;</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kt">boolean</span><span class="w"> </span><span class="n">forDelete</span><span class="p">;</span></span></span></code></pre></div></div>
-<p>查询执行时，只要将TableHandle、ColumnHandl交给数据源连接器，它就知道拉取那些表、哪些列的数据，这是一个基本抽象，在考虑到各种下推优化时，这两个概念将发挥更大的作用</p>]]></description>
 </item>
 </channel>
 </rss>

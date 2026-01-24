@@ -87,7 +87,7 @@ classpath为`presto-server-main`，启动类为`io.prestosql.server.PrestoServer
 
 将`coordinator.properties`文件中的`node-scheduler.include-coordinator`设置为`false`，集群协调节点不会执行具体的查询任务
 
-每个查询执行节点的配置类似，比如，可以在项目中创建`presto-server-main/etc/worker1.properties`，内存如下
+每个查询执行节点的配置类似，比如，可以在项目中创建`presto-server-main/etc/worker1.properties`，内容如下
 
 ```properties
 coordinator=false
