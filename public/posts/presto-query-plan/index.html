@@ -7,7 +7,7 @@
         <title>Presto查询计划生成和优化 - 爱吃芒果</title><meta name="Description" content="This is my cool site"><meta property="og:url" content="http://example.org/posts/presto-query-plan/">
   <meta property="og:site_name" content="爱吃芒果">
   <meta property="og:title" content="Presto查询计划生成和优化">
-  <meta property="og:description" content="语义分析、生成执行计划 private PlanRoot doPlanQuery() { // planNodeId是一个从0递增的int值 PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator(); LogicalPlanner logicalPlanner = new LogicalPlanner(stateMachine.getSession(), planOptimizers, idAllocator, metadata, typeOperators, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, stateMachine.getWarningCollector()); // 语义分析(Analysis)，生成执行计划 // 优化执行计划，生成优化后的执行计划 Plan plan = logicalPlanner.plan(analysis); queryPlan.set(plan); // 将逻辑执行计划分成多棵子树 SubPlan fragmentedPlan = planFragmenter.createSubPlans(stateMachine.getSession(), plan, false, stateMachine.getWarningCollector()); // extract inputs List&lt;Input&gt; inputs = new InputExtractor(metadata, stateMachine.getSession()).extractInputs(fragmentedPlan); stateMachine.setInputs(inputs); stateMachine.setOutput(analysis.getTarget()); boolean explainAnalyze = analysis.getStatement() instanceof Explain &amp;&amp; ((Explain) analysis.getStatement()).isAnalyze(); return new PlanRoot(fragmentedPlan, !explainAnalyze); } LogicalPlanner.plan的职责如下：">
+  <meta property="og:description" content="在SqlQueryExecution.doPlanQuery中，从原来的抽象语法树生成逻辑执行计划，然后优化执行计划，生成优化后的执行计划，最后将逻辑执行计划切分成多颗子树。">
   <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="article">
     <meta property="article:section" content="posts">
@@ -18,12 +18,12 @@
 
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Presto查询计划生成和优化">
-  <meta name="twitter:description" content="语义分析、生成执行计划 private PlanRoot doPlanQuery() { // planNodeId是一个从0递增的int值 PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator(); LogicalPlanner logicalPlanner = new LogicalPlanner(stateMachine.getSession(), planOptimizers, idAllocator, metadata, typeOperators, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, stateMachine.getWarningCollector()); // 语义分析(Analysis)，生成执行计划 // 优化执行计划，生成优化后的执行计划 Plan plan = logicalPlanner.plan(analysis); queryPlan.set(plan); // 将逻辑执行计划分成多棵子树 SubPlan fragmentedPlan = planFragmenter.createSubPlans(stateMachine.getSession(), plan, false, stateMachine.getWarningCollector()); // extract inputs List&lt;Input&gt; inputs = new InputExtractor(metadata, stateMachine.getSession()).extractInputs(fragmentedPlan); stateMachine.setInputs(inputs); stateMachine.setOutput(analysis.getTarget()); boolean explainAnalyze = analysis.getStatement() instanceof Explain &amp;&amp; ((Explain) analysis.getStatement()).isAnalyze(); return new PlanRoot(fragmentedPlan, !explainAnalyze); } LogicalPlanner.plan的职责如下：">
+  <meta name="twitter:description" content="在SqlQueryExecution.doPlanQuery中，从原来的抽象语法树生成逻辑执行计划，然后优化执行计划，生成优化后的执行计划，最后将逻辑执行计划切分成多颗子树。">
 <meta name="application-name" content="My cool site">
 <meta name="apple-mobile-web-app-title" content="My cool site">
 <meta name="referrer" content="no-referrer" /><meta name="theme-color" content="#ffffff"><meta name="msapplication-TileColor" content="#da532c"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/presto-query-plan/" /><link rel="prev" href="http://example.org/posts/presto-environment-setup/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/presto-query-plan/" /><link rel="prev" href="http://example.org/posts/presto-environment-setup/" /><link rel="next" href="http://example.org/posts/presto-query-schedule-task/" /><link rel="stylesheet" href="/css/style.min.css"><link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
         <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css"></noscript><link rel="preload" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
         <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css"></noscript><script type="application/ld+json">
     {
@@ -34,7 +34,7 @@
         "mainEntityOfPage": {
             "@type": "WebPage",
             "@id": "http:\/\/example.org\/posts\/presto-query-plan\/"
-        },"genre": "posts","keywords": "Presto, Trino","wordcount":  954 ,
+        },"genre": "posts","keywords": "Presto, Trino","wordcount":  1181 ,
         "url": "http:\/\/example.org\/posts\/presto-query-plan\/","datePublished": "2026-01-24T19:35:06+08:00","dateModified": "2026-01-24T19:35:06+08:00","publisher": {
             "@type": "Organization",
             "name": ""},"author": {
@@ -108,8 +108,8 @@
             <div class="toc-content" id="toc-content-auto"></div>
         </div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">Presto查询计划生成和优化</h1><div class="post-meta">
             <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-category">included in <a href="/categories/presto/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Presto</a>&nbsp;<a href="/categories/trino/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Trino</a></span></div>
-            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2026-01-24">2026-01-24</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;954 words&nbsp;
-                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;2 minutes&nbsp;</div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw" aria-hidden="true"></i>&nbsp;<time datetime="2026-01-24">2026-01-24</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden="true"></i>&nbsp;1181 words&nbsp;
+                <i class="far fa-clock fa-fw" aria-hidden="true"></i>&nbsp;3 minutes&nbsp;</div>
         </div><div class="details toc" id="toc-static"  data-kept="">
                 <div class="details-summary toc-title">
                     <span>Contents</span>
@@ -119,15 +119,14 @@
   <ul>
     <li>
       <ul>
-        <li><a href="#语义分析生成执行计划">语义分析、生成执行计划</a></li>
+        <li><a href="#语义分析生成执行计划并优化执行计划">语义分析、生成执行计划，并优化执行计划</a></li>
         <li><a href="#将逻辑执行计划树拆分为多棵子树">将逻辑执行计划树拆分为多棵子树</a></li>
       </ul>
     </li>
-    <li><a href="#heading"></a></li>
   </ul>
 </nav></div>
-            </div><div class="content" id="content"><h3 id="语义分析生成执行计划">语义分析、生成执行计划</h3>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+            </div><div class="content" id="content"><p>在<code>SqlQueryExecution.doPlanQuery</code>中，从原来的抽象语法树生成逻辑执行计划，然后优化执行计划，生成优化后的执行计划，最后将逻辑执行计划切分成多颗子树。</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -162,13 +161,14 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kt">boolean</span><span class="w"> </span><span class="n">explainAnalyze</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">analysis</span><span class="p">.</span><span class="na">getStatement</span><span class="p">()</span><span class="w"> </span><span class="k">instanceof</span><span class="w"> </span><span class="n">Explain</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="p">((</span><span class="n">Explain</span><span class="p">)</span><span class="w"> </span><span class="n">analysis</span><span class="p">.</span><span class="na">getStatement</span><span class="p">()).</span><span class="na">isAnalyze</span><span class="p">();</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">PlanRoot</span><span class="p">(</span><span class="n">fragmentedPlan</span><span class="p">,</span><span class="w"> </span><span class="o">!</span><span class="n">explainAnalyze</span><span class="p">);</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
+<h3 id="语义分析生成执行计划并优化执行计划">语义分析、生成执行计划，并优化执行计划</h3>
 <p>LogicalPlanner.plan的职责如下：</p>
 <ul>
 <li>语义分析：遍历SQL抽象语法树，将抽象语法树中表达的含义拆解为多个map结构，以便后续生成执行计划时，不再频繁遍历SQL抽象语法树。同时获取了表和字段的元数据，生成了对应的ConnectorTableHandle、ColumnHandle等与数据源连接器相关的对象实例，为了之后拿来即用打下基础。在此过程中生成的所有对象，都维护在一个实例化的Analysis对象，Analysis对象可以理解为一个Context对象</li>
 <li>生成执行计划：生成以PlanNode为节点的逻辑执行计划，它也是类似于抽象语法树的树型结构，树节点和根的类型都是PlanNode。</li>
 <li>优化执行计划，生成优化后的执行计划：用预定义的几百个优化器迭代优化之前生成的PlanNode树，并返回优化后的PlanNode树</li>
 </ul>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -204,7 +204,7 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">Plan</span><span class="p">(</span><span class="n">root</span><span class="p">,</span><span class="w"> </span><span class="n">types</span><span class="p">,</span><span class="w"> </span><span class="n">statsAndCosts</span><span class="p">);</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
 <h3 id="将逻辑执行计划树拆分为多棵子树">将逻辑执行计划树拆分为多棵子树</h3>
-<p>将逻辑执行计划拆分为多棵子树并生成subPlan的逻辑，这个过程用SimplePlanRewriter的实现类Fragmenter层层遍历上一步生成的PlanNode树，将其中的ExchangeNode[scope=REMOTE]替换为RemoteSourceNode，并且断开它与叶子节点的连接，这样一个PlanNode树就被划分成了两个PlanNode树，一个父树（对应创建一个PlanFragment）和一个子树（又称为SubPlan，对应创建一个PlanFragment）。在查询执行的数据流转中，子树是父树的数据产出上游。</p>
+<p>将逻辑执行计划拆分为多棵子树并生成subPlan的逻辑，这个过程用SimplePlanRewriter的实现类Fragmenter层层遍历上一步生成的PlanNode树，将其中的ExchangeNode[scope=REMOTE]替换为RemoteSourceNode，并且断开它与叶子节点的连接，这样一个PlanNode树就被划分成了两个PlanNode树，每棵树都是一个SubPlan。在查询执行的数据流转中，子树是父树的数据产出上游。</p>
 <div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-java">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
@@ -215,7 +215,65 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">PlanFragment</span><span class="w"> </span><span class="n">fragment</span><span class="p">;</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">SubPlan</span><span class="o">&gt;</span><span class="w"> </span><span class="n">children</span><span class="p">;</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
-<h2 id="heading"></h2>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="c1">// io.prestosql.sql.planner.PlanFragmenter.Fragmenter#visitExchange</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="kd">public</span><span class="w"> </span><span class="n">PlanNode</span><span class="w"> </span><span class="nf">visitExchange</span><span class="p">(</span><span class="n">ExchangeNode</span><span class="w"> </span><span class="n">exchange</span><span class="p">,</span><span class="w"> </span><span class="n">RewriteContext</span><span class="o">&lt;</span><span class="n">FragmentProperties</span><span class="o">&gt;</span><span class="w"> </span><span class="n">context</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">exchange</span><span class="p">.</span><span class="na">getScope</span><span class="p">()</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">REMOTE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">context</span><span class="p">.</span><span class="na">defaultRewrite</span><span class="p">(</span><span class="n">exchange</span><span class="p">,</span><span class="w"> </span><span class="n">context</span><span class="p">.</span><span class="na">get</span><span class="p">());</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">PartitioningScheme</span><span class="w"> </span><span class="n">partitioningScheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">exchange</span><span class="p">.</span><span class="na">getPartitioningScheme</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">exchange</span><span class="p">.</span><span class="na">getType</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">ExchangeNode</span><span class="p">.</span><span class="na">Type</span><span class="p">.</span><span class="na">GATHER</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="n">context</span><span class="p">.</span><span class="na">get</span><span class="p">().</span><span class="na">setSingleNodeDistribution</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">exchange</span><span class="p">.</span><span class="na">getType</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">ExchangeNode</span><span class="p">.</span><span class="na">Type</span><span class="p">.</span><span class="na">REPARTITION</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="n">context</span><span class="p">.</span><span class="na">get</span><span class="p">().</span><span class="na">setDistribution</span><span class="p">(</span><span class="n">partitioningScheme</span><span class="p">.</span><span class="na">getPartitioning</span><span class="p">().</span><span class="na">getHandle</span><span class="p">(),</span><span class="w"> </span><span class="n">metadata</span><span class="p">,</span><span class="w"> </span><span class="n">session</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">ImmutableList</span><span class="p">.</span><span class="na">Builder</span><span class="o">&lt;</span><span class="n">SubPlan</span><span class="o">&gt;</span><span class="w"> </span><span class="n">builder</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImmutableList</span><span class="p">.</span><span class="na">builder</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">sourceIndex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">0</span><span class="p">;</span><span class="w"> </span><span class="n">sourceIndex</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">exchange</span><span class="p">.</span><span class="na">getSources</span><span class="p">().</span><span class="na">size</span><span class="p">();</span><span class="w"> </span><span class="n">sourceIndex</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="n">FragmentProperties</span><span class="w"> </span><span class="n">childProperties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">FragmentProperties</span><span class="p">(</span><span class="n">partitioningScheme</span><span class="p">.</span><span class="na">translateOutputLayout</span><span class="p">(</span><span class="n">exchange</span><span class="p">.</span><span class="na">getInputs</span><span class="p">().</span><span class="na">get</span><span class="p">(</span><span class="n">sourceIndex</span><span class="p">)));</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="n">builder</span><span class="p">.</span><span class="na">add</span><span class="p">(</span><span class="n">buildSubPlan</span><span class="p">(</span><span class="n">exchange</span><span class="p">.</span><span class="na">getSources</span><span class="p">().</span><span class="na">get</span><span class="p">(</span><span class="n">sourceIndex</span><span class="p">),</span><span class="w"> </span><span class="n">childProperties</span><span class="p">,</span><span class="w"> </span><span class="n">context</span><span class="p">));</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">List</span><span class="o">&lt;</span><span class="n">SubPlan</span><span class="o">&gt;</span><span class="w"> </span><span class="n">children</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">builder</span><span class="p">.</span><span class="na">build</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">context</span><span class="p">.</span><span class="na">get</span><span class="p">().</span><span class="na">addChildren</span><span class="p">(</span><span class="n">children</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">List</span><span class="o">&lt;</span><span class="n">PlanFragmentId</span><span class="o">&gt;</span><span class="w"> </span><span class="n">childrenIds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">children</span><span class="p">.</span><span class="na">stream</span><span class="p">()</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="p">.</span><span class="na">map</span><span class="p">(</span><span class="n">SubPlan</span><span class="p">::</span><span class="n">getFragment</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="p">.</span><span class="na">map</span><span class="p">(</span><span class="n">PlanFragment</span><span class="p">::</span><span class="n">getId</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="p">.</span><span class="na">collect</span><span class="p">(</span><span class="n">toImmutableList</span><span class="p">());</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">RemoteSourceNode</span><span class="p">(</span><span class="n">exchange</span><span class="p">.</span><span class="na">getId</span><span class="p">(),</span><span class="w"> </span><span class="n">childrenIds</span><span class="p">,</span><span class="w"> </span><span class="n">exchange</span><span class="p">.</span><span class="na">getOutputSymbols</span><span class="p">(),</span><span class="w"> </span><span class="n">exchange</span><span class="p">.</span><span class="na">getOrderingScheme</span><span class="p">(),</span><span class="w"> </span><span class="n">exchange</span><span class="p">.</span><span class="na">getType</span><span class="p">());</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="kd">public</span><span class="w"> </span><span class="nf">RemoteSourceNode</span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nd">@JsonProperty</span><span class="p">(</span><span class="s">&#34;id&#34;</span><span class="p">)</span><span class="w"> </span><span class="n">PlanNodeId</span><span class="w"> </span><span class="n">id</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nd">@JsonProperty</span><span class="p">(</span><span class="s">&#34;sourceFragmentIds&#34;</span><span class="p">)</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">PlanFragmentId</span><span class="o">&gt;</span><span class="w"> </span><span class="n">sourceFragmentIds</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nd">@JsonProperty</span><span class="p">(</span><span class="s">&#34;outputs&#34;</span><span class="p">)</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">Symbol</span><span class="o">&gt;</span><span class="w"> </span><span class="n">outputs</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nd">@JsonProperty</span><span class="p">(</span><span class="s">&#34;orderingScheme&#34;</span><span class="p">)</span><span class="w"> </span><span class="n">Optional</span><span class="o">&lt;</span><span class="n">OrderingScheme</span><span class="o">&gt;</span><span class="w"> </span><span class="n">orderingScheme</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nd">@JsonProperty</span><span class="p">(</span><span class="s">&#34;exchangeType&#34;</span><span class="p">)</span><span class="w"> </span><span class="n">ExchangeNode</span><span class="p">.</span><span class="na">Type</span><span class="w"> </span><span class="n">exchangeType</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">super</span><span class="p">(</span><span class="n">id</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">requireNonNull</span><span class="p">(</span><span class="n">outputs</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;outputs is null&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">this</span><span class="p">.</span><span class="na">sourceFragmentIds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sourceFragmentIds</span><span class="p">;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">this</span><span class="p">.</span><span class="na">outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImmutableList</span><span class="p">.</span><span class="na">copyOf</span><span class="p">(</span><span class="n">outputs</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">this</span><span class="p">.</span><span class="na">orderingScheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">requireNonNull</span><span class="p">(</span><span class="n">orderingScheme</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;orderingScheme is null&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">this</span><span class="p">.</span><span class="na">exchangeType</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">requireNonNull</span><span class="p">(</span><span class="n">exchangeType</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;exchangeType is null&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
+<p><code>RemoteSourceNode</code>保存了当前stage直接依赖的所有stage的PlanFragmentId。</p>
 </div><div class="post-footer" id="post-footer">
     <div class="post-info">
         <div class="post-info-line">
@@ -239,7 +297,8 @@
         </section>
     </div>
 
-    <div class="post-nav"><a href="/posts/presto-environment-setup/" class="prev" rel="prev" title="Presto环境搭建"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>Presto环境搭建</a></div>
+    <div class="post-nav"><a href="/posts/presto-environment-setup/" class="prev" rel="prev" title="Presto环境搭建"><i class="fas fa-angle-left fa-fw" aria-hidden="true"></i>Presto环境搭建</a>
+            <a href="/posts/presto-query-schedule-task/" class="next" rel="next" title="Presto执行计划的调度">Presto执行计划的调度<i class="fas fa-angle-right fa-fw" aria-hidden="true"></i></a></div>
 </div>
 <div id="comments"><div id="utterances" class="comment"></div><noscript>
                 Please enable JavaScript to view the comments powered by <a href="https://utteranc.es/">utterances</a>.

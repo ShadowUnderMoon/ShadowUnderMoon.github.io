@@ -1,7 +1,7 @@
 # Presto查询计划生成和优化
 
 
-### 语义分析、生成执行计划
+在`SqlQueryExecution.doPlanQuery`中，从原来的抽象语法树生成逻辑执行计划，然后优化执行计划，生成优化后的执行计划，最后将逻辑执行计划切分成多颗子树。
 
 ```java
 private PlanRoot doPlanQuery()
@@ -35,6 +35,10 @@ private PlanRoot doPlanQuery()
     return new PlanRoot(fragmentedPlan, !explainAnalyze);
 }
 ```
+
+
+
+### 语义分析、生成执行计划，并优化执行计划
 
 LogicalPlanner.plan的职责如下：
 
@@ -77,7 +81,7 @@ public Plan plan(Analysis analysis, Stage stage, boolean collectPlanStatistics)
 
 ### 将逻辑执行计划树拆分为多棵子树
 
-将逻辑执行计划拆分为多棵子树并生成subPlan的逻辑，这个过程用SimplePlanRewriter的实现类Fragmenter层层遍历上一步生成的PlanNode树，将其中的ExchangeNode[scope=REMOTE]替换为RemoteSourceNode，并且断开它与叶子节点的连接，这样一个PlanNode树就被划分成了两个PlanNode树，一个父树（对应创建一个PlanFragment）和一个子树（又称为SubPlan，对应创建一个PlanFragment）。在查询执行的数据流转中，子树是父树的数据产出上游。
+将逻辑执行计划拆分为多棵子树并生成subPlan的逻辑，这个过程用SimplePlanRewriter的实现类Fragmenter层层遍历上一步生成的PlanNode树，将其中的ExchangeNode[scope=REMOTE]替换为RemoteSourceNode，并且断开它与叶子节点的连接，这样一个PlanNode树就被划分成了两个PlanNode树，每棵树都是一个SubPlan。在查询执行的数据流转中，子树是父树的数据产出上游。
 
 ```java
 public class SubPlan
@@ -87,6 +91,63 @@ public class SubPlan
 }
 ```
 
-## 
 
+
+```java
+// io.prestosql.sql.planner.PlanFragmenter.Fragmenter#visitExchange
+public PlanNode visitExchange(ExchangeNode exchange, RewriteContext<FragmentProperties> context)
+{
+    if (exchange.getScope() != REMOTE) {
+        return context.defaultRewrite(exchange, context.get());
+    }
+
+    PartitioningScheme partitioningScheme = exchange.getPartitioningScheme();
+
+    if (exchange.getType() == ExchangeNode.Type.GATHER) {
+        context.get().setSingleNodeDistribution();
+    }
+    else if (exchange.getType() == ExchangeNode.Type.REPARTITION) {
+        context.get().setDistribution(partitioningScheme.getPartitioning().getHandle(), metadata, session);
+    }
+
+    ImmutableList.Builder<SubPlan> builder = ImmutableList.builder();
+    for (int sourceIndex = 0; sourceIndex < exchange.getSources().size(); sourceIndex++) {
+        FragmentProperties childProperties = new FragmentProperties(partitioningScheme.translateOutputLayout(exchange.getInputs().get(sourceIndex)));
+        builder.add(buildSubPlan(exchange.getSources().get(sourceIndex), childProperties, context));
+    }
+
+    List<SubPlan> children = builder.build();
+    context.get().addChildren(children);
+
+    List<PlanFragmentId> childrenIds = children.stream()
+            .map(SubPlan::getFragment)
+            .map(PlanFragment::getId)
+            .collect(toImmutableList());
+
+    return new RemoteSourceNode(exchange.getId(), childrenIds, exchange.getOutputSymbols(), exchange.getOrderingScheme(), exchange.getType());
+}
+```
+
+
+
+```java
+public RemoteSourceNode(
+        @JsonProperty("id") PlanNodeId id,
+        @JsonProperty("sourceFragmentIds") List<PlanFragmentId> sourceFragmentIds,
+        @JsonProperty("outputs") List<Symbol> outputs,
+        @JsonProperty("orderingScheme") Optional<OrderingScheme> orderingScheme,
+        @JsonProperty("exchangeType") ExchangeNode.Type exchangeType)
+{
+    super(id);
+
+    requireNonNull(outputs, "outputs is null");
+
+    this.sourceFragmentIds = sourceFragmentIds;
+    this.outputs = ImmutableList.copyOf(outputs);
+    this.orderingScheme = requireNonNull(orderingScheme, "orderingScheme is null");
+    this.exchangeType = requireNonNull(exchangeType, "exchangeType is null");
+}
+```
+
+`RemoteSourceNode`保存了当前stage直接依赖的所有stage的PlanFragmentId。
 

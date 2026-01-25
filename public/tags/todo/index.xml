@@ -1,0 +1,22 @@
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+    <channel>
+        <title>TODO - Tag - 爱吃芒果</title>
+        <link>http://example.org/tags/todo/</link>
+        <description>TODO - Tag - 爱吃芒果</description>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 25 Jan 2026 21:34:59 &#43;0800</lastBuildDate><atom:link href="http://example.org/tags/todo/" rel="self" type="application/rss+xml" /><item>
+    <title>Presto客户端和服务区交互流程</title>
+    <link>http://example.org/posts/presto-client-server-interaction/</link>
+    <pubDate>Sun, 25 Jan 2026 21:34:59 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://example.org/posts/presto-client-server-interaction/</guid>
+    <description><![CDATA[<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="n">StatementClientV1</span><span class="p">.</span><span class="na">advance</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nl">ExecutingStatementResource</span><span class="p">::</span><span class="n">getQueryResult</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nl">Query</span><span class="p">::</span><span class="n">getNextResult</span></span></span></code></pre></div></div>]]></description>
+</item>
+</channel>
+</rss>

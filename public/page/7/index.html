@@ -94,85 +94,88 @@
     </div><main class="main">
                 <div class="container"><div class="page home" data-home="posts"><div class="home-profile"><h1 class="home-title">爱吃芒果</h1><div class="home-subtitle"><div id="id-1" class="typeit"></div></div><div class="links"><a href="https://github.com/ShadowUnderMoon" title="GitHub" target="_blank" rel="noopener noreffer me"><i class="fab fa-github fa-fw" aria-hidden="true"></i></a></div></div>
 <article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
-        <a href="/posts/grpc-keepalive/">Grpc Keepalive</a>
-    </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-10-19">2025-10-19</time></span></div><div class="content"><h2 id="tcp-keepalive">TCP KeepAlive</h2>
-<p><a href="https://www.cnblogs.com/hueyxu/p/15759819.html" target="_blank" rel="noopener noreffer ">TCP KeepAlive机制理解与实践小结</a>中详细介绍了TCP KeepAlive的机制，这里重点提一下涉及到的参数:</p>
-<ul>
-<li><code>tcp_keepalive_time</code> 在TCP保活打开的情况下，最后一次数据交换到TCP发送第一个保活探测包的间隔，即允许的空闲时长，默认为2h</li>
-<li><code>tcp_keepalive_probes</code> 最大允许发送保活探测包的次数，达到此次数后直接放弃尝试，并关闭连接，默认为9次</li>
-<li><code>tcp_keepalive_intvl</code> 发送保活探测包的间隔，默认为75s</li>
-</ul>
-<p>所以如果开启了TCP KeepAlive并保持默认参数，则空闲连接会在大约 2h 11min之后被断开</p></div><div class="post-footer">
-        <a href="/posts/grpc-keepalive/">Read More</a></div>
-</article><article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
-        <a href="/posts/grpc-client-connection/">Grpc Client Connection</a>
-    </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-10-12">2025-10-12</time></span></div><div class="content"><p><img
-        class="lazyload"
-        src="/svg/loading.min.svg"
-        data-src="/posts/grpc-client-connection/image-20251012165622531.png"
-        data-srcset="/posts/grpc-client-connection/image-20251012165622531.png, /posts/grpc-client-connection/image-20251012165622531.png 1.5x, /posts/grpc-client-connection/image-20251012165622531.png 2x"
-        data-sizes="auto"
-        alt="/posts/grpc-client-connection/image-20251012165622531.png"
-        title="image-20251012165622531" width="3728" height="1552" /></p>
-<p><img
-        class="lazyload"
-        src="/svg/loading.min.svg"
-        data-src="/posts/grpc-client-connection/image-20251012165854471.png"
-        data-srcset="/posts/grpc-client-connection/image-20251012165854471.png, /posts/grpc-client-connection/image-20251012165854471.png 1.5x, /posts/grpc-client-connection/image-20251012165854471.png 2x"
-        data-sizes="auto"
-        alt="/posts/grpc-client-connection/image-20251012165854471.png"
-        title="image-20251012165854471" width="3758" height="1904" /></p>
-<p><img
-        class="lazyload"
-        src="/svg/loading.min.svg"
-        data-src="/posts/grpc-client-connection/image-20251012171239336.png"
-        data-srcset="/posts/grpc-client-connection/image-20251012171239336.png, /posts/grpc-client-connection/image-20251012171239336.png 1.5x, /posts/grpc-client-connection/image-20251012171239336.png 2x"
-        data-sizes="auto"
-        alt="/posts/grpc-client-connection/image-20251012171239336.png"
-        title="image-20251012171239336" width="3690" height="1648" /></p>
-<p>是的，有不少优秀的博客／技术文章探讨了在 gRPC / TCP 长连接中，应对“隐蔽断开”（silent drop）、“僵尸连接”（zombie connection）问题的方案。下面列几个经典与实用的，并且我还会摘关键要点供你快速对比。</p></div><div class="post-footer">
-        <a href="/posts/grpc-client-connection/">Read More</a></div>
-</article><article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
-        <a href="/posts/direct-memory-in-practice/">直接内存实战</a>
-    </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-09-07">2025-09-07</time></span>&nbsp;<span class="post-category">included in <a href="/categories/java/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Java</a></span></div><div class="content"><h2 id="背景知识">背景知识</h2>
-<p>在JDK 1.2之后，Java将引用分为强引用（Strongly Reference）、软引用（Soft Reference）、弱引用（Weak Reference）和虚引用（Phanom Reference），这4种引用强度依次逐渐减弱。</p></div><div class="post-footer">
-        <a href="/posts/direct-memory-in-practice/">Read More</a><div class="post-tags">
-                <i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/java/">Java</a></div></div>
-</article><article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
-        <a href="/posts/grpc-metadata/">gRPC元数据</a>
-    </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-08-02">2025-08-02</time></span>&nbsp;<span class="post-category">included in <a href="/categories/grpc/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Grpc</a></span></div><div class="content"><p>Metadata是关于某个特定RPC调用的信息，grpc元数据通过HTTP/2 header实现，它以键值对的形式存在，其中键是字符串，值通常是字符串，但也可以是二进制数据。键不区分大小写，由ASCII字母、数字和特殊字符<code>-</code>、<code>_</code>、<code>.</code>组成，但不能以<code>grpc-</code>开头（该前缀保留给gRPC使用），二进制数据对应的key以<code>-bin</code>结尾，而ASCII类型的键不带<code>-bin</code>后缀。</p></div><div class="post-footer">
-        <a href="/posts/grpc-metadata/">Read More</a><div class="post-tags">
-                <i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/grpc/">Grpc</a></div></div>
-</article><article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
-        <a href="/posts/grpc-interceptors/">grpc拦截器</a>
-    </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-08-02">2025-08-02</time></span>&nbsp;<span class="post-category">included in <a href="/categories/grpc/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Grpc</a></span></div><div class="content"></div><div class="post-footer">
-        <a href="/posts/grpc-interceptors/">Read More</a><div class="post-tags">
-                <i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/grpc/">Grpc</a></div></div>
-</article><article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
-        <a href="/posts/foundationdb-in-practice/">FoundationDB in Practice</a>
-    </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-07-26">2025-07-26</time></span>&nbsp;<span class="post-category">included in <a href="/categories/foundationdb/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>FoundationDB</a></span></div><div class="content"><h2 id="mac上运行foundationdb">mac上运行FoundationDB</h2>
-<p>fdb_java的java包没有打包fdb_c的动态链接库，所以需要通过<code>-DFDB_LIBRARY_PATH_FDB_C=/usr/local/lib/libfdb_c.dylib</code>指定对应的动态链接库位置。</p></div><div class="post-footer">
-        <a href="/posts/foundationdb-in-practice/">Read More</a><div class="post-tags">
-                <i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/foundationdb/">FoundationDB</a></div></div>
+        <a href="/posts/minio-get-started/">MinIO大杂烩</a>
+    </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-01-22">2025-01-22</time></span>&nbsp;<span class="post-category">included in <a href="/categories/minio/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>MinIO</a></span></div><div class="content"><h2 id="xlmeta-数据结构">xl.meta 数据结构</h2>
+<p>当对象大小超过 128KiB 后，比如<code>a.txt</code>，数据和元数据分开存储</p>
+<p>MinIO 提供了命令行工具<code>xl-meta</code>用来查看<code>xl.meta</code>文件</p>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-json">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;Versions&#34;</span><span class="p">:</span> <span class="p">[</span>
+</span></span><span class="line"><span class="cl">    <span class="p">{</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;Header&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;EcM&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;EcN&#34;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;Flags&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;ModTime&#34;</span><span class="p">:</span> <span class="s2">&#34;2025-01-23T15:27:45.311572+08:00&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;Signature&#34;</span><span class="p">:</span> <span class="s2">&#34;d0c2b58b&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;Type&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;VersionID&#34;</span><span class="p">:</span> <span class="s2">&#34;00000000000000000000000000000000&#34;</span>
+</span></span><span class="line"><span class="cl">      <span class="p">},</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;Idx&#34;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;Metadata&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;Type&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;V2Obj&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;CSumAlgo&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;DDir&#34;</span><span class="p">:</span> <span class="s2">&#34;74hQxU7FTrq56ShK8pjqAA==&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;EcAlgo&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;EcBSize&#34;</span><span class="p">:</span> <span class="mi">1048576</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;EcDist&#34;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;EcIndex&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;EcM&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;EcN&#34;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;ID&#34;</span><span class="p">:</span> <span class="s2">&#34;AAAAAAAAAAAAAAAAAAAAAA==&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;MTime&#34;</span><span class="p">:</span> <span class="mi">1737617265311572000</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;MetaSys&#34;</span><span class="p">:</span> <span class="p">{},</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;MetaUsr&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;content-type&#34;</span><span class="p">:</span> <span class="s2">&#34;text/plain&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;etag&#34;</span><span class="p">:</span> <span class="s2">&#34;90a1a2b65a4e40d55d758f2a59fe33b4&#34;</span>
+</span></span><span class="line"><span class="cl">          <span class="p">},</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;PartASizes&#34;</span><span class="p">:</span> <span class="p">[</span><span class="mi">2097152</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;PartETags&#34;</span><span class="p">:</span> <span class="kc">null</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;PartNums&#34;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;PartSizes&#34;</span><span class="p">:</span> <span class="p">[</span><span class="mi">2097152</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;Size&#34;</span><span class="p">:</span> <span class="mi">2097152</span>
+</span></span><span class="line"><span class="cl">        <span class="p">},</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;v&#34;</span><span class="p">:</span> <span class="mi">1734527744</span>
+</span></span><span class="line"><span class="cl">      <span class="p">}</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="p">]</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span></span></span></code></pre></div></div>
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-bash">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">.
+</span></span><span class="line"><span class="cl">├── a.txt
+</span></span><span class="line"><span class="cl">│   ├── ef8850c5-4ec5-4eba-b9e9-284af298ea00
+</span></span><span class="line"><span class="cl">│   │   └── part.1
+</span></span><span class="line"><span class="cl">│   └── xl.meta
+</span></span><span class="line"><span class="cl">└── b.txt
+</span></span><span class="line"><span class="cl">    └── xl.meta</span></span></code></pre></div></div>
+<h2 id="minio-的启动流程">minio 的启动流程</h2>
+<p>minio 启动核心的核心命令为 <code>minio server https://minio{1...4}.example.net:9000/mnt/disk{1...4}/minio</code>，表示 minio 服务分布部署在 4 台服务器上总共 16 块磁盘上，<code>...这种写法称之为拓展表达式，比如 </code>http://minio{1&hellip;4}.example.net:9000<code>实际上表示</code><a href="http://minio1.example.net:9000" target="_blank" rel="noopener noreffer ">http://minio1.example.net:9000</a><code>到</code><a href="http://minio4.example.net:9000" target="_blank" rel="noopener noreffer ">http://minio4.example.net:9000</a>`的4台主机。</p></div><div class="post-footer">
+        <a href="/posts/minio-get-started/">Read More</a><div class="post-tags">
+                <i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/minio/">MinIO</a></div></div>
 </article><ul class="pagination"><li class="page-item ">
                     <span class="page-link">
                         <a href="/">1</a>
                     </span>
-                </li><li class="page-item active">
-                    <span class="page-link">
-                        <a href="/page/2/">2</a>
-                    </span>
-                </li><li class="page-item ">
-                    <span class="page-link">
-                        <a href="/page/3/">3</a>
-                    </span>
-                </li><li class="page-item ">
-                    <span class="page-link">
-                        <a href="/page/4/">4</a>
-                    </span>
                 </li><li class="page-item ">
                     <span class="page-link" aria-hidden="true">&hellip;</span>
                 </li><li class="page-item ">
+                    <span class="page-link">
+                        <a href="/page/5/">5</a>
+                    </span>
+                </li><li class="page-item ">
+                    <span class="page-link">
+                        <a href="/page/6/">6</a>
+                    </span>
+                </li><li class="page-item active">
                     <span class="page-link">
                         <a href="/page/7/">7</a>
                     </span>

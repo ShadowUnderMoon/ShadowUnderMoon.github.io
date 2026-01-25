@@ -94,6 +94,25 @@
     </div><main class="main">
                 <div class="container"><div class="page home" data-home="posts"><div class="home-profile"><h1 class="home-title">爱吃芒果</h1><div class="home-subtitle"><div id="id-1" class="typeit"></div></div><div class="links"><a href="https://github.com/ShadowUnderMoon" title="GitHub" target="_blank" rel="noopener noreffer me"><i class="fab fa-github fa-fw" aria-hidden="true"></i></a></div></div>
 <article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
+        <a href="/posts/spark_standalone/">Spark Standalone</a>
+    </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-06-08">2025-06-08</time></span></div><div class="content"><p>Spark集群可以使用不同的方式进行部署，比如Standalone、Mesos, YARN和Kubernetes，这几个版本的主要区别在于：Standalone版本的资源管理和任务调度器由Spark系统本身提供，其他版本的资源管理和任务调度器依赖于第三方框架，如YARN可以同时管理Spark任务和Hadoop MapReduce任务。</p></div><div class="post-footer">
+        <a href="/posts/spark_standalone/">Read More</a></div>
+</article><article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
+        <a href="/posts/ehcache3/">Ehcache3</a>
+    </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-06-07">2025-06-07</time></span>&nbsp;<span class="post-category">included in <a href="/categories/ehcache3/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Ehcache3</a></span></div><div class="content"></div><div class="post-footer">
+        <a href="/posts/ehcache3/">Read More</a><div class="post-tags">
+                <i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/ehcache3/">Ehcache3</a></div></div>
+</article><article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
+        <a href="/posts/spark_fault_tolerance/">Spark错误容忍机制</a>
+    </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-06-07">2025-06-07</time></span>&nbsp;<span class="post-category">included in <a href="/categories/spark/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Spark</a></span></div><div class="content"><p>Spark的错误容忍机制的核心方法主要有两种：</p>
+<ol>
+<li>通过重新执行计算任务来容忍错误，当job抛出异常不能继续执行时，重新启动计算任务，再次执行</li>
+<li>通过采用checkpoint机制，对一些重要的输入、输出、中间数据进行持久化，这可以在一定程度上解决数据丢失问题，而且能够提高任务重新计算时的效率。</li>
+</ol>
+<p>Spark采用了延迟删除策略，将上游stage的Shuffle Write的结果写入本地磁盘，只有在当前job完成后，才删除Shuffle Writre写入磁盘的数据。这样，即使stage2中某个task执行失败，但由于上游的stage0和stage1的输出数据还在磁盘上，也可以再次通过Shuffle Read读取得到相同的数据，避免再次执行上游stage中的task，所以，Spark根据ShuffleDependency切分出的stage既保证了task的独立性，也方便了错误容忍的重新计算。</p></div><div class="post-footer">
+        <a href="/posts/spark_fault_tolerance/">Read More</a><div class="post-tags">
+                <i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/spark/">Spark</a></div></div>
+</article><article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
         <a href="/posts/spark_data_cache/">Spark数据缓存</a>
     </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-06-07">2025-06-07</time></span></div><div class="content"><p>缓存机制实际上是一种空间换时间的方法，集体的，如果数据满足一下3条，就可以进行缓存.</p>
 <ol>
@@ -127,24 +146,6 @@
     </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-06-01">2025-06-01</time></span>&nbsp;<span class="post-category">included in <a href="/categories/spark/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Spark</a></span></div><div class="content"><p>运行在不同stage、不同节点上的task见通过shuffle机制传递数据，shuffle解决的问题是如何将数据进行重新组织，使其能够在上游和下游task之间进行传递和计算。如果只是单纯的数据传递，则只需要将数据进行分区、通过网络传输即可，没有太大的难度，但shuffle机制还需要进行各种类型的计算（如聚合、排序），而且数据量一般会很大，如果支持这些不同类型的计算，如果提高shuffle的性能都是shuffle机制设计的难点。</p></div><div class="post-footer">
         <a href="/posts/spark_shuffle/">Read More</a><div class="post-tags">
                 <i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/spark/">Spark</a></div></div>
-</article><article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
-        <a href="/posts/java-concurrenthashmap/">Java ConcurrentHashMap</a>
-    </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-05-28">2025-05-28</time></span></div><div class="content"><p>这篇是对<a href="https://www.javadoop.com/post/hashmap" target="_blank" rel="noopener noreffer ">javadoop</a>对concurrentHashMap非常棒的源码解析的学习。</p>
-<h2 id="java7-hashmap">Java7 HashMap</h2>
-<p>HashMap是一个非并发安全的hashmap，使用链表数组实现，逻辑比较简单。</p></div><div class="post-footer">
-        <a href="/posts/java-concurrenthashmap/">Read More</a></div>
-</article><article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
-        <a href="/posts/spark_physical_plan/">Spark物理执行计划</a>
-    </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-05-25">2025-05-25</time></span>&nbsp;<span class="post-category">included in <a href="/categories/spark/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Spark</a></span></div><div class="content"><h2 id="spark物理执行计划生成方法">Spark物理执行计划生成方法</h2>
-<p>Spark具体采用3个步骤来生成物理执行计划，首先根据action操作顺序将应用划分为作业（job），然后根据每个job的逻辑处理流程中的ShuffleDependency依赖关系，将job划分为执行阶段（stage）。最后在每个stage中，根据最后生成的RDD的分区个数生成多个计算任务（task）。</p></div><div class="post-footer">
-        <a href="/posts/spark_physical_plan/">Read More</a><div class="post-tags">
-                <i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/spark/">Spark</a></div></div>
-</article><article class="single summary" itemscope itemtype="http://schema.org/Article"><h1 class="single-title" itemprop="name headline">
-        <a href="/posts/grpc-metric/">Grpc Metric</a>
-    </h1><div class="post-meta"><span class="post-author"><a href="/" title="Author" rel="author" class="author"><i class="fas fa-user-circle fa-fw" aria-hidden="true"></i>爱吃芒果</a></span>&nbsp;<span class="post-publish">published on <time datetime="2025-05-13">2025-05-13</time></span>&nbsp;<span class="post-category">included in <a href="/categories/grpc/"><i class="far fa-folder fa-fw" aria-hidden="true"></i>Grpc</a></span></div><div class="content"><h2 id="opentelemetry">OpenTelemetry</h2>
-<p>OpenTelemetry是CNCF孵化的开源观测框架，用于创建和管理遥测数据（telemetry），比如metrics, tracing, logs。这一项目的核心目标是避免依赖于vendor，从而可以更好地集成和拓展。</p></div><div class="post-footer">
-        <a href="/posts/grpc-metric/">Read More</a><div class="post-tags">
-                <i class="fas fa-tags fa-fw" aria-hidden="true"></i>&nbsp;<a href="/tags/grpc/">Grpc</a></div></div>
 </article><ul class="pagination"><li class="page-item ">
                     <span class="page-link">
                         <a href="/">1</a>
@@ -168,6 +169,10 @@
                 </li><li class="page-item ">
                     <span class="page-link">
                         <a href="/page/6/">6</a>
+                    </span>
+                </li><li class="page-item ">
+                    <span class="page-link">
+                        <a href="/page/7/">7</a>
                     </span>
                 </li></ul></div></div>
             </main><footer class="footer">

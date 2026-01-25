@@ -3,49 +3,59 @@
         <title>Presto - Category - 爱吃芒果</title>
         <link>http://example.org/categories/presto/</link>
         <description>Presto - Category - 爱吃芒果</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 24 Jan 2026 19:35:06 &#43;0800</lastBuildDate><atom:link href="http://example.org/categories/presto/" rel="self" type="application/rss+xml" /><item>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sun, 25 Jan 2026 21:37:20 &#43;0800</lastBuildDate><atom:link href="http://example.org/categories/presto/" rel="self" type="application/rss+xml" /><item>
+    <title>Presto任务执行流程</title>
+    <link>http://example.org/posts/presto-task-execution/</link>
+    <pubDate>Sun, 25 Jan 2026 21:37:20 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://example.org/posts/presto-task-execution/</guid>
+    <description><![CDATA[<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="c1">// TaskResouce /v1/task/{taskId}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="kd">public</span><span class="w"> </span><span class="n">Response</span><span class="w"> </span><span class="nf">createOrUpdateTask</span><span class="p">(</span><span class="nd">@PathParam</span><span class="p">(</span><span class="s">&#34;taskId&#34;</span><span class="p">)</span><span class="w"> </span><span class="n">TaskId</span><span class="w"> </span><span class="n">taskId</span><span class="p">,</span><span class="w"> </span><span class="n">TaskUpdateRequest</span><span class="w"> </span><span class="n">taskUpdateRequest</span><span class="p">,</span><span class="w"> </span><span class="nd">@Context</span><span class="w"> </span><span class="n">UriInfo</span><span class="w"> </span><span class="n">uriInfo</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">requireNonNull</span><span class="p">(</span><span class="n">taskUpdateRequest</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;taskUpdateRequest is null&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">Session</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taskUpdateRequest</span><span class="p">.</span><span class="na">getSession</span><span class="p">().</span><span class="na">toSession</span><span class="p">(</span><span class="n">sessionPropertyManager</span><span class="p">,</span><span class="w"> </span><span class="n">taskUpdateRequest</span><span class="p">.</span><span class="na">getExtraCredentials</span><span class="p">());</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">TaskInfo</span><span class="w"> </span><span class="n">taskInfo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taskManager</span><span class="p">.</span><span class="na">updateTask</span><span class="p">(</span><span class="n">session</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">taskId</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">taskUpdateRequest</span><span class="p">.</span><span class="na">getFragment</span><span class="p">(),</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">taskUpdateRequest</span><span class="p">.</span><span class="na">getSources</span><span class="p">(),</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">taskUpdateRequest</span><span class="p">.</span><span class="na">getOutputIds</span><span class="p">(),</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">taskUpdateRequest</span><span class="p">.</span><span class="na">getTotalPartitions</span><span class="p">());</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">shouldSummarize</span><span class="p">(</span><span class="n">uriInfo</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="n">taskInfo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taskInfo</span><span class="p">.</span><span class="na">summarize</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">Response</span><span class="p">.</span><span class="na">ok</span><span class="p">().</span><span class="na">entity</span><span class="p">(</span><span class="n">taskInfo</span><span class="p">).</span><span class="na">build</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>]]></description>
+</item>
+<item>
+    <title>Presto客户端和服务区交互流程</title>
+    <link>http://example.org/posts/presto-client-server-interaction/</link>
+    <pubDate>Sun, 25 Jan 2026 21:34:59 &#43;0800</pubDate>
+    <author>爱吃芒果</author>
+    <guid>http://example.org/posts/presto-client-server-interaction/</guid>
+    <description><![CDATA[<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
+    <div class="code-header language-java">
+        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
+        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
+        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
+    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="n">StatementClientV1</span><span class="p">.</span><span class="na">advance</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nl">ExecutingStatementResource</span><span class="p">::</span><span class="n">getQueryResult</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nl">Query</span><span class="p">::</span><span class="n">getNextResult</span></span></span></code></pre></div></div>]]></description>
+</item>
+<item>
     <title>Presto查询计划生成和优化</title>
     <link>http://example.org/posts/presto-query-plan/</link>
     <pubDate>Sat, 24 Jan 2026 19:35:06 &#43;0800</pubDate>
     <author>爱吃芒果</author>
     <guid>http://example.org/posts/presto-query-plan/</guid>
-    <description><![CDATA[<h3 id="语义分析生成执行计划">语义分析、生成执行计划</h3>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
-    <div class="code-header language-java">
-        <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
-        <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
-        <span class="copy" title="Copy to clipboard"><i class="far fa-copy fa-fw" aria-hidden="true"></i></span>
-    </div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="kd">private</span><span class="w"> </span><span class="n">PlanRoot</span><span class="w"> </span><span class="nf">doPlanQuery</span><span class="p">()</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">{</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// planNodeId是一个从0递增的int值</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">PlanNodeIdAllocator</span><span class="w"> </span><span class="n">idAllocator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">PlanNodeIdAllocator</span><span class="p">();</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">LogicalPlanner</span><span class="w"> </span><span class="n">logicalPlanner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">LogicalPlanner</span><span class="p">(</span><span class="n">stateMachine</span><span class="p">.</span><span class="na">getSession</span><span class="p">(),</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">planOptimizers</span><span class="p">,</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">idAllocator</span><span class="p">,</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">metadata</span><span class="p">,</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">typeOperators</span><span class="p">,</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="k">new</span><span class="w"> </span><span class="n">TypeAnalyzer</span><span class="p">(</span><span class="n">sqlParser</span><span class="p">,</span><span class="w"> </span><span class="n">metadata</span><span class="p">),</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">statsCalculator</span><span class="p">,</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">costCalculator</span><span class="p">,</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="n">stateMachine</span><span class="p">.</span><span class="na">getWarningCollector</span><span class="p">());</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  	</span><span class="c1">// 语义分析(Analysis)，生成执行计划</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">  	</span><span class="c1">// 优化执行计划，生成优化后的执行计划</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">Plan</span><span class="w"> </span><span class="n">plan</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">logicalPlanner</span><span class="p">.</span><span class="na">plan</span><span class="p">(</span><span class="n">analysis</span><span class="p">);</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">queryPlan</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="n">plan</span><span class="p">);</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 将逻辑执行计划分成多棵子树</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">SubPlan</span><span class="w"> </span><span class="n">fragmentedPlan</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">planFragmenter</span><span class="p">.</span><span class="na">createSubPlans</span><span class="p">(</span><span class="n">stateMachine</span><span class="p">.</span><span class="na">getSession</span><span class="p">(),</span><span class="w"> </span><span class="n">plan</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="n">stateMachine</span><span class="p">.</span><span class="na">getWarningCollector</span><span class="p">());</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// extract inputs</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">List</span><span class="o">&lt;</span><span class="n">Input</span><span class="o">&gt;</span><span class="w"> </span><span class="n">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">InputExtractor</span><span class="p">(</span><span class="n">metadata</span><span class="p">,</span><span class="w"> </span><span class="n">stateMachine</span><span class="p">.</span><span class="na">getSession</span><span class="p">()).</span><span class="na">extractInputs</span><span class="p">(</span><span class="n">fragmentedPlan</span><span class="p">);</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">stateMachine</span><span class="p">.</span><span class="na">setInputs</span><span class="p">(</span><span class="n">inputs</span><span class="p">);</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">stateMachine</span><span class="p">.</span><span class="na">setOutput</span><span class="p">(</span><span class="n">analysis</span><span class="p">.</span><span class="na">getTarget</span><span class="p">());</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kt">boolean</span><span class="w"> </span><span class="n">explainAnalyze</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">analysis</span><span class="p">.</span><span class="na">getStatement</span><span class="p">()</span><span class="w"> </span><span class="k">instanceof</span><span class="w"> </span><span class="n">Explain</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="p">((</span><span class="n">Explain</span><span class="p">)</span><span class="w"> </span><span class="n">analysis</span><span class="p">.</span><span class="na">getStatement</span><span class="p">()).</span><span class="na">isAnalyze</span><span class="p">();</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">PlanRoot</span><span class="p">(</span><span class="n">fragmentedPlan</span><span class="p">,</span><span class="w"> </span><span class="o">!</span><span class="n">explainAnalyze</span><span class="p">);</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span></span></span></code></pre></div></div>
-<p>LogicalPlanner.plan的职责如下：</p>]]></description>
+    <description><![CDATA[<p>在<code>SqlQueryExecution.doPlanQuery</code>中，从原来的抽象语法树生成逻辑执行计划，然后优化执行计划，生成优化后的执行计划，最后将逻辑执行计划切分成多颗子树。</p>]]></description>
 </item>
 <item>
     <title>Presto环境搭建</title>

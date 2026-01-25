@@ -147,7 +147,7 @@
 <p>使用idea将项目中<code>presto-parser/target/generated-sources/antlr4</code>标记为<code>Generated Source Root</code>，这样antlr4生成的代码就可以被idea识别到。</p>
 <h2 id="单机调试环境搭建">单机调试环境搭建</h2>
 <p>在项目中创建<code>presto-server-main/etc/coordinator.properties</code>文件，文件内容如下</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-properties">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -200,7 +200,7 @@
 <p>集群调试环境会分别启动集群协调节点和查询执行节点：</p>
 <p>将<code>coordinator.properties</code>文件中的<code>node-scheduler.include-coordinator</code>设置为<code>false</code>，集群协调节点不会执行具体的查询任务</p>
 <p>每个查询执行节点的配置类似，比如，可以在项目中创建<code>presto-server-main/etc/worker1.properties</code>，内容如下</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-properties">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
@@ -229,7 +229,7 @@
 <h2 id="启动成功">启动成功</h2>
 <p>启动成功后可以访问<code>http://127.0.0.1:8080</code>，查看Presto的WebUI。</p>
 <p>运行<code>./presto-cli/target/presto-cli-350-executable.jar</code>可以打开客户端命令行，执行查询命令，比如：</p>
-<div class="code-block code-line-numbers" style="counter-reset: code-block 0">
+<div class="code-block code-line-numbers open" style="counter-reset: code-block 0">
     <div class="code-header language-bash">
         <span class="code-title"><i class="arrow fas fa-angle-right fa-fw" aria-hidden="true"></i></span>
         <span class="ellipses"><i class="fas fa-ellipsis-h fa-fw" aria-hidden="true"></i></span>
